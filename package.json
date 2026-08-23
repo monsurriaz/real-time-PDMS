@@ -1,0 +1,33 @@
+{
+  "name": "real-time-pdms",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Real-Time Parcel Delivery Management System — CSC 470",
+  "workspaces": [
+    "shared",
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,magenta \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm run dev --workspace @pdms/server",
+    "dev:client": "npm run dev --workspace @pdms/client",
+    "seed": "tsx scripts/seed.ts",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "mongoose": "^8.9.5",
+    "zod": "^3.24.1",
+    "bcryptjs": "^2.4.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

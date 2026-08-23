@@ -1,0 +1,78 @@
+/**
+ * The one place that talks to the server.
+ *
+ * In development everything goes through Vite's /api proxy, which keeps the
+ * browser same-origin so the httpOnly auth cookie needs no CORS or SameSite
+ * special-casing. Deployed, client and server are on different hosts (Vercel
+ * and Render), so requests must name the API's origin outright — which is
+ * also why COOKIE_SECURE flips the cookie to SameSite=None there.
+ */
+const BASE = import.meta.env.PROD
+  ? (import.meta.env.VITE_API_BASE_URL ?? '')
+  : '/api'
+
+/** Mirrors the server's single error shape from middleware/httpError.ts. */
+export interface ApiErrorBody {
+  error: string
+  details?: Array<{ path: string; message: string }> | unknown
+}
+
+export class ApiError extends Error {
+  readonly status: number
+  readonly details?: ApiErrorBody['details']
+
+  constructor(status: number, message: string, details?: ApiErrorBody['details']) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.details = details
+  }
+
+  /** True when the server says we are not logged in. */
+  get isUnauthorized(): boolean {
+    return this.status === 401
+  }
+}
+
+const request = async <T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> => {
+  let res: Response
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      ...init,
+      // Without this the auth cookie is neither sent nor stored.
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...init?.headers,
+      },
+    })
+  } catch {
+    // fetch only rejects on network failure, which is worth distinguishing
+    // from a 500 — the UI can suggest "check your connection".
+    throw new ApiError(0, 'cannot reach the server')
+  }
+
+  if (res.status === 204) return undefined as T
+
+  const text = await res.text()
+  const body: unknown = text ? JSON.parse(text) : {}
+
+  if (!res.ok) {
+    const err = body as ApiErrorBody
+    throw new ApiError(res.status, err.error ?? res.statusText, err.details)
+  }
+
+  return body as T
+}
+
+export const api = {
+  get: <T>(path: string): Promise<T> => request<T>(path),
+  post: <T>(path: string, body?: unknown): Promise<T> =>
+    request<T>(path, {
+      method: 'POST',
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
+}

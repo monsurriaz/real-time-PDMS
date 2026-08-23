@@ -1,0 +1,120 @@
+/**
+ * THE DESIGN SYSTEM. Generated from docs/parcel-design-system.html — if the
+ * two ever disagree, the HTML wins (CLAUDE.md section 4).
+ *
+ * Do not add a value here to satisfy one screen. Every colour, radius and
+ * font in the app resolves to something in this file.
+ *
+ * Radii live in @theme rather than :root because Tailwind's --radius-*
+ * namespace and the design system's radius names are the same names — one
+ * declaration serves both `rounded-sm` and `var(--radius-sm)`, instead of two
+ * that can drift apart.
+ */
+@theme {
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+}
+
+:root {
+  /* surfaces */
+  --paper: #faf9f7;
+  --surface: #ffffff;
+  --surface-sunk: #f4f2ee;
+  --hairline: #e9e6e0;
+  --hairline-strong: #d8d4cc;
+
+  /* ink */
+  --ink: #14140f;
+  --ink-2: #4a4740;
+  --muted: #6b6862;
+  --faint: #9c988f;
+
+  /* accent — flat, never a gradient */
+  --accent: #ea4e1b;
+  --accent-press: #c63e11;
+  --accent-tint: #fff1eb;
+
+  /* lifecycle ramp */
+  --s-booked: #8a8f98;
+  --s-booked-bg: #eff0f2;
+  --s-booked-ink: #454a52;
+  --s-assigned: #4c6ef5;
+  --s-assigned-bg: #e9edfd;
+  --s-assigned-ink: #26307a;
+  --s-picked: #0e9891;
+  --s-picked-bg: #e0f3f1;
+  --s-picked-ink: #0a4f4b;
+  --s-transit: #ea4e1b;
+  --s-transit-bg: #fff1eb;
+  --s-transit-ink: #8f2c0c;
+  --s-delivered: #17864f;
+  --s-delivered-bg: #e3f3e9;
+  --s-delivered-ink: #0d4a2c;
+  --s-failed: #c9342c;
+  --s-failed-bg: #fcebea;
+  --s-failed-ink: #7a1c17;
+
+  /* The design system calls the 12px radius --radius; Tailwind's scale calls
+     it --radius-md. Same value, both names resolve. */
+  --radius: var(--radius-md);
+  --pill: var(--radius-pill);
+
+  --font: "Manrope", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  --display: "Montserrat", var(--font);
+}
+
+/**
+ * Tailwind reads the design system rather than shipping its own palette.
+ * `--color-*: initial` removes every default colour, so `bg-blue-500` simply
+ * does not exist — which is what stops rule 1 of CLAUDE.md from being broken
+ * by muscle memory.
+ *
+ * `inline` makes the generated utilities reference var(--paper) directly
+ * instead of adding a second indirection.
+ */
+@theme inline {
+  --color-*: initial;
+
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-sunk: var(--surface-sunk);
+  --color-hairline: var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
+
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+
+  --color-accent: var(--accent);
+  --color-accent-press: var(--accent-press);
+  --color-accent-tint: var(--accent-tint);
+
+  --color-white: #ffffff;
+
+  --color-booked: var(--s-booked);
+  --color-booked-bg: var(--s-booked-bg);
+  --color-booked-ink: var(--s-booked-ink);
+  --color-assigned: var(--s-assigned);
+  --color-assigned-bg: var(--s-assigned-bg);
+  --color-assigned-ink: var(--s-assigned-ink);
+  --color-picked: var(--s-picked);
+  --color-picked-bg: var(--s-picked-bg);
+  --color-picked-ink: var(--s-picked-ink);
+  --color-transit: var(--s-transit);
+  --color-transit-bg: var(--s-transit-bg);
+  --color-transit-ink: var(--s-transit-ink);
+  --color-delivered: var(--s-delivered);
+  --color-delivered-bg: var(--s-delivered-bg);
+  --color-delivered-ink: var(--s-delivered-ink);
+  --color-failed: var(--s-failed);
+  --color-failed-bg: var(--s-failed-bg);
+  --color-failed-ink: var(--s-failed-ink);
+
+  --font-sans: var(--font);
+  --font-mono: var(--mono);
+  --font-display: var(--display);
+}

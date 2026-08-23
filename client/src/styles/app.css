@@ -1,0 +1,37 @@
+@import 'tailwindcss';
+@import './tokens.css';
+
+/**
+ * Base styles lifted from docs/parcel-design-system.html so the shells match
+ * the locked reference: paper ground, Manrope at 15px/1.55, ink text.
+ */
+@layer base {
+  body {
+    font-family: var(--font);
+    background: var(--paper);
+    color: var(--ink);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /**
+   * Every number on screen uses the mono face with tabular figures
+   * (CLAUDE.md section 4). Declared once here so a column of prices lines up
+   * without each component remembering to ask.
+   */
+  .mono {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  /**
+   * Keyboard focus must be visible — it is in the definition of done. Using
+   * :focus-visible rather than :focus keeps the ring off mouse clicks.
+   */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
