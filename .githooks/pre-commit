@@ -1,0 +1,49 @@
+#!/bin/sh
+# Blocks secrets from entering a commit.
+# Enable once per clone:  git config core.hooksPath .githooks
+
+fail=0
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+
+# 1. No environment file may be committed, except the keys-only template.
+for f in $staged; do
+	case "$f" in
+	.env.example) ;;
+	.env | .env.*)
+		echo "BLOCKED  $f — environment files must stay local"
+		fail=1
+		;;
+	esac
+done
+
+# 2. .env.example ships key names, never values.
+#    Secret-shaped keys must be empty or a known-inert placeholder prefix.
+if echo "$staged" | grep -qx '\.env\.example'; then
+	bad=$(git show :.env.example |
+		grep -nE '^[A-Z0-9_]*(SECRET|PASSWORD|PASSWD|TOKEN|API_KEY|MONGODB_URI|DATABASE_URL|DSN)[A-Z0-9_]*=..*' |
+		grep -vE '=(sk_test_|pk_test_|whsec_)$')
+	if [ -n "$bad" ]; then
+		echo "BLOCKED  .env.example has values on secret keys:"
+		echo "$bad" | sed 's/^/         /'
+		echo "         Move the value to .env and leave the key empty here."
+		fail=1
+	fi
+fi
+
+# 3. Catch-all: a credentialed connection string in any staged file.
+for f in $staged; do
+	hits=$(git show ":$f" 2>/dev/null |
+		grep -nE '(mongodb(\+srv)?|postgres(ql)?|mysql|redis|amqp)://[^:/[:space:]]+:[^@[:space:]]+@' |
+		grep -vE ':(<password>|\$\{[A-Z_]+\}|password|PASSWORD|changeme)@')
+	if [ -n "$hits" ]; then
+		echo "BLOCKED  $f has a connection string with an inline password:"
+		echo "$hits" | sed 's/^/         /'
+		fail=1
+	fi
+done
+
+if [ "$fail" -ne 0 ]; then
+	echo ""
+	echo "Commit aborted. Fix the above, or bypass with --no-verify if you are certain."
+	exit 1
+fi
