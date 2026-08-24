@@ -7,25 +7,10 @@ import {
 } from '@pdms/shared'
 import type { Doc } from './types'
 import { runAsSystem } from '../lib/context'
+import { optionalPoint } from './geo'
 import { ALLOW_ALL, DENY_ALL, roleScopePlugin } from './plugins/roleScope'
 
 export type DeliveryDoc = Doc<Delivery, 'parcel' | 'agent'>
-
-const geoPointPath = {
-  type: {
-    type: String,
-    enum: ['Point'],
-    required: false,
-  },
-  coordinates: {
-    type: [Number],
-    required: false,
-    validate: {
-      validator: (v: number[] | undefined) => v === undefined || v.length === 2,
-      message: 'coordinates must be [longitude, latitude]',
-    },
-  },
-}
 
 const deliveryEvent = new Schema(
   {
@@ -33,7 +18,7 @@ const deliveryEvent = new Schema(
     at: { type: Date, required: true },
     actor: { type: Schema.Types.ObjectId, ref: 'User', required: false, default: null },
     actorRole: { type: String, enum: roleSchema.options, required: false, default: null },
-    point: geoPointPath,
+    point: optionalPoint,
     note: { type: String, required: false, trim: true },
   },
   { _id: false },
@@ -81,7 +66,7 @@ const deliveryMongooseSchema = new Schema<DeliveryDoc>(
     proofOfDelivery: { type: proofOfDelivery, required: false },
     failureReason: { type: String, required: false, trim: true },
 
-    lastKnownLocation: geoPointPath,
+    lastKnownLocation: optionalPoint,
     lastLocationAt: { type: Date, required: false },
 
     expectedBy: { type: Date, required: false, default: null },

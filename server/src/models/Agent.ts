@@ -1,6 +1,7 @@
 import mongoose, { Schema } from 'mongoose'
 import { agentStatusSchema, vehicleSchema, zoneName, type Agent } from '@pdms/shared'
 import type { Doc } from './types'
+import { optionalPoint } from './geo'
 import { ALLOW_ALL, DENY_ALL, roleScopePlugin } from './plugins/roleScope'
 
 export type AgentDoc = Doc<Agent, 'user'>
@@ -25,22 +26,7 @@ const agentMongooseSchema = new Schema<AgentDoc>(
       default: 'offline',
       index: true,
     },
-    currentLocation: {
-      type: {
-        type: String,
-        enum: ['Point'],
-        required: false,
-      },
-      coordinates: {
-        type: [Number],
-        required: false,
-        validate: {
-          validator: (v: number[] | undefined) =>
-            v === undefined || v.length === 2,
-          message: 'currentLocation.coordinates must be [longitude, latitude]',
-        },
-      },
-    },
+    currentLocation: optionalPoint,
     locationUpdatedAt: { type: Date, required: false },
   },
   { timestamps: true },

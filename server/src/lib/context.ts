@@ -48,6 +48,15 @@ export const runInRequestContext = <T>(
  *
  * `reason` is required so these show up as a grep-able list rather than
  * accumulating silently.
+ *
+ * IMPORTANT: the work must actually START inside `fn`. A Mongoose Query is a
+ * lazy thenable, so returning one unexecuted defers it until after this
+ * function has exited — at which point the surrounding request context is
+ * active again and the query is scoped after all. Always `.exec()` (or await)
+ * inside the callback:
+ *
+ *     runAsSystem('why', async () => Model.findOne(q).exec())   // correct
+ *     runAsSystem('why', () => Model.findOne(q))                // WRONG
  */
 export const runAsSystem = <T>(reason: string, fn: () => T): T =>
   storage.run({ kind: 'system', reason }, fn)

@@ -2,25 +2,10 @@ import mongoose, { Schema, type Types } from 'mongoose'
 import { parcelSizeSchema, zoneName, type Parcel } from '@pdms/shared'
 import type { Doc } from './types'
 import { runAsSystem } from '../lib/context'
+import { optionalPoint } from './geo'
 import { ALLOW_ALL, DENY_ALL, roleScopePlugin } from './plugins/roleScope'
 
 export type ParcelDoc = Doc<Parcel, 'customer'>
-
-const geoPointPath = {
-  type: {
-    type: String,
-    enum: ['Point'],
-    required: false,
-  },
-  coordinates: {
-    type: [Number],
-    required: false,
-    validate: {
-      validator: (v: number[] | undefined) => v === undefined || v.length === 2,
-      message: 'coordinates must be [longitude, latitude]',
-    },
-  },
-}
 
 const address = new Schema(
   {
@@ -30,7 +15,11 @@ const address = new Schema(
     city: { type: String, required: true, default: 'Dhaka', trim: true },
     contactName: { type: String, required: true, trim: true },
     contactPhone: { type: String, required: true, trim: true },
-    point: geoPointPath,
+    /**
+     * Absent until the geocoder resolves the address in M2 — and absent means
+     * absent, so the sparse 2dsphere index on pickup.point stays valid.
+     */
+    point: optionalPoint,
     resolvedLabel: { type: String, required: false },
   },
   { _id: false },

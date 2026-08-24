@@ -224,6 +224,15 @@ const seed = async (): Promise<void> => {
               ? { currentLocation: a.at, locationUpdatedAt: new Date() }
               : {}),
           },
+          /**
+           * An agent with no position must have the field genuinely absent,
+           * not an empty object — the 2dsphere index rejects a malformed
+           * point even on a sparse index. $unset also repairs a document left
+           * behind by an earlier run, which is what keeps re-seeding safe.
+           */
+          ...(a.at
+            ? {}
+            : { $unset: { currentLocation: '', locationUpdatedAt: '' } }),
         },
         { upsert: true },
       )

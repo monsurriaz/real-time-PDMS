@@ -1,6 +1,7 @@
 import type { FilterQuery, Query, Schema } from 'mongoose'
 import type { Role } from '@pdms/shared'
 import { currentActor, isSystemContext, type Actor } from '../../lib/context'
+import { isProd } from '../../lib/env'
 
 /**
  * Role scoping as query middleware (CLAUDE.md section 7).
@@ -72,7 +73,20 @@ export const roleScopePlugin = <T>(
 
     const actor = currentActor()
     if (!actor) {
-      // Anonymous request touching a scoped collection. Nothing is public.
+      /**
+       * Anonymous request touching a scoped collection. Nothing is public, so
+       * this denies everything — which is correct, but it is also exactly what
+       * a mislaid runAsSystem looks like: a pre-auth lookup that was meant to
+       * be unscoped silently returns zero documents instead. Saying so in
+       * development turns a confusing empty result into an obvious one.
+       */
+      if (!isProd) {
+        console.warn(
+          `[roleScope] anonymous read of ${this.model.modelName} denied all documents. ` +
+            'If this was a pre-auth lookup, it must run inside runAsSystem — ' +
+            'and start the query there (.exec()), since a Query is lazy.',
+        )
+      }
       this.where(IMPOSSIBLE as FilterQuery<T>)
       return
     }

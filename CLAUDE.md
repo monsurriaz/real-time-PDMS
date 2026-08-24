@@ -92,6 +92,11 @@ layouts. `tokens.css` is generated from it — if the two ever disagree, the HTM
 --s-transit:#EA4E1B;    --s-delivered:#17864F;  --s-failed:#C9342C;
 
 --radius-sm:8px;  --radius:12px;  --radius-lg:16px;
+
+--space-1:4px;    --space-2:8px;    --space-3:12px;
+--space-4:16px;   --space-5:20px;   --space-6:24px;
+--space-7:28px;   --space-8:32px;   --space-10:40px;
+--space-14:56px;  --space-16:64px;
 ```
 
 - Fonts: **Manrope** (UI), **JetBrains Mono** (all numbers, IDs, money, times),
@@ -204,12 +209,4 @@ spread across all lifecycle states including one Failed and one Delayed.
 - Works at 375px wide
 - Keyboard focus is visible
 - No console errors
-
----
-
-## 11. Spacing Scale
---space-1: 4px;   --space-2: 8px;   --space-3: 12px;
---space-4: 16px;  --space-5: 20px;  --space-6: 24px;
---space-7: 28px;  --space-8: 32px;  --space-10: 40px;
---space-14: 56px; --space-16: 64px;
 

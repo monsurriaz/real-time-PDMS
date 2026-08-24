@@ -77,9 +77,14 @@ authRouter.post('/login', async (req, res, next) => {
      * Runs as system: the caller is by definition unauthenticated, so role
      * scoping has no actor to scope to. passwordHash is select:false on the
      * schema, so it must be asked for explicitly.
+     *
+     * `.exec()` matters. A Mongoose Query is a lazy thenable — returning it
+     * unexecuted would run it after runAsSystem has already exited, back
+     * inside the request context, where an anonymous caller is denied every
+     * document and login fails for a correct password.
      */
-    const user = await runAsSystem('auth: login lookup', () =>
-      UserModel.findOne({ email: input.email }).select('+passwordHash'),
+    const user = await runAsSystem('auth: login lookup', async () =>
+      UserModel.findOne({ email: input.email }).select('+passwordHash').exec(),
     )
 
     if (!user) {
