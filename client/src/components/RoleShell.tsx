@@ -1,4 +1,5 @@
-import { useNavigate } from 'react-router-dom'
+import type { ReactNode } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import type { Role } from '@pdms/shared'
 import { Button } from '@/components/Button'
 import { useLogout, useMe } from '@/features/auth/useAuth'
@@ -11,18 +12,19 @@ const ROLE_LABEL: Record<Role, string> = {
 
 interface Props {
   title: string
-  /** What this screen becomes in a later milestone. */
-  next: string
+  /** One line under the heading. */
+  subtitle?: string
+  /** Links shown in the top bar for this role. */
+  nav?: ReadonlyArray<{ to: string; label: string }>
+  children: ReactNode
 }
 
 /**
- * M1 proof-of-wiring shell, shared by all three role pages.
- *
- * This is deliberately NOT the M0 design — it exists to show that auth,
- * routing and the design tokens are connected. The real role layouts come
- * from docs/design-system.html.
+ * Page chrome shared by all three roles: the sticky topbar from
+ * docs/design-system.html — translucent paper, 62px tall, hairline
+ * underneath — plus the wordmark, role-specific nav and sign-out.
  */
-export const RoleShell = ({ title, next }: Props) => {
+export const RoleShell = ({ title, subtitle, nav = [], children }: Props) => {
   const me = useMe()
   const logout = useLogout()
   const navigate = useNavigate()
@@ -36,70 +38,54 @@ export const RoleShell = ({ title, next }: Props) => {
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-50 bg-paper/[0.88] backdrop-blur-[10px] border-b border-hairline">
-        <div className="max-w-[1180px] mx-auto px-5 sm:px-7 h-[62px] flex items-center gap-7">
-          <div className="flex items-center gap-9px">
+        <div className="max-w-[1180px] mx-auto px-5 sm:px-7 h-[62px] flex items-center gap-5 sm:gap-7">
+          <Link to="/" className="flex items-center gap-9px flex-none">
             <span className="w-[9px] h-[9px] rounded-[2px] bg-accent rotate-45" />
             <span className="font-display font-bold text-[17px] tracking-[-0.02em]">
               ParcelDelivery
             </span>
-          </div>
-          <Button
-            variant="ink"
-            onClick={signOut}
-            disabled={logout.isPending}
-            className="ml-auto"
+          </Link>
+
+          <nav className="hidden sm:flex gap-6 ml-auto">
+            {nav.map((n) => (
+              <Link
+                key={n.to}
+                to={n.to}
+                className="text-[13.5px] font-medium text-muted hover:text-ink"
+              >
+                {n.label}
+              </Link>
+            ))}
+          </nav>
+
+          <div
+            className={[
+              'flex items-center gap-4',
+              nav.length > 0 ? '' : 'ml-auto',
+            ].join(' ')}
           >
-            {logout.isPending ? 'Signing out…' : 'Log out'}
-          </Button>
+            {me.data ? (
+              <span className="hidden md:inline text-[12.5px] text-muted">
+                {me.data.name} · {ROLE_LABEL[me.data.role]}
+              </span>
+            ) : null}
+            <Button variant="ink" onClick={signOut} disabled={logout.isPending}>
+              {logout.isPending ? 'Signing out…' : 'Log out'}
+            </Button>
+          </div>
         </div>
       </header>
 
-      <main className="max-w-[1180px] mx-auto px-5 sm:px-7 py-9">
+      <main className="max-w-[1180px] mx-auto px-5 sm:px-7 py-7 sm:py-9">
         <h1 className="text-[26px] font-semibold tracking-[-0.02em] mb-1">
           {title}
         </h1>
-        <p className="text-muted text-[13.5px] mb-7">
-          Milestone 1 — auth, routing and tokens are wired. {next}
-        </p>
-
-        {me.isPending ? (
-          <p className="text-muted text-[13.5px]">Loading your account…</p>
-        ) : me.data ? (
-          <section className="bg-surface border border-hairline rounded-md max-w-[520px]">
-            <div className="px-5 py-4 border-b border-hairline">
-              <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-faint">
-                Signed in as
-              </h2>
-            </div>
-            <dl className="px-5 py-4 grid grid-cols-[92px_1fr] gap-y-3 gap-x-4 text-[14px]">
-              <dt className="text-muted">Name</dt>
-              <dd className="font-medium">{me.data.name}</dd>
-
-              <dt className="text-muted">Role</dt>
-              <dd className="font-medium">{ROLE_LABEL[me.data.role]}</dd>
-
-              <dt className="text-muted">Email</dt>
-              {/* Not a number, but an identifier — mono, per section 4. */}
-              <dd className="mono text-[13px]">{me.data.email}</dd>
-
-              <dt className="text-muted">Phone</dt>
-              <dd className="mono text-[13px]">{me.data.phone}</dd>
-
-              {me.data.zone ? (
-                <>
-                  <dt className="text-muted">Zone</dt>
-                  <dd className="font-medium">{me.data.zone}</dd>
-                </>
-              ) : null}
-            </dl>
-          </section>
+        {subtitle ? (
+          <p className="text-muted text-[13.5px] mb-7">{subtitle}</p>
         ) : (
-          // Empty/error state. RequireRole normally redirects before this is
-          // reachable, but a session expiring mid-view lands here.
-          <p className="text-[13.5px] text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2 max-w-[520px]">
-            Your session has ended. Reload to sign in again.
-          </p>
+          <div className="mb-7" />
         )}
+        {children}
       </main>
     </div>
   )

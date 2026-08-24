@@ -21,6 +21,7 @@ import {
   ZoneModel,
   type UserDoc,
 } from '../server/src/models'
+import { seedParcels } from './seed-parcels'
 
 /** Shared across every demo account so the whole class can log in fast. */
 const DEMO_PASSWORD = 'pdms-demo-2026'
@@ -246,6 +247,9 @@ const seed = async (): Promise<void> => {
         .map(([k, v]) => `${v} ${k}`)
         .join(', ')})`,
     )
+
+    // ---- demo parcels (needs pricing + geocoding, so it runs last) ----
+    await seedParcels()
 
     // ---- credentials ----
     const firstCustomer = CUSTOMERS[0]

@@ -59,16 +59,68 @@ export const parcelSchema = z.object({
 export type Parcel = z.infer<typeof parcelSchema>
 
 /**
- * POST /parcels input (M2). Price is absent — the server computes it from
- * PricingConfig and never trusts a client-supplied amount.
+ * What the customer fills in. Used by the booking form AND the server route,
+ * so the two cannot drift (CLAUDE.md rule 4).
+ *
+ * Price is absent on purpose: the server computes it from PricingConfig and
+ * never trusts a client-supplied amount. Neither is `point` — geocoding is
+ * server-side, on submit, to respect Nominatim's 1 req/sec limit.
  */
-export const bookParcelInputSchema = z.object({
-  pickup: addressSchema.omit({ point: true, resolvedLabel: true }),
-  drop: addressSchema.omit({ point: true, resolvedLabel: true }),
-  weightKg: z.number().positive().max(1000),
-  size: parcelSizeSchema,
-  description: z.string().max(300).optional(),
-  isCod: z.boolean().default(false),
-  codAmount: taka.default(0),
+const addressInputSchema = addressSchema.omit({
+  point: true,
+  resolvedLabel: true,
 })
+export type AddressInput = z.infer<typeof addressInputSchema>
+
+export const bookParcelInputSchema = z
+  .object({
+    pickup: addressInputSchema,
+    drop: addressInputSchema,
+    weightKg: z.number().positive().max(1000),
+    size: parcelSizeSchema,
+    description: z.string().max(300).optional(),
+    isCod: z.boolean().default(false),
+    codAmount: taka.default(0),
+  })
+  .superRefine((v, ctx) => {
+    // A COD amount on a non-COD parcel is never collected, so silently
+    // accepting it would promise the sender money that never arrives.
+    if (!v.isCod && v.codAmount > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['codAmount'],
+        message: 'set isCod before entering a COD amount',
+      })
+    }
+    if (v.isCod && v.codAmount <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['codAmount'],
+        message: 'a COD parcel needs an amount to collect',
+      })
+    }
+  })
 export type BookParcelInput = z.infer<typeof bookParcelInputSchema>
+
+/**
+ * POST /parcels/quote — the price estimate shown before final confirm. Takes
+ * the same payload as booking so the quote and the booking cannot be computed
+ * from different inputs.
+ */
+export const quoteInputSchema = bookParcelInputSchema
+export type QuoteInput = z.infer<typeof quoteInputSchema>
+
+/** What a parcel looks like in the customer's list. */
+export const parcelListItemSchema = z.object({
+  _id: objectId,
+  trackingId: trackingId,
+  status: z.string(),
+  pickupArea: z.string(),
+  dropArea: z.string(),
+  weightKg: z.number(),
+  total: taka,
+  isCod: z.boolean(),
+  codAmount: taka,
+  createdAt: z.coerce.date(),
+})
+export type ParcelListItem = z.infer<typeof parcelListItemSchema>

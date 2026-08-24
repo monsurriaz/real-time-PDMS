@@ -6,6 +6,7 @@
 export * from './schemas/common'
 export * from './schemas/user'
 export * from './schemas/zone'
+export * from './schemas/geo-lookup'
 export * from './schemas/pricing'
 export * from './schemas/agent'
 export * from './schemas/parcel'

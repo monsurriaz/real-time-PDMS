@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express'
 import { ZodError } from 'zod'
 import { isProd } from '../lib/env'
+import { LookupError, statusForLookup } from '../lib/lookupError'
 
 /** An error whose status and message are safe to show a client. */
 export class HttpError extends Error {
@@ -50,6 +51,22 @@ export const errorHandler = (
         path: i.path.join('.'),
         message: i.message,
       })),
+    })
+    return
+  }
+
+  /**
+   * Geocoding and routing failures carry a machine-readable reason and, when
+   * two addresses were submitted, which one failed. The booking form needs
+   * both to point at the right field and to decide whether to offer a retry —
+   * so they are passed through rather than flattened into a generic 4xx.
+   */
+  if (err instanceof LookupError) {
+    res.status(statusForLookup(err.reason)).json({
+      error: err.message,
+      reason: err.reason,
+      retryable: err.retryable,
+      ...(err.field ? { field: err.field } : {}),
     })
     return
   }

@@ -19,3 +19,19 @@ export type Doc<T extends { _id: string }, Refs extends keyof T = never> = Omit<
   // Ref fields become ObjectId, preserving nullability from the shared type.
   [K in Refs]: null extends T[K] ? Types.ObjectId | null : Types.ObjectId
 }
+
+/**
+ * Doc<T> deliberately omits createdAt/updatedAt so a Schema definition does
+ * not have to declare fields that `timestamps: true` manages. They do exist
+ * on every stored document though, so a read that needs one asks for this
+ * shape explicitly:
+ *
+ *     .lean<Timestamped<PricingConfigDoc>>()
+ *
+ * which keeps the claim visible at the call site rather than hiding it behind
+ * a cast.
+ */
+export type Timestamped<T> = T & {
+  createdAt: Date
+  updatedAt: Date
+}

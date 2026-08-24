@@ -26,12 +26,25 @@ export interface ApiErrorBody {
 export class ApiError extends Error {
   readonly status: number
   readonly details?: ApiErrorBody['details']
+  /**
+   * The whole parsed body. Some errors carry fields beyond `error` and
+   * `details` — a geocoding failure adds `reason`, `field` and `retryable` so
+   * the booking form can point at the offending address — and flattening
+   * those away would force the UI to re-guess what went wrong.
+   */
+  readonly body: unknown
 
-  constructor(status: number, message: string, details?: ApiErrorBody['details']) {
+  constructor(
+    status: number,
+    message: string,
+    details?: ApiErrorBody['details'],
+    body?: unknown,
+  ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.details = details
+    this.body = body
   }
 
   /** True when the server says we are not logged in. */
@@ -68,7 +81,7 @@ const request = async <T>(
 
   if (!res.ok) {
     const err = body as ApiErrorBody
-    throw new ApiError(res.status, err.error ?? res.statusText, err.details)
+    throw new ApiError(res.status, err.error ?? res.statusText, err.details, body)
   }
 
   return body as T
@@ -79,6 +92,11 @@ export const api = {
   post: <T>(path: string, body?: unknown): Promise<T> =>
     request<T>(path, {
       method: 'POST',
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
+  put: <T>(path: string, body?: unknown): Promise<T> =>
+    request<T>(path, {
+      method: 'PUT',
       body: body === undefined ? undefined : JSON.stringify(body),
     }),
 }

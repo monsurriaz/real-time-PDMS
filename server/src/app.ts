@@ -6,6 +6,9 @@ import { env } from './lib/env'
 import { attachActor } from './middleware/auth'
 import { errorHandler, notFoundHandler } from './middleware/httpError'
 import { authRouter } from './routes/auth'
+import { parcelsRouter } from './routes/parcels'
+import { pricingRouter } from './routes/pricing'
+import { zonesRouter } from './routes/zones'
 // Registers every model with Mongoose before any route can query one.
 import './models'
 
@@ -41,6 +44,9 @@ export const createApp = (): Express => {
   })
 
   app.use('/auth', authRouter)
+  app.use('/zones', zonesRouter)
+  app.use('/pricing', pricingRouter)
+  app.use('/parcels', parcelsRouter)
 
   app.use(notFoundHandler)
   app.use(errorHandler)
