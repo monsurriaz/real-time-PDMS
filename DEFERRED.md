@@ -30,6 +30,7 @@ the debt.
 | `.b-cancelled` badge variant | M2 | Design system defines six badge variants for seven lifecycle states. Cancelled currently borrows Booked's neutral grey — correct behaviour, but the variant should exist by name. |
 | Zone base differentiation | M2 | All zones seeded at `baseFare: 0` so the ৳126 documented example reproduces exactly. Consider giving zones distinct bases for demo texture — one-line seed change. |
 | Assignment ignores rider workload | M3 | `$near` filters on `status: 'available'` only, so one rider can hold unlimited `Assigned` parcels before picking any up. Availability flips at `PickedUp`, not `Assigned`, which is deliberate — but a cap or a load-aware tiebreak would spread work more realistically. |
+| `advanceStatus` is the only status path **by convention** | M3.5 | Nothing writes `delivery.status` outside `advanceStatus()` today, but `DeliveryModel` is exported and importable — any future route could `$set: { status }` and bypass the state machine entirely. CLAUDE.md §5 says "no route mutates status directly"; that is currently discipline, not enforcement. Options: a Mongoose pre-hook rejecting `status` writes that lack an internal marker, or moving the model behind a repository that exposes no status setter. |
 | No admin unassign | M3 | An admin can reassign a delivery but cannot return it to `Booked`/unassigned. Not in CLAUDE.md §5's lifecycle, so adding it means adding a transition — decide deliberately rather than by accident. |
 
 ---

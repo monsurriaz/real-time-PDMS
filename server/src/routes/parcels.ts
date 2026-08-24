@@ -15,6 +15,7 @@ import { DeliveryModel } from '../models/Delivery'
 import { ParcelModel } from '../models/Parcel'
 import { requireAuth, requireRole } from '../middleware/auth'
 import { HttpError, unauthorized } from '../middleware/httpError'
+import { autoAssignAfterBooking } from '../services/assignment'
 import { priceFor } from '../services/pricing'
 import { availableTransitions } from '../services/lifecycle'
 import { generateTrackingId } from '../services/trackingId'
@@ -122,7 +123,7 @@ parcelsRouter.post('/', requireAuth, requireRole('customer'), async (req, res, n
      * set here only because this is creation, not a transition — every later
      * change goes through advanceStatus() in M3.
      */
-    await DeliveryModel.create({
+    const delivery = await DeliveryModel.create({
       parcel: parcel._id,
       agent: null,
       status: 'Booked',
@@ -141,12 +142,28 @@ parcelsRouter.post('/', requireAuth, requireRole('customer'), async (req, res, n
       expectedBy: null,
     })
 
+    /**
+     * Assign straight away (CLAUDE.md section 5).
+     *
+     * Runs as the system, not as the customer: a customer has no authority to
+     * move a delivery to Assigned, and borrowing their identity would put a
+     * false actor in the audit trail.
+     *
+     * Never throws. If nobody is free the parcel stays Booked and the admin
+     * board flags it — the outcome is reported here so the customer is not
+     * told a rider is coming when none is.
+     */
+    const assignment = await autoAssignAfterBooking({
+      deliveryId: delivery._id.toString(),
+    })
+
     res.status(201).json({
       parcel: {
         _id: parcel._id.toString(),
         trackingId: parcel.trackingId,
         price: parcel.price,
       },
+      assignment,
     })
   } catch (err) {
     next(err)

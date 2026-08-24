@@ -89,10 +89,22 @@ export class TransitionError extends HttpError {
   }
 }
 
+/**
+ * Who is driving a transition. `'system'` is the server acting on its own —
+ * auto-assignment right after booking is the only case today.
+ *
+ * A distinct value rather than a borrowed admin identity, because the event
+ * log has to stay truthful: /shared's DeliveryEvent already models `actor` as
+ * nullable so that "the system did this" is representable, and stamping the
+ * booking customer's id with role 'admin' would make TRANSITION_AUTHORITY a
+ * lie in the audit trail.
+ */
+export type TransitionActor = Actor | 'system'
+
 export interface AdvanceArgs {
   deliveryId: string
   to: DeliveryStatus
-  actor: Actor
+  actor: TransitionActor
   /** Where the actor was. Riders have GPS; admins do not. */
   point?: GeoPoint
   note?: string
@@ -170,7 +182,9 @@ export const advanceStatus = async (
   }
 
   // ---- 2. may THIS actor make it? ----
-  if (!TRANSITION_AUTHORITY[to].includes(actor.role)) {
+  // The system is trusted: it is the server itself, and it only reaches here
+  // for transitions the map above has already validated.
+  if (actor !== 'system' && !TRANSITION_AUTHORITY[to].includes(actor.role)) {
     throw new TransitionError(
       403,
       `a ${actor.role} cannot move a delivery to ${to}`,
@@ -181,7 +195,7 @@ export const advanceStatus = async (
 
   // An agent may only touch their own assignment; a customer only their own
   // parcel. Admins are unrestricted.
-  if (actor.role === 'agent') {
+  if (actor !== 'system' && actor.role === 'agent') {
     const ownsIt = await runAsSystem('lifecycle: agent owns delivery', async () => {
       const AgentModel = mongoose.model('Agent')
       const agent = await AgentModel.findOne({
@@ -197,7 +211,7 @@ export const advanceStatus = async (
     }
   }
 
-  if (actor.role === 'customer') {
+  if (actor !== 'system' && actor.role === 'customer') {
     const ownsIt = await runAsSystem('lifecycle: customer owns parcel', async () => {
       const parcel = await ParcelModel.findById(delivery.parcel)
         .select('customer')
@@ -250,8 +264,9 @@ export const advanceStatus = async (
           events: {
             status: to,
             at,
-            actor: new mongoose.Types.ObjectId(actor.id),
-            actorRole: actor.role,
+            // Null actor + null role reads as "the system did this".
+            actor: actor === 'system' ? null : new mongoose.Types.ObjectId(actor.id),
+            actorRole: actor === 'system' ? null : actor.role,
             ...(point ? { point } : {}),
             ...(note?.trim() ? { note: note.trim() } : {}),
           },

@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { deliveryStatusSchema, type DeliveryStatus } from '@pdms/shared'
+import {
+  advanceStatusInputSchema,
+  deliveryStatusSchema,
+  type DeliveryStatus,
+} from '@pdms/shared'
 import { Badge } from '@/components/Badge'
 import { Button } from '@/components/Button'
 import { Panel } from '@/components/Panel'
@@ -36,9 +40,16 @@ const CancelButton = ({
     <span className="flex items-center gap-2">
       <Button
         disabled={advance.isPending}
-        onClick={() =>
-          advance.mutate({ deliveryId, to: 'Cancelled', note: 'Cancelled by customer' })
-        }
+        onClick={() => {
+          // Validated with the same schema the server uses (rule 4); the
+          // server re-validates and re-checks authority regardless.
+          const parsed = advanceStatusInputSchema.safeParse({
+            to: 'Cancelled',
+            note: 'Cancelled by customer',
+          })
+          if (!parsed.success) return
+          advance.mutate({ deliveryId, ...parsed.data })
+        }}
       >
         {advance.isPending ? 'Cancelling…' : 'Confirm'}
       </Button>

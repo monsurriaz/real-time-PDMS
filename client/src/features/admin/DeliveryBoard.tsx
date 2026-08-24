@@ -1,5 +1,9 @@
 import { useState } from 'react'
-import { deliveryStatusSchema, type DeliveryStatus } from '@pdms/shared'
+import {
+  assignInputSchema,
+  deliveryStatusSchema,
+  type DeliveryStatus,
+} from '@pdms/shared'
 import { Badge } from '@/components/Badge'
 import { Button } from '@/components/Button'
 import { Eyebrow, Panel } from '@/components/Panel'
@@ -121,12 +125,17 @@ const AssignPanel = ({
                     </div>
                     <Button
                       disabled={assign.isPending || c.agentId === currentAgentId}
-                      onClick={() =>
+                      onClick={() => {
+                        // Shared schema, same as the server's (rule 4).
+                        const parsed = assignInputSchema.safeParse({
+                          agentId: c.agentId,
+                        })
+                        if (!parsed.success) return
                         assign.mutate(
-                          { deliveryId, agentId: c.agentId },
+                          { deliveryId, agentId: parsed.data.agentId },
                           { onSuccess: onClose },
                         )
-                      }
+                      }}
                     >
                       {c.agentId === currentAgentId ? 'Assigned' : 'Choose'}
                     </Button>

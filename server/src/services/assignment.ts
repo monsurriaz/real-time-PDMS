@@ -5,7 +5,7 @@ import { runAsSystem } from '../lib/context'
 import { AgentModel } from '../models/Agent'
 import { DeliveryModel } from '../models/Delivery'
 import { HttpError } from '../middleware/httpError'
-import { advanceStatus } from './lifecycle'
+import { advanceStatus, type TransitionActor } from './lifecycle'
 
 /**
  * Nearest-available-agent assignment (CLAUDE.md section 5):
@@ -177,7 +177,7 @@ export const assignDelivery = async (args: {
   deliveryId: string
   /** Omit to auto-pick the nearest available rider. */
   agentId?: string
-  actor: Actor
+  actor: TransitionActor
 }): Promise<{
   status: DeliveryStatus
   agent: Candidate
@@ -281,8 +281,8 @@ export const assignDelivery = async (args: {
           events: {
             status: 'Assigned',
             at,
-            actor: new mongoose.Types.ObjectId(actor.id),
-            actorRole: actor.role,
+            actor: actor === 'system' ? null : new mongoose.Types.ObjectId(actor.id),
+            actorRole: actor === 'system' ? null : actor.role,
             note: `Reassigned to ${chosen.name}`,
           },
         },
@@ -299,6 +299,48 @@ export const assignDelivery = async (args: {
   }
 
   return { status: updated.status, agent: chosen, strategy, reassigned: true }
+}
+
+/** The outcome of an automatic assignment attempt. */
+export type AutoAssignOutcome =
+  | { assigned: true; agentName: string; strategy: MatchStrategy | 'override' }
+  | { assigned: false; reason: string }
+
+/**
+ * Automatic assignment immediately after booking (CLAUDE.md section 5).
+ *
+ * Reuses assignDelivery wholesale — the same $near query, the same 5 km
+ * zone-only fallback, the same "no rider covers this zone" message the manual
+ * path already produces. The only difference is what happens on failure.
+ *
+ * This never throws. A booking must not fail because the roster happens to be
+ * busy: the parcel stays Booked, which is exactly the state the admin board
+ * already flags as unassigned. The reason is returned rather than discarded,
+ * so the customer's booking response says what happened instead of implying a
+ * rider is on the way.
+ */
+export const autoAssignAfterBooking = async (args: {
+  deliveryId: string
+}): Promise<AutoAssignOutcome> => {
+  try {
+    const result = await assignDelivery({
+      deliveryId: args.deliveryId,
+      actor: 'system',
+    })
+    return {
+      assigned: true,
+      agentName: result.agent.name,
+      strategy: result.strategy,
+    }
+  } catch (err) {
+    const reason =
+      err instanceof HttpError ? err.message : 'assignment could not be completed'
+    // Logged loudly, not swallowed. The parcel is still booked and visible.
+    console.warn(
+      `[assignment] delivery ${args.deliveryId} left unassigned — ${reason}`,
+    )
+    return { assigned: false, reason }
+  }
 }
 
 /**
