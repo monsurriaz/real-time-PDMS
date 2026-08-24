@@ -10,7 +10,7 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 /**
- * Ported from .btn in docs/parcel-design-system.html — same padding, radius,
+ * Ported from .btn in docs/design-system.html — same padding, radius,
  * weight and transition. No shadow, no gradient.
  *
  * `primary` is the orange one and means "moving"; a screen gets at most one.

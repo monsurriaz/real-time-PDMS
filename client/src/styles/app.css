@@ -2,7 +2,7 @@
 @import './tokens.css';
 
 /**
- * Base styles lifted from docs/parcel-design-system.html so the shells match
+ * Base styles lifted from docs/design-system.html so the shells match
  * the locked reference: paper ground, Manrope at 15px/1.55, ink text.
  */
 @layer base {

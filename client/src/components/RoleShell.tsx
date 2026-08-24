@@ -20,7 +20,7 @@ interface Props {
  *
  * This is deliberately NOT the M0 design — it exists to show that auth,
  * routing and the design tokens are connected. The real role layouts come
- * from docs/parcel-design-system.html.
+ * from docs/design-system.html.
  */
 export const RoleShell = ({ title, next }: Props) => {
   const me = useMe()
