@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { deliveryStatusSchema, type DeliveryStatus } from '@pdms/shared'
 import { Badge } from '@/components/Badge'
@@ -6,6 +7,55 @@ import { Panel } from '@/components/Panel'
 import { ApiError } from '@/lib/api'
 import { formatDateTime, formatKg, formatTaka } from '@/lib/format'
 import { useParcels } from '../booking/useBooking'
+import { useAdvanceStatus } from '../deliveries/useDeliveries'
+
+/**
+ * Cancelling before pickup, per section 5. Two taps: the second confirms,
+ * because a cancellation is not reversible and the button sits in a dense row
+ * where a mis-tap is easy.
+ */
+const CancelButton = ({
+  deliveryId,
+  trackingId,
+}: {
+  deliveryId: string
+  trackingId: string
+}) => {
+  const advance = useAdvanceStatus()
+  const [armed, setArmed] = useState(false)
+
+  if (advance.isError) {
+    return (
+      <span role="alert" className="text-[11.5px] text-failed-ink">
+        {advance.error instanceof ApiError ? advance.error.message : 'Could not cancel'}
+      </span>
+    )
+  }
+
+  return armed ? (
+    <span className="flex items-center gap-2">
+      <Button
+        disabled={advance.isPending}
+        onClick={() =>
+          advance.mutate({ deliveryId, to: 'Cancelled', note: 'Cancelled by customer' })
+        }
+      >
+        {advance.isPending ? 'Cancelling…' : 'Confirm'}
+      </Button>
+      <button
+        type="button"
+        onClick={() => setArmed(false)}
+        className="text-[12px] text-muted hover:text-ink"
+      >
+        Keep
+      </button>
+    </span>
+  ) : (
+    <Button onClick={() => setArmed(true)} aria-label={`Cancel ${trackingId}`}>
+      Cancel
+    </Button>
+  )
+}
 
 /**
  * The customer's parcels. Status comes from the Delivery record and is shown
@@ -74,7 +124,7 @@ export const ParcelList = () => {
         <table className="w-full border-collapse min-w-[620px]">
           <thead>
             <tr>
-              {['Tracking', 'Route', 'Weight', 'Status', 'Price', 'Booked'].map((h) => (
+              {['Tracking', 'Route', 'Weight', 'Status', 'Price', 'Booked', ''].map((h) => (
                 <th
                   key={h}
                   className="text-left text-[11px] font-semibold uppercase tracking-[0.13em] text-faint pb-3 border-b border-hairline"
@@ -107,10 +157,19 @@ export const ParcelList = () => {
                     </span>
                   ) : null}
                 </td>
-                <td className="py-3">
+                <td className="py-3 pr-4">
                   <span className="mono text-[12px] text-muted">
                     {formatDateTime(p.createdAt)}
                   </span>
+                </td>
+                <td className="py-3">
+                  {/*
+                    Offered only where the server says cancelling is legal —
+                    before pickup. It re-checks when clicked (rule 3).
+                  */}
+                  {p.deliveryId && p.allowedTransitions.includes('Cancelled') ? (
+                    <CancelButton deliveryId={p.deliveryId} trackingId={p.trackingId} />
+                  ) : null}
                 </td>
               </tr>
             ))}

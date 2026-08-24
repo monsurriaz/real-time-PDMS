@@ -8,6 +8,7 @@ import {
   trackingId,
   zoneName,
 } from './common'
+import { deliveryStatusSchema } from './delivery'
 import { priceBreakdownSchema } from './pricing'
 
 /**
@@ -113,14 +114,21 @@ export type QuoteInput = z.infer<typeof quoteInputSchema>
 /** What a parcel looks like in the customer's list. */
 export const parcelListItemSchema = z.object({
   _id: objectId,
+  /** Needed to act on the lifecycle — e.g. cancelling before pickup. */
+  deliveryId: objectId.nullable(),
   trackingId: trackingId,
-  status: z.string(),
+  status: deliveryStatusSchema,
   pickupArea: z.string(),
   dropArea: z.string(),
   weightKg: z.number(),
   total: taka,
   isCod: z.boolean(),
   codAmount: taka,
+  /**
+   * What this customer may do next, decided by the server from its own
+   * transition map. The client renders these; it never derives them.
+   */
+  allowedTransitions: z.array(deliveryStatusSchema),
   createdAt: z.coerce.date(),
 })
 export type ParcelListItem = z.infer<typeof parcelListItemSchema>

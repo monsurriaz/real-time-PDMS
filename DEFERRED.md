@@ -29,6 +29,8 @@ the debt.
 | Design debt: arbitrary values | M1 | `rounded-[2px]` on the wordmark dot, `text-[13.5px]`, `text-[14.5px]` aren't backed by tokens. Rule 1 covers radius and font, not just spacing. Cosmetic only. Sweep once, after every screen exists. |
 | `.b-cancelled` badge variant | M2 | Design system defines six badge variants for seven lifecycle states. Cancelled currently borrows Booked's neutral grey — correct behaviour, but the variant should exist by name. |
 | Zone base differentiation | M2 | All zones seeded at `baseFare: 0` so the ৳126 documented example reproduces exactly. Consider giving zones distinct bases for demo texture — one-line seed change. |
+| Assignment ignores rider workload | M3 | `$near` filters on `status: 'available'` only, so one rider can hold unlimited `Assigned` parcels before picking any up. Availability flips at `PickedUp`, not `Assigned`, which is deliberate — but a cap or a load-aware tiebreak would spread work more realistically. |
+| No admin unassign | M3 | An admin can reassign a delivery but cannot return it to `Booked`/unassigned. Not in CLAUDE.md §5's lifecycle, so adding it means adding a transition — decide deliberately rather than by accident. |
 
 ---
 

@@ -4,6 +4,7 @@ import {
   bookParcelInputSchema,
   quoteInputSchema,
   type AddressInput,
+  type DeliveryStatus,
   type GeocodedAddress,
   type ParcelListItem,
 } from '@pdms/shared'
@@ -15,6 +16,7 @@ import { ParcelModel } from '../models/Parcel'
 import { requireAuth, requireRole } from '../middleware/auth'
 import { HttpError, unauthorized } from '../middleware/httpError'
 import { priceFor } from '../services/pricing'
+import { availableTransitions } from '../services/lifecycle'
 import { generateTrackingId } from '../services/trackingId'
 
 export const parcelsRouter = Router()
@@ -170,7 +172,7 @@ interface ParcelRow {
  * handler that forgets cannot leak another customer's parcels. Admins see all,
  * by the same mechanism.
  */
-parcelsRouter.get('/', requireAuth, async (_req, res, next) => {
+parcelsRouter.get('/', requireAuth, async (req, res, next) => {
   try {
     const parcels = await ParcelModel.find()
       .sort({ createdAt: -1 })
@@ -183,24 +185,40 @@ parcelsRouter.get('/', requireAuth, async (_req, res, next) => {
       parcel: { $in: parcels.map((p) => p._id) },
     })
       .select('parcel status')
-      .lean<Array<{ parcel: mongoose.Types.ObjectId; status: string }>>()
+      .lean<
+        Array<{
+          _id: mongoose.Types.ObjectId
+          parcel: mongoose.Types.ObjectId
+          status: DeliveryStatus
+        }>
+      >()
 
-    const statusByParcel = new Map(
-      deliveries.map((d) => [d.parcel.toString(), d.status]),
-    )
+    const byParcel = new Map(deliveries.map((d) => [d.parcel.toString(), d]))
+    const role = req.actor?.role ?? 'customer'
 
-    const items: ParcelListItem[] = parcels.map((p) => ({
-      _id: p._id.toString(),
-      trackingId: p.trackingId,
-      status: statusByParcel.get(p._id.toString()) ?? 'Booked',
-      pickupArea: p.pickup.area,
-      dropArea: p.drop.area,
-      weightKg: p.weightKg,
-      total: p.price.total,
-      isCod: p.isCod,
-      codAmount: p.codAmount,
-      createdAt: p.createdAt,
-    }))
+    const items: ParcelListItem[] = parcels.map((p) => {
+      const d = byParcel.get(p._id.toString())
+      const status: DeliveryStatus = d?.status ?? 'Booked'
+      return {
+        _id: p._id.toString(),
+        deliveryId: d ? d._id.toString() : null,
+        trackingId: p.trackingId,
+        status,
+        pickupArea: p.pickup.area,
+        dropArea: p.drop.area,
+        weightKg: p.weightKg,
+        total: p.price.total,
+        isCod: p.isCod,
+        codAmount: p.codAmount,
+        /**
+         * From the server's own transition map, so the list can offer
+         * "Cancel" only where cancelling is actually legal — and the server
+         * still re-checks when it is clicked.
+         */
+        allowedTransitions: [...availableTransitions(status, role)],
+        createdAt: p.createdAt,
+      }
+    })
 
     res.json({ parcels: items })
   } catch (err) {

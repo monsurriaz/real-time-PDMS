@@ -1,14 +1,17 @@
 import { RoleShell } from '@/components/RoleShell'
-import { PricingEditor } from './PricingEditor'
+import { DeliveryBoard } from './DeliveryBoard'
 
-const NAV = [{ to: '/admin', label: 'Pricing' }] as const
+export const ADMIN_NAV = [
+  { to: '/admin', label: 'Operations' },
+  { to: '/admin/pricing', label: 'Pricing' },
+] as const
 
 export const AdminHome = () => (
   <RoleShell
-    title="Pricing"
-    subtitle="Changes apply to the next booking. Already-booked parcels keep their price."
-    nav={NAV}
+    title="Operations"
+    subtitle="Assign riders, and watch what is moving. Reassignment is possible until a parcel is picked up."
+    nav={ADMIN_NAV}
   >
-    <PricingEditor />
+    <DeliveryBoard />
   </RoleShell>
 )
