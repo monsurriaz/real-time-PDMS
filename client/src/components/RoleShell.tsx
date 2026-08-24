@@ -69,7 +69,17 @@ export const RoleShell = ({ title, subtitle, nav = [], children }: Props) => {
                 {me.data.name} · {ROLE_LABEL[me.data.role]}
               </span>
             ) : null}
-            <Button variant="ink" onClick={signOut} disabled={logout.isPending}>
+            {/*
+              Section 4's 48px floor applies to the whole rider UI, and the top
+              bar is part of it. Only the rider's — bumping every role's chrome
+              would be a restyle nobody asked for.
+            */}
+            <Button
+              variant="ink"
+              {...(me.data?.role === 'agent' ? { size: 'lg' as const } : {})}
+              onClick={signOut}
+              disabled={logout.isPending}
+            >
               {logout.isPending ? 'Signing out…' : 'Log out'}
             </Button>
           </div>

@@ -11,7 +11,16 @@
  * that can drift apart.
  */
 @theme {
+  /**
+   * `--radius-chip` (the 38px stat-card icon tile) and `--radius-xs` (the
+   * wordmark dot) are values design-system.html already uses. They are named
+   * here for the same reason the optical spacing steps are: the reference wins
+   * on disagreement, so its values belong in the scale rather than appearing as
+   * arbitrary brackets in a component.
+   */
+  --radius-xs: 2px;
   --radius-sm: 8px;
+  --radius-chip: 11px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-pill: 999px;

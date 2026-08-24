@@ -34,7 +34,7 @@ const ADVANCE_LABEL: Record<string, string> = {
   Delivered: 'Mark delivered',
 }
 
-const CAPS = 'text-[11px] font-semibold uppercase tracking-[0.13em] text-faint'
+const CAPS = 'text-[11px] font-semibold uppercase tracking-[0.13em] text-muted'
 
 export const ActiveDelivery = ({ d }: { d: DeliveryListItem }) => {
   const advance = useAdvanceStatus()
@@ -97,10 +97,11 @@ export const ActiveDelivery = ({ d }: { d: DeliveryListItem }) => {
             recipient's number, which section 7 keeps off this payload — so
             both are present and disabled rather than pretending to work.
           */}
-          <Button className="flex-1" disabled>
+          {/* min-h-12: section 4's 48px floor for anything a rider taps. */}
+          <Button className="flex-1 min-h-12" disabled>
             Call
           </Button>
-          <Button className="flex-1" disabled>
+          <Button className="flex-1 min-h-12" disabled>
             Navigate
           </Button>
         </div>
@@ -153,7 +154,7 @@ export const ActiveDelivery = ({ d }: { d: DeliveryListItem }) => {
             {needsProof ? (
               // The reference says "Needs a photo or OTP first". All three
               // methods are live now, so the line names all three.
-              <p className="text-[11.5px] text-faint text-center mt-11px">
+              <p className="text-[11.5px] text-muted text-center mt-11px">
                 Needs a photo, code, or signature first
               </p>
             ) : null}
@@ -176,12 +177,12 @@ export const ActiveDelivery = ({ d }: { d: DeliveryListItem }) => {
                 value={failureNote}
                 placeholder="Recipient not reachable"
                 onChange={(e) => setFailureNote(e.target.value)}
-                className="w-full font-sans text-[14.5px] text-ink px-13px py-11px mb-3
+                className="w-full min-h-12 font-sans text-[14.5px] text-ink px-13px py-11px mb-3
                            border border-hairline-strong rounded-sm bg-surface outline-none
                            focus:border-accent focus:ring-[3px] focus:ring-accent-tint"
               />
               <Button
-                className="w-full"
+                className="w-full min-h-12"
                 disabled={failureNote.trim().length < 3 || busy}
                 onClick={() => void move('Failed', failureNote.trim())}
               >
@@ -190,7 +191,7 @@ export const ActiveDelivery = ({ d }: { d: DeliveryListItem }) => {
               <button
                 type="button"
                 onClick={() => setShowFail(false)}
-                className="w-full text-[12px] text-muted hover:text-ink mt-3"
+                className="w-full min-h-12 text-[12px] text-muted hover:text-ink mt-3"
               >
                 Back
               </button>
@@ -199,7 +200,7 @@ export const ActiveDelivery = ({ d }: { d: DeliveryListItem }) => {
             <button
               type="button"
               onClick={() => setShowFail(true)}
-              className="w-full text-[12.5px] font-medium text-muted hover:text-ink mt-4 py-2"
+              className="w-full min-h-12 text-[12.5px] font-medium text-muted hover:text-ink mt-4 py-2"
             >
               Can&apos;t deliver
             </button>

@@ -26,10 +26,12 @@ import { useIssueOtp, useRecordPod } from '../deliveries/useDeliveries'
  * transition, and nothing here competes with it.
  */
 
-const CAPS = 'text-[11px] font-semibold uppercase tracking-[0.13em] text-faint'
+const CAPS = 'text-[11px] font-semibold uppercase tracking-[0.13em] text-muted'
 
 const FIELD = [
-  'w-full font-sans text-[14.5px] text-ink px-13px py-11px',
+  // min-h-12 for the same reason the tiles are min-h-12: this is a phone in a
+  // rider's hand, and section 4 puts the floor at 48px.
+  'w-full min-h-12 font-sans text-[14.5px] text-ink px-13px py-11px',
   'border border-hairline-strong rounded-sm bg-surface outline-none',
   'focus:border-accent focus:ring-[3px] focus:ring-accent-tint',
 ].join(' ')
@@ -85,7 +87,7 @@ const PodTile = ({
       'flex-1 min-h-12 border border-dashed rounded-md py-4 px-3 text-center',
       'text-[12.5px] font-medium transition-colors duration-100',
       disabled
-        ? 'border-hairline text-faint cursor-not-allowed'
+        ? 'border-hairline text-muted cursor-not-allowed'
         : selected
           ? 'border-accent bg-accent-tint text-ink cursor-pointer'
           : 'border-hairline-strong text-ink-2 hover:bg-surface-sunk cursor-pointer',
@@ -274,7 +276,7 @@ export const PodCapture = ({ d }: Props) => {
           ) : null}
 
           {photo ? (
-            <p className="text-[11.5px] text-faint mt-2">
+            <p className="text-[11.5px] text-muted mt-2">
               Uploaded{' '}
               <span className="mono">
                 {formatBytes(photo.from)} → {formatBytes(photo.bytes)}
@@ -282,7 +284,7 @@ export const PodCapture = ({ d }: Props) => {
               · stored as a link, not an image
             </p>
           ) : (
-            <p className="text-[11.5px] text-faint mt-2">
+            <p className="text-[11.5px] text-muted mt-2">
               Compressed on the phone before it is sent.
             </p>
           )}
@@ -312,13 +314,14 @@ export const PodCapture = ({ d }: Props) => {
                   className={`${FIELD} mono flex-1 min-w-0 tracking-[0.3em] text-[17px]`}
                 />
                 <Button
+                  className="min-h-12"
                   disabled={code.length !== POD_OTP_LENGTH || busy}
                   onClick={submitCode}
                 >
                   {pod.isPending ? 'Checking…' : 'Verify'}
                 </Button>
               </div>
-              <p className="text-[11.5px] text-faint mt-2">
+              <p className="text-[11.5px] text-muted mt-2">
                 Sent to the sender&apos;s tracking screen. Expires{' '}
                 <span className="mono">
                   {new Date(issue.data.otp.expiresAt).toLocaleTimeString('en-BD', {
@@ -339,7 +342,7 @@ export const PodCapture = ({ d }: Props) => {
               >
                 {issue.isPending ? 'Sending…' : 'Send code'}
               </Button>
-              <p className="text-[11.5px] text-faint mt-2">
+              <p className="text-[11.5px] text-muted mt-2">
                 The code goes to the sender, never to this screen.
               </p>
             </>
@@ -364,7 +367,11 @@ export const PodCapture = ({ d }: Props) => {
               onChange={(e) => setReceivedBy(e.target.value)}
               className={`${FIELD} flex-1 min-w-0`}
             />
-            <Button disabled={receivedBy.trim().length < 2 || busy} onClick={submitSignature}>
+            <Button
+              className="min-h-12"
+              disabled={receivedBy.trim().length < 2 || busy}
+              onClick={submitSignature}
+            >
               {pod.isPending ? 'Saving…' : 'Save'}
             </Button>
           </div>

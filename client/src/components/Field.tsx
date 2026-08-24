@@ -22,6 +22,13 @@ interface BaseProps {
   hint?: string
   /** Rendered under the control and announced to screen readers. */
   error?: string | null
+  /**
+   * Rider-facing sizing: a 48px minimum control (CLAUDE.md section 4's tap
+   * target floor) and a hint in --muted rather than --faint, which is 2.88:1 on
+   * white and unreadable in daylight. Off by default so the desk-bound screens
+   * keep the reference appearance exactly.
+   */
+  touch?: boolean
 }
 
 interface FieldProps
@@ -30,7 +37,7 @@ interface FieldProps
   suffix?: ReactNode
 }
 
-export const Field = ({ label, hint, error, suffix, ...rest }: FieldProps) => {
+export const Field = ({ label, hint, error, suffix, touch, ...rest }: FieldProps) => {
   const id = useId()
   const errorId = `${id}-error`
   return (
@@ -41,7 +48,7 @@ export const Field = ({ label, hint, error, suffix, ...rest }: FieldProps) => {
       <div className={suffix ? 'flex items-center gap-2' : undefined}>
         <input
           id={id}
-          className={`${CONTROL} ${errorBorder(Boolean(error))}`}
+          className={`${CONTROL} ${touch ? 'min-h-12' : ''} ${errorBorder(Boolean(error))}`}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
           {...rest}
@@ -55,7 +62,9 @@ export const Field = ({ label, hint, error, suffix, ...rest }: FieldProps) => {
           {error}
         </p>
       ) : hint ? (
-        <p className="text-[11.5px] text-faint mt-1.5">{hint}</p>
+        <p className={`text-[11.5px] mt-1.5 ${touch ? 'text-muted' : 'text-faint'}`}>
+          {hint}
+        </p>
       ) : null}
     </div>
   )
@@ -72,6 +81,7 @@ export const SelectField = ({
   hint,
   error,
   children,
+  touch,
   ...rest
 }: SelectFieldProps) => {
   const id = useId()
@@ -83,7 +93,7 @@ export const SelectField = ({
       </label>
       <select
         id={id}
-        className={`${CONTROL} ${errorBorder(Boolean(error))}`}
+        className={`${CONTROL} ${touch ? 'min-h-12' : ''} ${errorBorder(Boolean(error))}`}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
         {...rest}
@@ -95,7 +105,9 @@ export const SelectField = ({
           {error}
         </p>
       ) : hint ? (
-        <p className="text-[11.5px] text-faint mt-1.5">{hint}</p>
+        <p className={`text-[11.5px] mt-1.5 ${touch ? 'text-muted' : 'text-faint'}`}>
+          {hint}
+        </p>
       ) : null}
     </div>
   )

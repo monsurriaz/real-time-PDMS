@@ -79,11 +79,11 @@ export const ShiftControls = () => {
     <Panel title="Your shift" className="mb-5">
       <div className="flex items-start justify-between gap-4 mb-5">
         <div>
-          <Eyebrow>Status</Eyebrow>
+          <Eyebrow tone="strong">Status</Eyebrow>
           <p className="text-[15px] font-semibold">
             {STATUS_LABEL[agent.status] ?? agent.status}
           </p>
-          <p className="text-[11.5px] text-faint mt-0.5">
+          <p className="text-[11.5px] text-muted mt-0.5">
             {agent.activeCount} active{' '}
             {agent.activeCount === 1 ? 'delivery' : 'deliveries'}
           </p>
@@ -124,13 +124,13 @@ export const ShiftControls = () => {
       ) : null}
 
       <div className="border-t border-hairline pt-4">
-        <Eyebrow>Your location</Eyebrow>
+        <Eyebrow tone="strong">Your location</Eyebrow>
         {agent.currentLocation ? (
           <p className="mono text-[12.5px] mb-3">
             {agent.currentLocation.coordinates[1].toFixed(4)},{' '}
             {agent.currentLocation.coordinates[0].toFixed(4)}
             {agent.locationUpdatedAt ? (
-              <span className="block font-sans text-[11px] text-faint">
+              <span className="block font-sans text-[11px] text-muted">
                 set {formatDateTime(agent.locationUpdatedAt)}
               </span>
             ) : null}
@@ -149,7 +149,8 @@ export const ShiftControls = () => {
                 type="button"
                 onClick={() => setMode(m)}
                 className={[
-                  'text-[12.5px] font-medium px-3 py-1.5 rounded-pill border',
+                  // 48px floor, same as every other control a rider taps.
+                  'text-[12.5px] font-medium px-4 min-h-12 rounded-pill border',
                   mode === m
                     ? 'bg-ink text-white border-transparent'
                     : 'bg-surface text-ink-2 border-hairline-strong hover:bg-surface-sunk',
@@ -162,6 +163,7 @@ export const ShiftControls = () => {
 
           {mode === 'zone' ? (
             <SelectField
+              touch
               label="Zone centre"
               value={zone}
               hint="Drops you at the centre of that zone."
@@ -177,6 +179,7 @@ export const ShiftControls = () => {
           ) : (
             <div className="grid grid-cols-2 gap-x-3">
               <Field
+              touch
                 label="Latitude"
                 inputMode="decimal"
                 placeholder="23.7461"
@@ -184,6 +187,7 @@ export const ShiftControls = () => {
                 onChange={(e) => setLat(e.target.value)}
               />
               <Field
+              touch
                 label="Longitude"
                 inputMode="decimal"
                 placeholder="90.3742"

@@ -6,6 +6,7 @@ import { env } from './lib/env'
 import { attachActor } from './middleware/auth'
 import { errorHandler, notFoundHandler } from './middleware/httpError'
 import { agentsRouter } from './routes/agents'
+import { analyticsRouter } from './routes/analytics'
 import { authRouter } from './routes/auth'
 import { deliveriesRouter } from './routes/deliveries'
 import { parcelsRouter } from './routes/parcels'
@@ -68,6 +69,7 @@ export const createApp = (): Express => {
   app.use('/deliveries', deliveriesRouter)
   app.use('/agents', agentsRouter)
   app.use('/payments', paymentsRouter)
+  app.use('/analytics', analyticsRouter)
   app.use('/tracking', trackingRouter)
 
   app.use(notFoundHandler)

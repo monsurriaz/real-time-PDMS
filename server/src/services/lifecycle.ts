@@ -65,6 +65,24 @@ export const TRANSITION_AUTHORITY: Record<DeliveryStatus, readonly Role[]> = {
   Booked: [], // only creation produces Booked
 }
 
+/**
+ * How long after booking a parcel is promised.
+ *
+ * CLAUDE.md does not state a service level, so this is an assumption made in
+ * one place rather than scattered: `delivery.expectedBy` is booking time plus
+ * this, and everything that says "delayed" — the admin alert, the board's
+ * overdue flag — reads that field rather than re-deriving a deadline.
+ *
+ * If the promise ever needs to differ by zone or by weight it belongs in
+ * PricingConfig beside the rates, where an admin can edit it without a deploy.
+ * One number in one file is the honest version of "we have not decided that
+ * yet"; six copies of `24 * 3_600_000` would not be.
+ */
+export const PROMISED_WINDOW_HOURS = 24
+
+export const promisedBy = (bookedAt: Date): Date =>
+  new Date(bookedAt.getTime() + PROMISED_WINDOW_HOURS * 3_600_000)
+
 export const isTerminal = (s: DeliveryStatus): boolean =>
   (TERMINAL_STATUSES as readonly DeliveryStatus[]).includes(s)
 

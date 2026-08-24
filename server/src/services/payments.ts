@@ -588,21 +588,20 @@ export const settleAgent = async (args: {
 /**
  * The settlement trail, newest first.
  *
- * `agentId` is honoured only for an admin, and not because a rider filtering
- * the list would be a leak — the model's scoping already pins them to their own
- * agent id. It is because of HOW that scoping applies: the plugin merges its
- * filter with `Query.where`, and two conditions on the same path do not AND,
- * the later one wins. So a rider asking for someone else's trail would get
- * their own back, filtered by a condition the response no longer reflects. Fail
- * safe, but a misleading answer is still a wrong answer.
+ * The `agentId` filter is applied for every role and left to compose with the
+ * model's own scoping. That is safe since M6 fixed the scope plugin to merge
+ * with `$and`: a rider asking for another rider's trail now gets a filter that
+ * requires both agent ids at once, which matches nothing. Before that fix the
+ * scope condition replaced this one and they got their own trail back under
+ * someone else's filter — the M5 workaround here was to honour the filter for
+ * admins only, and it is no longer needed.
  */
 export const settlementHistory = async (args: {
-  actor: Actor
   agentId?: string
 }): Promise<Settlement[]> => {
-  const { actor, agentId } = args
+  const { agentId } = args
   const filter =
-    actor.role === 'admin' && agentId && mongoose.Types.ObjectId.isValid(agentId)
+    agentId && mongoose.Types.ObjectId.isValid(agentId)
       ? { agent: new mongoose.Types.ObjectId(agentId) }
       : {}
 

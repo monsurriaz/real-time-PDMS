@@ -30,9 +30,29 @@ export const Panel = ({ title, action, children, className = '' }: PanelProps) =
   </section>
 )
 
-/** The `.eyebrow` label — 11px, uppercase, wide tracking, faint. */
-export const Eyebrow = ({ children }: { children: ReactNode }) => (
-  <p className="text-[11px] font-semibold uppercase tracking-[0.13em] text-faint mb-10px">
+/**
+ * The `.eyebrow` label — 11px, uppercase, wide tracking, faint.
+ *
+ * `tone="strong"` swaps --faint for --muted. Not a restyle: --faint on white is
+ * 2.88:1, which is legible on a desk and genuinely is not on a phone in Dhaka
+ * daylight, and CLAUDE.md section 4 is explicit that riders work outdoors. The
+ * agent screens ask for it; every other screen keeps the reference appearance,
+ * because the design system is frozen and this is the one place with a stated
+ * reason to differ.
+ */
+export const Eyebrow = ({
+  children,
+  tone = 'faint',
+}: {
+  children: ReactNode
+  tone?: 'faint' | 'strong'
+}) => (
+  <p
+    className={[
+      'text-[11px] font-semibold uppercase tracking-[0.13em] mb-10px',
+      tone === 'strong' ? 'text-muted' : 'text-faint',
+    ].join(' ')}
+  >
     {children}
   </p>
 )

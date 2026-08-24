@@ -109,6 +109,21 @@ export const BookingPage = () => {
   const zoneOptions = zones.data ?? []
 
   /**
+   * The zone list is the one piece of reference data this form cannot work
+   * without, and a select that is simply empty gives no clue why. Loading and
+   * failure are said out loud on the control itself rather than left to the
+   * customer to infer from an empty dropdown.
+   */
+  const zoneHint = zones.isPending
+    ? 'Loading zones…'
+    : zones.isError
+      ? 'Zones could not be loaded — reload the page to try again.'
+      : zoneOptions.length === 0
+        ? 'No serviceable zones are configured yet.'
+        : null
+  const zoneProblem = zones.isError || (!zones.isPending && zoneOptions.length === 0)
+
+  /**
    * The heaviest parcel the current tiers price.
    *
    * Read from the live PricingConfig rather than written here: an admin can
@@ -195,11 +210,14 @@ export const BookingPage = () => {
           <SelectField
             label="Zone"
             value={draft.pickupZone}
-            error={errors['pickup.zone']}
-            hint="The zone base fare is taken from the pick-up zone."
+            error={zoneProblem ? zoneHint : errors['pickup.zone']}
+            hint={zoneHint ?? 'The zone base fare is taken from the pick-up zone.'}
+            disabled={zones.isPending}
             onChange={(e) => set('pickupZone', e.target.value as ZoneName | '')}
           >
-            <option value="">Select a zone</option>
+            <option value="">
+              {zones.isPending ? 'Loading zones…' : 'Select a zone'}
+            </option>
             {zoneOptions.map((z) => (
               <option key={z.name} value={z.name}>{z.label}</option>
             ))}
@@ -238,10 +256,14 @@ export const BookingPage = () => {
           <SelectField
             label="Zone"
             value={draft.dropZone}
-            error={errors['drop.zone']}
+            error={zoneProblem ? zoneHint : errors['drop.zone']}
+            {...(zoneHint && !zoneProblem ? { hint: zoneHint } : {})}
+            disabled={zones.isPending}
             onChange={(e) => set('dropZone', e.target.value as ZoneName | '')}
           >
-            <option value="">Select a zone</option>
+            <option value="">
+              {zones.isPending ? 'Loading zones…' : 'Select a zone'}
+            </option>
             {zoneOptions.map((z) => (
               <option key={z.name} value={z.name}>{z.label}</option>
             ))}

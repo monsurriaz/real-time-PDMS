@@ -18,7 +18,7 @@ import { HttpError, unauthorized } from '../middleware/httpError'
 import { autoAssignAfterBooking } from '../services/assignment'
 import { createPaymentForParcel, summariesForParcels } from '../services/payments'
 import { priceFor } from '../services/pricing'
-import { availableTransitions } from '../services/lifecycle'
+import { availableTransitions, promisedBy } from '../services/lifecycle'
 import { generateTrackingId } from '../services/trackingId'
 
 export const parcelsRouter = Router()
@@ -140,7 +140,12 @@ parcelsRouter.post('/', requireAuth, requireRole('customer'), async (req, res, n
       assignedAt: null,
       pickedUpAt: null,
       deliveredAt: null,
-      expectedBy: null,
+      /**
+       * The promise, set at booking. Left null until M6, which meant the
+       * delayed-parcel alert could only ever fire on seeded data — a real
+       * booking was never late because it was never due.
+       */
+      expectedBy: promisedBy(new Date()),
     })
 
     /**

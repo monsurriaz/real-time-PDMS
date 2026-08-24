@@ -301,6 +301,13 @@ export const seedParcels = async (): Promise<void> => {
       lastKnownLocation: pointFor(spec.status),
       lastLocationAt: at(spec.status) ?? bookedAt,
       /**
+       * Backdated alongside the parcel. Without this every seeded delivery
+       * claims to have been created the moment the seed ran, which makes the
+       * admin board's recency sort and M6's day-over-day deltas nonsense.
+       */
+      createdAt: bookedAt,
+      updatedAt: at(spec.status) ?? bookedAt,
+      /**
        * The delayed-looking parcel is overdue by construction; the rest get a
        * plausible window so M6's "delayed" alert has something to compare.
        */

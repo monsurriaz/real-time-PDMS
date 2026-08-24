@@ -153,7 +153,19 @@ export const FleetMap = () => {
       ) : (
         <div className="relative h-[380px] rounded-md overflow-hidden border border-hairline bg-surface-sunk">
           <TrackingMap className="absolute inset-0" riders={riders} animate />
-          {riders.length === 0 && !fleet.isPending ? (
+          {/*
+            Three states over one map, not two: an empty fleet and a fleet that
+            has not loaded yet look identical on the canvas, and telling an admin
+            "nobody is out there" while the request is still in flight is a lie
+            that resolves itself — but only after they have believed it.
+          */}
+          {fleet.isPending ? (
+            <div className="absolute inset-0 grid place-items-center pointer-events-none">
+              <p className="text-[13px] text-muted bg-paper/[0.92] border border-hairline rounded-sm px-3 py-2">
+                Locating riders…
+              </p>
+            </div>
+          ) : riders.length === 0 ? (
             <div className="absolute inset-0 grid place-items-center pointer-events-none">
               <p className="text-[13px] text-muted bg-paper/[0.92] border border-hairline rounded-sm px-3 py-2">
                 No active rider has reported a position yet. Run the simulator to

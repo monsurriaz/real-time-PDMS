@@ -4,6 +4,7 @@ import { FleetMap } from './FleetMap'
 
 export const ADMIN_NAV = [
   { to: '/admin', label: 'Operations' },
+  { to: '/admin/analytics', label: 'Analytics' },
   { to: '/admin/cod', label: 'COD' },
   { to: '/admin/pricing', label: 'Pricing' },
 ] as const

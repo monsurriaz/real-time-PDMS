@@ -61,6 +61,43 @@ const WRITE_HOOKS = [
 /** A filter that can never match — Mongo has no false literal. */
 const IMPOSSIBLE = { _id: { $exists: false } } as const
 
+/**
+ * Add a condition to a query so it ANDs with whatever the handler already asked
+ * for.
+ *
+ * `Query.where` is the obvious call and the wrong one: it assigns into the
+ * condition object, so a scope condition on a path the handler had already
+ * constrained REPLACES it rather than narrowing it. `Query.and` appends to
+ * `$and`, which is the only merge that cannot silently drop either side.
+ *
+ * That distinction was a live authorisation bug, not a theoretical one. Socket
+ * room joins authorise with `ParcelModel.exists({ _id: parcelId })` inside the
+ * joiner's context, and Parcel's rule for an agent is `{ _id: { $in: theirs } }`
+ * — same path. With `where`, the requested id was overwritten by the list of
+ * their own, so ANY agent holding at least one assignment could join ANY
+ * parcel's room and receive its position stream.
+ */
+const narrow = <T>(query: Query<unknown, T>, condition: FilterQuery<T>): void => {
+  query.and([condition])
+}
+
+/**
+ * The applier each schema was given, so a test can invoke exactly what runs in
+ * production. A WeakMap rather than a field on the schema: nothing outside the
+ * test has any business reaching for it.
+ */
+const scopeAppliers = new WeakMap<
+  Schema<never>,
+  (this: Query<unknown, never>) => Promise<void>
+>()
+
+export const scopeApplierFor = <T>(
+  schema: Schema<T>,
+): ((this: Query<unknown, T>) => Promise<void>) | undefined =>
+  scopeAppliers.get(schema as unknown as Schema<never>) as
+    | ((this: Query<unknown, T>) => Promise<void>)
+    | undefined
+
 export const roleScopePlugin = <T>(
   schema: Schema<T>,
   rules: ScopeRules<T>,
@@ -87,26 +124,35 @@ export const roleScopePlugin = <T>(
             'and start the query there (.exec()), since a Query is lazy.',
         )
       }
-      this.where(IMPOSSIBLE as FilterQuery<T>)
+      narrow(this, IMPOSSIBLE as FilterQuery<T>)
       return
     }
 
     const rule = rules[actor.role]
     if (!rule) {
-      this.where(IMPOSSIBLE as FilterQuery<T>)
+      narrow(this, IMPOSSIBLE as FilterQuery<T>)
       return
     }
 
     const result = await rule(actor)
     if (result === ALLOW_ALL) return
     if (result === DENY_ALL) {
-      this.where(IMPOSSIBLE as FilterQuery<T>)
+      narrow(this, IMPOSSIBLE as FilterQuery<T>)
       return
     }
-    // `where` merges rather than replaces, so a handler's own conditions and
-    // this scope both apply.
-    this.where(result)
+    narrow(this, result)
   }
+
+  /**
+   * Exported for the regression test, which drives it against a real Query and
+   * inspects the filter that comes out. Registering the same function the test
+   * calls is the point — a test against a re-implementation would not have
+   * caught the `where`/`and` distinction above.
+   */
+  scopeAppliers.set(
+    schema as unknown as Schema<never>,
+    applyScope as unknown as (this: Query<unknown, never>) => Promise<void>,
+  )
 
   for (const hook of [...READ_HOOKS, ...WRITE_HOOKS]) {
     schema.pre(hook, applyScope)

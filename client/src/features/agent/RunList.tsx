@@ -45,7 +45,7 @@ export const RunList = () => {
               <>
                 {active.length > 0 ? (
                   <>
-                    <Eyebrow>
+                    <Eyebrow tone="strong">
                       {active.length === 1
                         ? 'Active delivery'
                         : `${active.length} active`}
@@ -65,7 +65,7 @@ export const RunList = () => {
 
                 {done.length > 0 ? (
                   <>
-                    <Eyebrow>Finished · {done.length}</Eyebrow>
+                    <Eyebrow tone="strong">Finished · {done.length}</Eyebrow>
                     <Panel>
                       {done.map((d) => (
                         <div

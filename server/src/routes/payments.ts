@@ -142,12 +142,9 @@ paymentsRouter.post(
  */
 paymentsRouter.get('/settlements', requireAuth, async (req, res, next) => {
   try {
-    const actor = req.actor
-    if (!actor) throw unauthorized()
     const agentId = (req.query as Record<string, string | undefined>).agentId
     res.json({
       settlements: await settlementHistory({
-        actor,
         ...(agentId ? { agentId } : {}),
       }),
     })
