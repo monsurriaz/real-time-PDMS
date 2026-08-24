@@ -19,6 +19,10 @@ Course project, CSC 470. Seven-day build. Demo-ready beats feature-complete.
 5. **One milestone per session.** Commit at the end. Don't start the next one.
 6. **No secrets in the repo.** Everything through `.env`, with `.env.example` kept current.
 7. **Vertical slices, not layers.** "Booking works end to end" before "all models exist."
+8. **Deferred work lives in DEFERRED.md, not in the current milestone.** When you defer
+   something, append it there with a target milestone and a one-line reason — don't fix
+   it in the current session unless I ask. At the start of M5, M6, and M7, read that
+   file's matching section and confirm scope with me before starting.
 
 ---
 
@@ -203,6 +207,8 @@ to zone-only if no agent is within 5 km. Admin can override.
 | M5 | POD + payments | Photo/OTP stored, Stripe test checkout, COD flag, reconciliation table per agent |
 | M6 | Analytics + polish | Stat cards, one chart, delayed alerts, loading/empty/error states, agent mobile pass |
 | M7 | Deploy + rehearse | Live on Vercel + Render + Atlas, demo data seeded, run-through twice |
+
+See DEFERRED.md for work parked out of each milestone.
 
 If M3 slips, cut M6 before cutting anything in M4. Live tracking is the flagship.
 
