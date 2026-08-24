@@ -93,11 +93,27 @@ layouts. `tokens.css` is generated from it — if the two ever disagree, the HTM
 
 --radius-sm:8px;  --radius:12px;  --radius-lg:16px;
 
+/* grid steps — --space-N is N x 4px */
 --space-1:4px;    --space-2:8px;    --space-3:12px;
 --space-4:16px;   --space-5:20px;   --space-6:24px;
 --space-7:28px;   --space-8:32px;   --space-10:40px;
 --space-14:56px;  --space-16:64px;
+
+/* optical steps — the off-grid values design-system.html actually uses.
+   Named in literal pixels because seven of them are odd numbers that no
+   fraction of the 4px grid names readably. */
+--space-5px:5px;    --space-7px:7px;    --space-9px:9px;
+--space-10px:10px;  --space-11px:11px;  --space-13px:13px;
+--space-14px:14px;  --space-15px:15px;  --space-17px:17px;
+--space-18px:18px;  --space-22px:22px;  --space-30px:30px;
 ```
+
+- Two families, one scale. Reach for a **grid step** when you are choosing
+  spacing. Reach for an **optical step** only to match a specific value in
+  `design-system.html` — they exist so those values are tokens rather than raw
+  pixels, not to widen the palette of choices.
+- `--space-14` is 56px and `--space-14px` is 14px. The `px` suffix always means
+  literal pixels.
 
 - Fonts: **Manrope** (UI), **JetBrains Mono** (all numbers, IDs, money, times),
   **Montserrat 700** (wordmark only).

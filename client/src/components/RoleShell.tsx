@@ -37,7 +37,7 @@ export const RoleShell = ({ title, next }: Props) => {
     <div className="min-h-dvh">
       <header className="sticky top-0 z-50 bg-paper/[0.88] backdrop-blur-[10px] border-b border-hairline">
         <div className="max-w-[1180px] mx-auto px-5 sm:px-7 h-[62px] flex items-center gap-7">
-          <div className="flex items-center gap-[9px]">
+          <div className="flex items-center gap-9px">
             <span className="w-[9px] h-[9px] rounded-[2px] bg-accent rotate-45" />
             <span className="font-display font-bold text-[17px] tracking-[-0.02em]">
               ParcelDelivery

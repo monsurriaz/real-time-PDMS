@@ -62,10 +62,11 @@
   --pill: var(--radius-pill);
 
   /**
-   * Spacing scale (CLAUDE.md section 4). The numbering is deliberately the
-   * same as Tailwind's default spacing scale — --space-4 is 16px and so is
-   * `p-4` — so a utility class and a hand-written var() cannot disagree.
-   * Verified against Tailwind's generated output, not assumed.
+   * Spacing scale (CLAUDE.md section 4), in two families.
+   *
+   * GRID STEPS — --space-N is N x 4px. The numbering deliberately matches
+   * Tailwind's default spacing scale, so `p-4` and var(--space-4) are both
+   * 16px and cannot drift. Use these when CHOOSING spacing.
    */
   --space-1: 4px;
   --space-2: 8px;
@@ -78,6 +79,31 @@
   --space-10: 40px;
   --space-14: 56px;
   --space-16: 64px;
+
+  /**
+   * OPTICAL STEPS — the off-grid values design-system.html actually uses.
+   *
+   * Named in literal pixels rather than as fractions of the grid: seven of
+   * the twelve are odd numbers, and --space-3-75 reads worse than the 15px it
+   * stands for. The `px` suffix always means literal pixels, which is what
+   * keeps --space-14 (56px) and --space-14px (14px) from being confusable.
+   *
+   * These exist so the reference's values are tokens instead of raw pixels.
+   * They are not an invitation to widen the palette — reach for one only to
+   * match a specific value in the locked HTML.
+   */
+  --space-5px: 5px;
+  --space-7px: 7px;
+  --space-9px: 9px;
+  --space-10px: 10px;
+  --space-11px: 11px;
+  --space-13px: 13px;
+  --space-14px: 14px;
+  --space-15px: 15px;
+  --space-17px: 17px;
+  --space-18px: 18px;
+  --space-22px: 22px;
+  --space-30px: 30px;
 
   --font: "Manrope", system-ui, -apple-system, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, monospace;
@@ -135,4 +161,25 @@
   --font-sans: var(--font);
   --font-mono: var(--mono);
   --font-display: var(--display);
+
+  /**
+   * Optical steps as utilities, so a component can write `py-11px` instead of
+   * `py-[11px]`. Same rendered pixels, but the value now resolves to a token
+   * and an arbitrary-value bracket in a diff becomes a real signal again.
+   *
+   * The grid steps need no entry here: Tailwind's own --spacing multiplier
+   * (.25rem) already makes p-1 .. p-16 land exactly on them.
+   */
+  --spacing-5px: var(--space-5px);
+  --spacing-7px: var(--space-7px);
+  --spacing-9px: var(--space-9px);
+  --spacing-10px: var(--space-10px);
+  --spacing-11px: var(--space-11px);
+  --spacing-13px: var(--space-13px);
+  --spacing-14px: var(--space-14px);
+  --spacing-15px: var(--space-15px);
+  --spacing-17px: var(--space-17px);
+  --spacing-18px: var(--space-18px);
+  --spacing-22px: var(--space-22px);
+  --spacing-30px: var(--space-30px);
 }

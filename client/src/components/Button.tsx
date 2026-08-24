@@ -36,8 +36,8 @@ export const Button = ({
       'border cursor-pointer transition-colors duration-100',
       'disabled:opacity-55 disabled:cursor-not-allowed',
       size === 'lg'
-        ? 'min-h-12 rounded-md px-[22px] py-4 text-[15.5px]'
-        : 'rounded-sm px-5 py-[11px] text-sm',
+        ? 'min-h-12 rounded-md px-22px py-4 text-[15.5px]'
+        : 'rounded-sm px-5 py-11px text-sm',
       VARIANTS[variant],
       className,
     ].join(' ')}

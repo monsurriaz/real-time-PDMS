@@ -39,7 +39,7 @@ export const LoginPage = () => {
   return (
     <main className="min-h-dvh grid place-items-center px-5 py-10">
       <div className="w-full max-w-[380px]">
-        <div className="flex items-center gap-[9px] mb-7">
+        <div className="flex items-center gap-9px mb-7">
           <span className="w-[9px] h-[9px] rounded-[2px] bg-accent rotate-45" />
           <span className="font-display font-bold text-[17px] tracking-[-0.02em]">
             ParcelDelivery
@@ -58,7 +58,7 @@ export const LoginPage = () => {
           noValidate
           className="bg-surface border border-hairline rounded-md p-5"
         >
-          <div className="mb-[15px]">
+          <div className="mb-15px">
             <label
               htmlFor="email"
               className="block text-[12.5px] font-medium text-ink-2 mb-1.5"
@@ -71,13 +71,13 @@ export const LoginPage = () => {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full font-sans text-[14.5px] text-ink px-[13px] py-[11px]
+              className="w-full font-sans text-[14.5px] text-ink px-13px py-11px
                          border border-hairline-strong rounded-sm bg-surface outline-none
                          focus:border-accent focus:ring-[3px] focus:ring-accent-tint"
             />
           </div>
 
-          <div className="mb-[15px]">
+          <div className="mb-15px">
             <label
               htmlFor="password"
               className="block text-[12.5px] font-medium text-ink-2 mb-1.5"
@@ -90,7 +90,7 @@ export const LoginPage = () => {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full font-sans text-[14.5px] text-ink px-[13px] py-[11px]
+              className="w-full font-sans text-[14.5px] text-ink px-13px py-11px
                          border border-hairline-strong rounded-sm bg-surface outline-none
                          focus:border-accent focus:ring-[3px] focus:ring-accent-tint"
             />
