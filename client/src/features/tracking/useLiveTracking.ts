@@ -9,6 +9,7 @@ import {
   type DeliveryStatus,
   type GeoPoint,
   type LocationBroadcast,
+  type ProofOfDelivery,
   type StatusChanged,
 } from '@pdms/shared'
 import { ApiError, api } from '@/lib/api'
@@ -35,7 +36,17 @@ export interface TrackingSnapshot {
     lastLocationAt: string | null
     expectedBy: string | null
     hasProofOfDelivery: boolean
+    proofOfDelivery: ProofOfDelivery | null
   }
+  /**
+   * The delivery code the rider asked for, when one is outstanding.
+   *
+   * Present for the parcel's owner and for an admin, and absent for the rider —
+   * the server decides that, because the code exists to prove the rider reached
+   * the recipient. There is no SMS provider in this project, so this screen is
+   * the channel: the sender reads the code out over the phone.
+   */
+  otp: { code: string; expiresAt: string } | null
   rider: { name: string; vehicle: string; currentLocation?: GeoPoint } | null
   route: Array<[number, number]>
 }

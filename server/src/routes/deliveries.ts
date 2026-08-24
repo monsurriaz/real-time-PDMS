@@ -6,6 +6,7 @@ import {
   recordPodInputSchema,
   type DeliveryListItem,
   type DeliveryStatus,
+  type PodMethod,
   type ZoneName,
 } from '@pdms/shared'
 import { runAsSystem } from '../lib/context'
@@ -16,6 +17,8 @@ import { UserModel } from '../models/User'
 import { requireAuth, requireRole } from '../middleware/auth'
 import { HttpError, unauthorized } from '../middleware/httpError'
 import { assignDelivery, suggestAgents } from '../services/assignment'
+import { codStatusForParcels } from '../services/payments'
+import { issueOtp, recordProof } from '../services/pod'
 import { advanceStatus, availableTransitions } from '../services/lifecycle'
 
 export const deliveriesRouter = Router()
@@ -32,7 +35,7 @@ interface DeliveryRow {
   parcel: mongoose.Types.ObjectId
   agent: mongoose.Types.ObjectId | null
   status: DeliveryStatus
-  proofOfDelivery?: unknown
+  proofOfDelivery?: { method: PodMethod }
   expectedBy: Date | null
   createdAt: Date
   updatedAt: Date
@@ -91,6 +94,14 @@ const toListItems = async (
     })
   }
 
+  /**
+   * Where each COD parcel's cash stands. One query for the page rather than
+   * one per row, and only for the parcels that are actually COD.
+   */
+  const codStatus = await codStatusForParcels(
+    parcels.filter((p) => p.isCod).map((p) => p._id),
+  )
+
   const now = Date.now()
 
   return rows.flatMap((d) => {
@@ -113,7 +124,9 @@ const toListItems = async (
         total: p.price.total,
         isCod: p.isCod,
         codAmount: p.codAmount,
+        codStatus: p.isCod ? (codStatus.get(p._id.toString()) ?? null) : null,
         hasProofOfDelivery: Boolean(d.proofOfDelivery),
+        podMethod: d.proofOfDelivery?.method ?? null,
         agentName: d.agent ? (nameByAgentId.get(d.agent.toString()) ?? null) : null,
         agentId: d.agent ? d.agent.toString() : null,
         /**
@@ -260,11 +273,30 @@ deliveriesRouter.post('/:id/status', requireAuth, async (req, res, next) => {
 })
 
 /**
+ * POST /deliveries/:id/pod/otp — send a delivery code.
+ *
+ * Returns when it was issued and when it dies, never the code itself. See
+ * services/pod.ts for why: the rider is the party the code checks.
+ */
+deliveriesRouter.post('/:id/pod/otp', requireAuth, async (req, res, next) => {
+  try {
+    const actor = req.actor
+    if (!actor) throw unauthorized()
+    const id = objectIdParam(req.params.id)
+
+    res.json({ otp: await issueOtp({ deliveryId: id, actor }) })
+  } catch (err) {
+    next(err)
+  }
+})
+
+/**
  * POST /deliveries/:id/pod — record proof of delivery.
  *
- * M3 scope: a signed-for name, which genuinely satisfies section 5's
- * precondition on Delivered. Photo upload and OTP verification are M5 (see
- * DEFERRED.md) and will extend this record rather than replace the rule.
+ * Three live methods since M5: a Cloudinary photo URL, a code the server
+ * verifies, or a signed-for name. Which fields each needs is expressed once, in
+ * the shared discriminated union, so a half-filled payload cannot arrive as an
+ * empty proof.
  *
  * Stored separately from the transition on purpose: section 5 says Delivered
  * requires proof "already stored on the record", so the two are distinct acts.
@@ -273,51 +305,11 @@ deliveriesRouter.post('/:id/pod', requireAuth, async (req, res, next) => {
   try {
     const actor = req.actor
     if (!actor) throw unauthorized()
-    if (actor.role === 'customer') {
-      throw new HttpError(403, 'only the rider or an admin can record delivery proof')
-    }
-
     const id = objectIdParam(req.params.id)
     const input = recordPodInputSchema.parse(req.body)
 
-    // Scoped read: an agent only reaches their own deliveries.
-    const delivery = await DeliveryModel.findById(id).select('status').lean<{
-      status: DeliveryStatus
-    } | null>()
-    if (!delivery) throw new HttpError(404, 'delivery not found')
-
-    /**
-     * Proof only makes sense for a parcel that is out for delivery. Allowing
-     * it earlier would let a rider pre-sign for something still in the depot.
-     */
-    if (delivery.status !== 'InTransit') {
-      throw new HttpError(
-        422,
-        `proof of delivery can only be recorded while a parcel is in transit — this one is ${delivery.status}`,
-      )
-    }
-
-    const capturedAt = new Date()
-    await DeliveryModel.updateOne(
-      { _id: new mongoose.Types.ObjectId(id), status: 'InTransit' },
-      {
-        $set: {
-          proofOfDelivery: {
-            method: 'signature',
-            receivedBy: input.receivedBy.trim(),
-            capturedAt,
-          },
-        },
-      },
-    )
-
-    res.json({
-      proofOfDelivery: {
-        method: 'signature',
-        receivedBy: input.receivedBy.trim(),
-        capturedAt,
-      },
-    })
+    const proofOfDelivery = await recordProof({ deliveryId: id, actor, input })
+    res.json({ proofOfDelivery })
   } catch (err) {
     next(err)
   }
@@ -337,12 +329,20 @@ deliveriesRouter.get('/:id', requireAuth, async (req, res, next) => {
     const [item] = await toListItems(rows, actor.role)
     if (!item) throw new HttpError(404, 'delivery not found')
 
-    const full = await DeliveryModel.findById(id).select('events failureReason').lean<{
-      events: unknown[]
-      failureReason?: string
-    } | null>()
+    const full = await DeliveryModel.findById(id)
+      .select('events failureReason proofOfDelivery')
+      .lean<{
+        events: unknown[]
+        failureReason?: string
+        proofOfDelivery?: unknown
+      } | null>()
 
-    res.json({ delivery: item, events: full?.events ?? [], failureReason: full?.failureReason })
+    res.json({
+      delivery: item,
+      events: full?.events ?? [],
+      failureReason: full?.failureReason,
+      proofOfDelivery: full?.proofOfDelivery ?? null,
+    })
   } catch (err) {
     next(err)
   }

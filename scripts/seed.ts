@@ -183,6 +183,20 @@ const seed = async (): Promise<void> => {
     console.log(`  zones            ${ZONES.length}`)
 
     // ---- pricing config (singleton) ----
+    /**
+     * The seeded ladder. The first three are CLAUDE.md's documented tiers; the
+     * fourth is the formula tier that replaced the hard 5 kg ceiling in M5 —
+     * BDT 130 plus BDT 15 for every kilogram over 5, up to 20 kg. It is
+     * continuous with the tier below it (both start at 130 at the 5 kg mark),
+     * so nothing jumps at the boundary.
+     */
+    const SEEDED_TIERS = [
+      { maxKg: 1, baseFee: 60, label: 'Up to 1 kg' },
+      { maxKg: 3, baseFee: 90, label: '1 - 3 kg' },
+      { maxKg: 5, baseFee: 130, label: '3 - 5 kg' },
+      { maxKg: 20, baseFee: 130, perKgOver: 15, label: '5 - 20 kg' },
+    ]
+
     await PricingConfigModel.updateOne(
       { key: 'default' },
       {
@@ -193,17 +207,42 @@ const seed = async (): Promise<void> => {
            * 0 zone base + (3 km x 12) + 90 (1-3 kg tier) = BDT 126.
            */
           perKmRate: 12,
-          weightTiers: [
-            { maxKg: 1, baseFee: 60, label: 'Up to 1 kg' },
-            { maxKg: 3, baseFee: 90, label: '1 - 3 kg' },
-            { maxKg: 5, baseFee: 130, label: '3 - 5 kg' },
-          ],
+          weightTiers: SEEDED_TIERS,
           zoneBaseOverrides: [],
         },
       },
       { upsert: true },
     )
-    console.log('  pricing config   1 (perKmRate BDT 12, 3 weight tiers)')
+
+    /**
+     * Repair an existing config in place.
+     *
+     * $setOnInsert above only reaches a fresh database, and this file's own
+     * contract is that "running it after a schema change repairs the existing
+     * rows". A config seeded before M5 stops at 5 kg, so a re-seed has to add
+     * the formula tier — but only when the admin has not already extended the
+     * ladder themselves, which is what the 5 kg ceiling check tests for.
+     */
+    const existing = await PricingConfigModel.findOne({ key: 'default' })
+      .select('weightTiers')
+      .lean<{ weightTiers: Array<{ maxKg: number }> } | null>()
+      .exec()
+
+    const ceiling = (existing?.weightTiers ?? []).reduce(
+      (max, t) => Math.max(max, t.maxKg),
+      0,
+    )
+    if (ceiling === 5) {
+      await PricingConfigModel.updateOne(
+        { key: 'default' },
+        { $set: { weightTiers: SEEDED_TIERS } },
+      )
+      console.log('  pricing config   1 (repaired: added the 5 - 20 kg formula tier)')
+    } else {
+      console.log(
+        `  pricing config   1 (perKmRate BDT 12, ${SEEDED_TIERS.length} weight tiers, ceiling ${ceiling || 20} kg)`,
+      )
+    }
 
     // ---- people ----
     const admin = await upsertUser(ADMIN)

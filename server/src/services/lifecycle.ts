@@ -11,6 +11,7 @@ import { DeliveryModel } from '../models/Delivery'
 import { ParcelModel } from '../models/Parcel'
 import { HttpError } from '../middleware/httpError'
 import { broadcast } from '../sockets/broadcast'
+import { syncCodOnTransition } from './payments'
 
 /**
  * THE state machine. CLAUDE.md section 5: legal transitions live in one map
@@ -291,6 +292,19 @@ export const advanceStatus = async (
   }
 
   await syncAgentAvailability(delivery.agent, to)
+
+  /**
+   * The COD ledger follows the lifecycle, for the same reason availability
+   * does: this is the single status path, so anything that must happen when a
+   * delivery finishes hangs off it rather than off whichever route triggered
+   * it. Delivered means the rider is holding cash; Failed and Cancelled mean
+   * nobody ever will.
+   */
+  await syncCodOnTransition({
+    parcelId: delivery.parcel,
+    agentId: delivery.agent,
+    to,
+  })
 
   /**
    * Section 6: the server broadcasts status:changed to the parcel's room.

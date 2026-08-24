@@ -9,6 +9,7 @@ import {
   zoneName,
 } from './common'
 import { deliveryStatusSchema } from './delivery'
+import { paymentSummarySchema } from './payment'
 import { priceBreakdownSchema } from './pricing'
 
 /**
@@ -124,6 +125,12 @@ export const parcelListItemSchema = z.object({
   total: taka,
   isCod: z.boolean(),
   codAmount: taka,
+  /**
+   * The payment for this parcel. Null only for a parcel booked before M5
+   * existed — every booking creates one now, COD included, so the list can
+   * state where the money is without a second request per row.
+   */
+  payment: paymentSummarySchema.nullable(),
   /**
    * What this customer may do next, decided by the server from its own
    * transition map. The client renders these; it never derives them.

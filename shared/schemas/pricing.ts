@@ -13,9 +13,36 @@ export const weightTierSchema = z.object({
   /** Upper bound of the tier, inclusive. The lowest tier starts at 0 kg. */
   maxKg: z.number().positive().max(1000),
   baseFee: taka,
+  /**
+   * Optional per-kilogram rate for weight ABOVE this tier's lower bound, on
+   * top of baseFee. The lower bound is the previous tier's maxKg (0 for the
+   * first tier), so a tier `{ maxKg: 20, baseFee: 130, perKgOver: 15 }` sitting
+   * above a 5 kg tier prices 8 kg as 130 + 15 x 3 = 175.
+   *
+   * This is what lets a heavy parcel be priced honestly instead of refused,
+   * WITHOUT hard-coding the rate: it is a field on the tier, so the admin
+   * pricing editor still owns it (CLAUDE.md section 5). Absent means a flat
+   * tier, which is why every existing tier keeps behaving exactly as before.
+   */
+  perKgOver: taka.optional(),
   label: z.string().min(1).max(40),
 })
 export type WeightTier = z.infer<typeof weightTierSchema>
+
+/**
+ * The lower bound of tier `index`: the previous tier's upper bound, or 0 for
+ * the first. Exported because the admin editor has to tell the admin what
+ * "over" means on a formula tier, and re-deriving it there would be a second
+ * definition free to disagree with the one pricing uses.
+ */
+export const tierFloor = (
+  tiers: readonly WeightTier[],
+  index: number,
+): number => (index <= 0 ? 0 : (tiers[index - 1]?.maxKg ?? 0))
+
+/** The heaviest parcel any tier covers — the stated limit above which we refuse. */
+export const heaviestPricedKg = (tiers: readonly WeightTier[]): number =>
+  tiers.reduce((max, t) => Math.max(max, t.maxKg), 0)
 
 export const zoneBaseOverrideSchema = z.object({
   zone: zoneName,

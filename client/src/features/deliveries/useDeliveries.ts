@@ -3,6 +3,9 @@ import type {
   DeliveryListItem,
   DeliveryStatus,
   GeoPoint,
+  OtpIssued,
+  ProofOfDelivery,
+  RecordPodInput,
   ZoneName,
 } from '@pdms/shared'
 import { api } from '@/lib/api'
@@ -90,13 +93,35 @@ export const useAdvanceStatus = () =>
       ),
   )
 
+/**
+ * Record proof. The payload is the shared discriminated union, so the three
+ * methods share one mutation and one invalidation instead of three near-copies.
+ *
+ * Note what the OTP arm sends: the digits the recipient read out, nothing more.
+ * The verdict comes back from the server (CLAUDE.md rule 3 applied to proof as
+ * well as to transitions).
+ */
 export const useRecordPod = () =>
-  useDeliveryMutation((input: { deliveryId: string; receivedBy: string }) =>
-    api.post<{ proofOfDelivery: { receivedBy: string; capturedAt: string } }>(
-      `/deliveries/${input.deliveryId}/pod`,
-      { receivedBy: input.receivedBy },
-    ),
-  )
+  useDeliveryMutation((input: { deliveryId: string } & RecordPodInput) => {
+    const { deliveryId, ...body } = input
+    return api.post<{ proofOfDelivery: ProofOfDelivery }>(
+      `/deliveries/${deliveryId}/pod`,
+      body,
+    )
+  })
+
+/**
+ * Ask the server to issue a delivery code.
+ *
+ * The response says when it was sent and when it expires — deliberately not the
+ * code, which reaches the recipient through the customer's tracking screen.
+ * There is nothing here for the rider to read, and that is the design.
+ */
+export const useIssueOtp = () =>
+  useMutation({
+    mutationFn: (deliveryId: string) =>
+      api.post<{ otp: OtpIssued }>(`/deliveries/${deliveryId}/pod/otp`),
+  })
 
 /**
  * The rider's current position, for stamping onto a transition.

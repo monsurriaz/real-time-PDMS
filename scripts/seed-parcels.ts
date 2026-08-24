@@ -26,6 +26,7 @@ import {
   AgentModel,
   DeliveryModel,
   ParcelModel,
+  PaymentModel,
   UserModel,
 } from '../server/src/models'
 
@@ -104,13 +105,19 @@ const SPECS: readonly Spec[] = [
   { n: 14, from: 'gulshan1', to: 'dhanmondi9', weightKg: 0.7, size: 'small', status: 'Delivered', customer: 'tanvir', agent: 'sabbir', agedHours: 38, isCod: true, codAmount: 2400 },
   { n: 15, from: 'bashundhara', to: 'mohammadpur', weightKg: 4.5, size: 'large', status: 'Delivered', customer: 'tanvir', agent: 'sabbir', agedHours: 44 },
   { n: 16, from: 'uttara7', to: 'mirpur10', weightKg: 2, size: 'medium', status: 'Delivered', customer: 'sadia', agent: 'imran', agedHours: 50 },
-  { n: 17, from: 'dhanmondi9', to: 'bashundhara', weightKg: 1.3, size: 'small', status: 'Delivered', customer: 'nusrat', agent: 'rakib', agedHours: 56 },
+  { n: 17, from: 'dhanmondi9', to: 'bashundhara', weightKg: 1.3, size: 'small', status: 'Delivered', customer: 'nusrat', agent: 'rakib', agedHours: 56, isCod: true, codAmount: 950 },
 
   { n: 18, from: 'mirpur10', to: 'gulshan2', weightKg: 2.5, size: 'medium', status: 'Cancelled', customer: 'tanvir', agedHours: 20 },
   { n: 19, from: 'mohammadpur', to: 'uttara4', weightKg: 3.8, size: 'medium', status: 'Cancelled', customer: 'sadia', agedHours: 24 },
 
   // the single Failed one
-  { n: 20, from: 'gulshan2', to: 'mirpur1', weightKg: 1.9, size: 'small', status: 'Failed', customer: 'tanvir', agent: 'sabbir', agedHours: 15, failureReason: 'Recipient not reachable after three attempts' },
+  /**
+   * COD as well as Failed, so the reconciliation table has an uncollectable
+   * row out of the box: CLAUDE.md is explicit that a failed delivery's cash
+   * must not count as collectable, and a rule with no demo data behind it is
+   * a rule nobody can see working.
+   */
+  { n: 20, from: 'gulshan2', to: 'mirpur1', weightKg: 1.9, size: 'small', status: 'Failed', customer: 'tanvir', agent: 'sabbir', agedHours: 15, isCod: true, codAmount: 1150, failureReason: 'Recipient not reachable after three attempts' },
 ]
 
 const SEED_PREFIX = 'PD-SEED-'
@@ -133,6 +140,45 @@ const CHAIN: Record<DeliveryStatus, readonly DeliveryStatus[]> = {
   Delivered: ['Booked', 'Assigned', 'PickedUp', 'InTransit', 'Delivered'],
   Cancelled: ['Booked', 'Cancelled'],
   Failed: ['Booked', 'Assigned', 'PickedUp', 'InTransit', 'Failed'],
+}
+
+
+/**
+ * The ledger row a seeded parcel would have.
+ *
+ * Payments are created at booking in the real flow, so demo parcels need them
+ * too — otherwise the customer list shows no payment state and the admin COD
+ * screen is empty on a fresh seed. The status follows the lifecycle exactly as
+ * the running system would have moved it:
+ *
+ *   COD, Delivered            -> collected, stamped with the rider who has it
+ *   COD, Failed / Cancelled   -> failed; that cash is never coming
+ *   COD, anything else        -> pending; the rider has not reached the door
+ *   card, past Assigned       -> paid; a moving parcel was paid for
+ *   card, Cancelled           -> failed; it never completed
+ *   card, Booked              -> pending; checkout not finished
+ */
+const paymentFor = (
+  spec: Spec,
+  deliveredAt: Date | null,
+): { method: 'cod' | 'card'; status: string; paidAt: Date | null; collected: boolean } => {
+  if (spec.isCod) {
+    if (spec.status === 'Delivered') {
+      return { method: 'cod', status: 'collected', paidAt: deliveredAt, collected: true }
+    }
+    if (spec.status === 'Failed' || spec.status === 'Cancelled') {
+      return { method: 'cod', status: 'failed', paidAt: null, collected: false }
+    }
+    return { method: 'cod', status: 'pending', paidAt: null, collected: false }
+  }
+
+  if (spec.status === 'Booked') {
+    return { method: 'card', status: 'pending', paidAt: null, collected: false }
+  }
+  if (spec.status === 'Cancelled') {
+    return { method: 'card', status: 'failed', paidAt: null, collected: false }
+  }
+  return { method: 'card', status: 'paid', paidAt: deliveredAt, collected: false }
 }
 
 export const seedParcels = async (): Promise<void> => {
@@ -161,6 +207,7 @@ export const seedParcels = async (): Promise<void> => {
   if (stale.length > 0) {
     const ids = stale.map((p) => p._id)
     await DeliveryModel.deleteMany({ parcel: { $in: ids } })
+    await PaymentModel.deleteMany({ parcel: { $in: ids } })
     await ParcelModel.deleteMany({ _id: { $in: ids } })
     console.log(`  cleared ${stale.length} previously seeded parcels`)
   }
@@ -262,6 +309,28 @@ export const seedParcels = async (): Promise<void> => {
         : new Date(bookedAt.getTime() + 24 * 3_600_000),
     })
 
+    /**
+     * The amount is the same choice the live service makes: a COD payment
+     * tracks the cash at the door, a card payment the delivery fee from the
+     * price snapshot. Two different sums with two different payers.
+     */
+    const ledger = paymentFor(spec, at('Delivered'))
+    await PaymentModel.create({
+      parcel: parcel._id,
+      customer: customerId,
+      collectedBy: ledger.collected ? (agentEntry?.agentId ?? null) : null,
+      method: ledger.method,
+      status: ledger.status,
+      amount: spec.isCod ? (spec.codAmount ?? 0) : price.total,
+      // A seeded card payment has no real Stripe session behind it, and
+      // inventing an id that resolves to nothing in the dashboard would be
+      // worse than admitting there is none.
+      providerRef: null,
+      paidAt: ledger.paidAt,
+      settledAt: null,
+      createdAt: bookedAt,
+    })
+
     done += 1
     if (done % 5 === 0) console.log(`    ${done}/${SPECS.length}`)
   }
@@ -274,5 +343,12 @@ export const seedParcels = async (): Promise<void> => {
     `  parcels          ${SPECS.length} (${Object.entries(byStatus)
       .map(([k, v]) => `${v} ${k}`)
       .join(', ')})`,
+  )
+  const cod = SPECS.filter((s) => s.isCod)
+  console.log(
+    `  payments         ${SPECS.length} (${cod.length} COD worth BDT ${cod.reduce(
+      (sum, s) => sum + (s.codAmount ?? 0),
+      0,
+    )})`,
   )
 }

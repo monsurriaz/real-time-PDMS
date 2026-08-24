@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   bookParcelInputSchema,
+  heaviestPricedKg,
   parcelSizeSchema,
   type BookParcelInput,
   type ParcelSize,
@@ -12,7 +13,8 @@ import { Field, SelectField } from '@/components/Field'
 import { Eyebrow, KeyValue, Panel } from '@/components/Panel'
 import { ApiError } from '@/lib/api'
 import { formatKm, formatTaka } from '@/lib/format'
-import { useZones } from '../pricing/usePricing'
+import { usePaymentConfig, useStartCheckout } from '../payments/usePayments'
+import { usePricing, useZones } from '../pricing/usePricing'
 import {
   asLookupProblem,
   useBookParcel,
@@ -88,8 +90,11 @@ const validate = (d: Draft): { ok: true; value: BookParcelInput } | { ok: false;
 export const BookingPage = () => {
   const navigate = useNavigate()
   const zones = useZones()
+  const pricing = usePricing()
+  const paymentConfig = usePaymentConfig()
   const quote = useQuote()
   const book = useBookParcel()
+  const checkout = useStartCheckout()
 
   const [draft, setDraft] = useState<Draft>(EMPTY)
   const [errors, setErrors] = useState<Errors>({})
@@ -103,6 +108,20 @@ export const BookingPage = () => {
 
   const zoneOptions = zones.data ?? []
 
+  /**
+   * The heaviest parcel the current tiers price.
+   *
+   * Read from the live PricingConfig rather than written here: an admin can
+   * raise the ceiling from the pricing editor with no deploy, so a constant in
+   * this file would start lying the moment they did. Stating it BEFORE submit is
+   * the point — the old behaviour was a 422 after the customer had filled in
+   * two addresses, which is a dead end however honest the message.
+   */
+  const maxKg = pricing.data ? heaviestPricedKg(pricing.data.weightTiers) : null
+  const enteredKg = Number(draft.weightKg)
+  const overWeight =
+    maxKg !== null && Number.isFinite(enteredKg) && enteredKg > maxKg
+
   const requestQuote = (e: React.FormEvent): void => {
     e.preventDefault()
     const result = validate(draft)
@@ -114,11 +133,38 @@ export const BookingPage = () => {
     quote.mutate(result.value, { onSuccess: (q) => setConfirmed(q) })
   }
 
+  /**
+   * Book, then pay.
+   *
+   * Two steps rather than one because they can fail independently: the parcel
+   * exists and is assigned the moment booking succeeds, and a customer who
+   * abandons the payment page has a real parcel with a pending payment — not a
+   * lost booking. That is also why nothing in the lifecycle waits on payment.
+   *
+   * A COD parcel skips checkout entirely: the rider collects at the door.
+   */
   const confirm = (): void => {
     const result = validate(draft)
     if (!result.ok) return
+
     book.mutate(result.value, {
-      onSuccess: () => navigate('/', { replace: true }),
+      onSuccess: (booked) => {
+        const payOnline =
+          !booked.parcel.isCod && paymentConfig.data?.cardPayments === true
+        if (!payOnline) {
+          navigate('/', { replace: true })
+          return
+        }
+        checkout.mutate(booked.parcel._id, {
+          // A hosted checkout page, so this leaves the SPA on purpose.
+          onSuccess: (session) => {
+            window.location.href = session.url
+          },
+          // The parcel is booked either way. Land on the list, where the row
+          // says the payment is still pending and offers to retry it.
+          onError: () => navigate('/', { replace: true }),
+        })
+      },
     })
   }
 
@@ -226,7 +272,14 @@ export const BookingPage = () => {
               inputMode="decimal"
               suffix="kg"
               value={draft.weightKg}
-              error={errors.weightKg}
+              error={
+                overWeight
+                  ? `We carry parcels up to ${String(maxKg)} kg — split anything heavier`
+                  : errors.weightKg
+              }
+              {...(maxKg !== null && !overWeight
+                ? { hint: `Up to ${maxKg} kg. Over 5 kg is priced by the kilo.` }
+                : {})}
               onChange={(e) => set('weightKg', e.target.value)}
             />
             <SelectField
@@ -277,7 +330,7 @@ export const BookingPage = () => {
             type="submit"
             variant="primary"
             size="lg"
-            disabled={quote.isPending}
+            disabled={quote.isPending || overWeight}
           >
             {quote.isPending ? 'Checking addresses…' : 'Get price'}
           </Button>
@@ -355,12 +408,23 @@ export const BookingPage = () => {
               size="lg"
               className="w-full mt-5"
               onClick={confirm}
-              disabled={book.isPending}
+              disabled={book.isPending || checkout.isPending}
             >
-              {book.isPending ? 'Booking…' : 'Confirm booking'}
+              {book.isPending
+                ? 'Booking…'
+                : checkout.isPending
+                  ? 'Opening checkout…'
+                  : draft.isCod
+                    ? 'Confirm booking'
+                    : 'Confirm and pay'}
             </Button>
             <p className="text-[11.5px] text-faint mt-2">
               This price is fixed once booked, even if rates change later.
+              {draft.isCod
+                ? ' The rider collects the cash at the door.'
+                : paymentConfig.data?.cardPayments
+                  ? ' You will be taken to a secure checkout page.'
+                  : ''}
             </p>
           </Panel>
         ) : !problem && !otherError ? (

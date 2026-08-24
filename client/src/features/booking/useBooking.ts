@@ -3,6 +3,7 @@ import type {
   BookParcelInput,
   LookupFailure,
   ParcelListItem,
+  PaymentSummary,
   PriceBreakdown,
 } from '@pdms/shared'
 import { ApiError, api } from '@/lib/api'
@@ -26,8 +27,10 @@ export const useQuote = () =>
       api.post<QuoteResult>('/parcels/quote', input),
   })
 
-interface BookResult {
-  parcel: { _id: string; trackingId: string; price: PriceBreakdown }
+export interface BookResult {
+  parcel: { _id: string; trackingId: string; price: PriceBreakdown; isCod: boolean }
+  /** The ledger row created at booking — pending until the customer pays. */
+  payment: PaymentSummary
 }
 
 export const useBookParcel = () => {
@@ -46,6 +49,18 @@ export const useParcels = () =>
     queryKey: parcelsKey,
     queryFn: () => api.get<{ parcels: ParcelListItem[] }>('/parcels'),
     select: (d) => d.parcels,
+    /**
+     * A card payment is confirmed by webhook, so its status changes without
+     * anything happening in this browser. While one is still pending the list
+     * re-asks; once nothing is pending it stops, because polling a settled
+     * list forever is exactly the kind of thing a free tier notices.
+     */
+    refetchInterval: (query) =>
+      query.state.data?.parcels.some(
+        (p) => p.payment?.method === 'card' && p.payment.status === 'pending',
+      )
+        ? 4_000
+        : false,
   })
 
 /**

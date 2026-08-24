@@ -27,6 +27,11 @@ const serialise = (
   weightTiers: doc.weightTiers.map((t) => ({
     maxKg: t.maxKg,
     baseFee: t.baseFee,
+    // Only present on a formula tier; spread so a flat tier stays flat on the
+    // wire rather than acquiring a perKgOver: undefined the editor would show.
+    ...(t.perKgOver === undefined || t.perKgOver === null
+      ? {}
+      : { perKgOver: t.perKgOver }),
     label: t.label,
   })),
   zoneBaseOverrides: doc.zoneBaseOverrides.map((o) => ({

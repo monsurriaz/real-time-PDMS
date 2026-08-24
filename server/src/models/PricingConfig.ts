@@ -13,6 +13,13 @@ const weightTier = new Schema(
   {
     maxKg: { type: Number, required: true, min: 0 },
     baseFee: { type: Number, required: true, min: 0 },
+    /**
+     * Per-kg rate for weight above this tier's lower bound. Absent on a flat
+     * tier, which is why it is optional rather than defaulted to 0 — a stored
+     * 0 and an absent field price identically, but only the absent one reads
+     * as "this tier has no formula".
+     */
+    perKgOver: { type: Number, required: false, min: 0 },
     label: { type: String, required: true, trim: true },
   },
   { _id: false },

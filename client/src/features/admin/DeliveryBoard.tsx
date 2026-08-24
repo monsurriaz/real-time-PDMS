@@ -238,8 +238,26 @@ export const DeliveryBoard = () => {
                     <td className="py-3 pr-4">
                       <span className="mono text-[13px]">{formatTaka(d.total)}</span>
                       {d.isCod ? (
-                        <span className="block text-[11px] text-faint mono">
+                        <span
+                          className={[
+                            'block text-[11px] mono',
+                            // Cash a rider is still carrying is the figure an
+                            // admin is scanning for; settled cash is history.
+                            d.codStatus === 'collected'
+                              ? 'text-transit-ink'
+                              : d.codStatus === 'failed'
+                                ? 'text-failed-ink'
+                                : 'text-faint',
+                          ].join(' ')}
+                        >
                           COD {formatTaka(d.codAmount)}
+                          {d.codStatus === 'collected'
+                            ? ' · held'
+                            : d.codStatus === 'settled'
+                              ? ' · settled'
+                              : d.codStatus === 'failed'
+                                ? ' · not collected'
+                                : ''}
                         </span>
                       ) : null}
                     </td>

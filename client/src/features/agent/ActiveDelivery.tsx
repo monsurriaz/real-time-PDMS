@@ -9,11 +9,8 @@ import { Button } from '@/components/Button'
 import { LifecycleRail } from '@/components/LifecycleRail'
 import { ApiError } from '@/lib/api'
 import { formatTaka } from '@/lib/format'
-import {
-  currentPosition,
-  useAdvanceStatus,
-  useRecordPod,
-} from '../deliveries/useDeliveries'
+import { currentPosition, useAdvanceStatus } from '../deliveries/useDeliveries'
+import { PodCapture } from './PodCapture'
 
 /**
  * The agent active-delivery card, ported from the phone mockup in
@@ -25,6 +22,10 @@ import {
  * The reference's own note: "This button only ever offers the one legal next
  * transition." That next step comes from the server's allowedTransitions, so
  * the client renders authority rather than deciding it (CLAUDE.md rule 3).
+ *
+ * M5 replaced the inert Photo/OTP tiles with real capture; that block now lives
+ * in PodCapture, which is the one part of this card with enough state of its own
+ * to be worth separating.
  */
 
 const ADVANCE_LABEL: Record<string, string> = {
@@ -35,49 +36,8 @@ const ADVANCE_LABEL: Record<string, string> = {
 
 const CAPS = 'text-[11px] font-semibold uppercase tracking-[0.13em] text-faint'
 
-/**
- * The dashed `.pod` tiles from the reference. Photo and OTP are M5, so those
- * two are inert and say so; the working signature capture lives in the same
- * row rather than as another full-width button competing with the primary.
- */
-const PodTile = ({
-  label,
-  hint,
-  onClick,
-  active,
-  children,
-}: {
-  label: string
-  hint?: string
-  onClick?: () => void
-  active?: boolean
-  children: React.ReactNode
-}) => (
-  <button
-    type="button"
-    onClick={onClick}
-    disabled={!onClick}
-    className={[
-      'flex-1 border border-dashed rounded-md py-4 px-3 text-center',
-      'text-[12.5px] font-medium transition-colors duration-100',
-      onClick
-        ? active
-          ? 'border-accent bg-accent-tint text-ink cursor-pointer'
-          : 'border-hairline-strong text-ink-2 hover:bg-surface-sunk cursor-pointer'
-        : 'border-hairline text-faint cursor-not-allowed',
-    ].join(' ')}
-  >
-    <span className="flex justify-center mb-1.5">{children}</span>
-    {label}
-    {hint ? <span className="block text-[10.5px] font-normal mt-0.5">{hint}</span> : null}
-  </button>
-)
-
 export const ActiveDelivery = ({ d }: { d: DeliveryListItem }) => {
   const advance = useAdvanceStatus()
-  const pod = useRecordPod()
-  const [capturing, setCapturing] = useState(false)
-  const [receivedBy, setReceivedBy] = useState('')
   const [failureNote, setFailureNote] = useState('')
   const [showFail, setShowFail] = useState(false)
 
@@ -90,14 +50,9 @@ export const ActiveDelivery = ({ d }: { d: DeliveryListItem }) => {
   )
   const canFail = d.allowedTransitions.includes('Failed')
   const needsProof = nextStep === 'Delivered' && !d.hasProofOfDelivery
-  const busy = advance.isPending || pod.isPending
+  const busy = advance.isPending
 
-  const err =
-    advance.error instanceof ApiError
-      ? advance.error.message
-      : pod.error instanceof ApiError
-        ? pod.error.message
-        : null
+  const err = advance.error instanceof ApiError ? advance.error.message : null
 
   const move = async (to: DeliveryStatus, note?: string): Promise<void> => {
     const point = await currentPosition()
@@ -152,7 +107,20 @@ export const ActiveDelivery = ({ d }: { d: DeliveryListItem }) => {
 
         {d.isCod ? (
           <div className="mt-22px p-4 bg-surface-sunk rounded-md">
-            <div className={CAPS}>Collect on delivery</div>
+            <div className={CAPS}>
+              {/*
+                The same figure means two things over a delivery's life: money
+                to collect, then money the rider is carrying. Saying which is
+                the difference between a rider asking for cash twice and not.
+              */}
+              {d.codStatus === 'collected'
+                ? 'Cash collected · hand in at the office'
+                : d.codStatus === 'settled'
+                  ? 'Cash handed in'
+                  : d.codStatus === 'failed'
+                    ? 'Not collected'
+                    : 'Collect on delivery'}
+            </div>
             {/* The largest thing on the screen, per the reference's rationale:
                 this is the number that gets a rider in trouble. */}
             <div className="mono text-[29px] font-medium tracking-[-0.035em] mt-1">
@@ -161,67 +129,8 @@ export const ActiveDelivery = ({ d }: { d: DeliveryListItem }) => {
           </div>
         ) : null}
 
-        {/* ---- proof of delivery row ---- */}
-        {nextStep === 'Delivered' ? (
-          <>
-            <div className={`${CAPS} mt-6`}>Proof of delivery</div>
-            <div className="flex gap-10px mt-14px">
-              <PodTile label="Photo" hint="M5">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z" />
-                  <circle cx="12" cy="13" r="3.5" />
-                </svg>
-              </PodTile>
-              <PodTile label="OTP" hint="M5">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <rect x="4" y="10" width="16" height="11" rx="2" />
-                  <path d="M8 10V7a4 4 0 0 1 8 0v3" />
-                </svg>
-              </PodTile>
-              <PodTile
-                label="Signature"
-                active={capturing || d.hasProofOfDelivery}
-                onClick={
-                  d.hasProofOfDelivery ? undefined : () => setCapturing((v) => !v)
-                }
-              >
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M3 17c3-1 4-8 7-8s2 6 5 6 3-3 6-3" />
-                </svg>
-              </PodTile>
-            </div>
-
-            {capturing && !d.hasProofOfDelivery ? (
-              <div className="mt-14px">
-                <label htmlFor={`rb-${d._id}`} className="block text-[12.5px] font-medium text-ink-2 mb-1.5">
-                  Received by
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    id={`rb-${d._id}`}
-                    value={receivedBy}
-                    placeholder={d.recipientName}
-                    onChange={(e) => setReceivedBy(e.target.value)}
-                    className="flex-1 min-w-0 font-sans text-[14.5px] text-ink px-13px py-11px
-                               border border-hairline-strong rounded-sm bg-surface outline-none
-                               focus:border-accent focus:ring-[3px] focus:ring-accent-tint"
-                  />
-                  <Button
-                    disabled={receivedBy.trim().length < 2 || busy}
-                    onClick={() =>
-                      pod.mutate(
-                        { deliveryId: d._id, receivedBy: receivedBy.trim() },
-                        { onSuccess: () => setCapturing(false) },
-                      )
-                    }
-                  >
-                    {pod.isPending ? 'Saving…' : 'Save'}
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-          </>
-        ) : null}
+        {/* ---- proof of delivery ---- */}
+        {nextStep === 'Delivered' || d.hasProofOfDelivery ? <PodCapture d={d} /> : null}
 
         {err ? (
           <p role="alert" className="text-[12.5px] text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2 mt-4">
@@ -242,8 +151,10 @@ export const ActiveDelivery = ({ d }: { d: DeliveryListItem }) => {
               {advance.isPending ? 'Saving…' : (ADVANCE_LABEL[nextStep] ?? nextStep)}
             </Button>
             {needsProof ? (
+              // The reference says "Needs a photo or OTP first". All three
+              // methods are live now, so the line names all three.
               <p className="text-[11.5px] text-faint text-center mt-11px">
-                Needs a signature first
+                Needs a photo, code, or signature first
               </p>
             ) : null}
           </>

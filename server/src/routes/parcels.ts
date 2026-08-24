@@ -16,6 +16,7 @@ import { ParcelModel } from '../models/Parcel'
 import { requireAuth, requireRole } from '../middleware/auth'
 import { HttpError, unauthorized } from '../middleware/httpError'
 import { autoAssignAfterBooking } from '../services/assignment'
+import { createPaymentForParcel, summariesForParcels } from '../services/payments'
 import { priceFor } from '../services/pricing'
 import { availableTransitions } from '../services/lifecycle'
 import { generateTrackingId } from '../services/trackingId'
@@ -143,6 +144,22 @@ parcelsRouter.post('/', requireAuth, requireRole('customer'), async (req, res, n
     })
 
     /**
+     * The ledger row, created at booking for every parcel — COD included.
+     *
+     * Its amount comes from the price snapshot just written (or from the COD
+     * amount the sender stated), never from a later recomputation: the whole
+     * point of the snapshot is that this number cannot move afterwards.
+     */
+    const payment = await createPaymentForParcel({
+      _id: parcel._id,
+      trackingId: parcel.trackingId,
+      customer: customerId,
+      isCod: parcel.isCod,
+      codAmount: parcel.codAmount,
+      price: { total: parcel.price.total },
+    })
+
+    /**
      * Assign straight away (CLAUDE.md section 5).
      *
      * Runs as the system, not as the customer: a customer has no authority to
@@ -162,7 +179,9 @@ parcelsRouter.post('/', requireAuth, requireRole('customer'), async (req, res, n
         _id: parcel._id.toString(),
         trackingId: parcel.trackingId,
         price: parcel.price,
+        isCod: parcel.isCod,
       },
+      payment,
       assignment,
     })
   } catch (err) {
@@ -211,6 +230,10 @@ parcelsRouter.get('/', requireAuth, async (req, res, next) => {
       >()
 
     const byParcel = new Map(deliveries.map((d) => [d.parcel.toString(), d]))
+    // One query for the page: the list has to say where every payment stands,
+    // and a per-row lookup would be N round trips for a screen that is mostly
+    // read on a phone.
+    const paymentByParcel = await summariesForParcels(parcels.map((p) => p._id))
     const role = req.actor?.role ?? 'customer'
 
     const items: ParcelListItem[] = parcels.map((p) => {
@@ -227,6 +250,7 @@ parcelsRouter.get('/', requireAuth, async (req, res, next) => {
         total: p.price.total,
         isCod: p.isCod,
         codAmount: p.codAmount,
+        payment: paymentByParcel.get(p._id.toString()) ?? null,
         /**
          * From the server's own transition map, so the list can offer
          * "Cancel" only where cancelling is actually legal — and the server

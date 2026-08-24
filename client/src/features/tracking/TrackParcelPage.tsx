@@ -1,11 +1,11 @@
 import { Link, useParams } from 'react-router-dom'
-import type { GeoPoint } from '@pdms/shared'
+import type { GeoPoint, ProofOfDelivery } from '@pdms/shared'
 import { Badge } from '@/components/Badge'
 import { Button } from '@/components/Button'
 import { LifecycleRail } from '@/components/LifecycleRail'
 import { TrackingMap, type MapRider } from '@/components/TrackingMap'
 import { ApiError } from '@/lib/api'
-import { formatKg, formatTaka } from '@/lib/format'
+import { formatDateTime, formatKg, formatTaka } from '@/lib/format'
 import { RoleShell } from '@/components/RoleShell'
 import { ConnectionPill } from './ConnectionPill'
 import { EventTimeline } from './EventTimeline'
@@ -44,6 +44,68 @@ const kmBetween = (a: GeoPoint, b: GeoPoint): number => {
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
   return 2 * 6371 * Math.asin(Math.sqrt(h))
 }
+
+
+/**
+ * The outstanding delivery code.
+ *
+ * Deliberately the loudest thing in the detail column while it is live: the
+ * rider is standing at the door waiting for it, and a code the sender has to
+ * hunt for is a code that gets read out wrong. It disappears on its own — the
+ * server stops returning it once the code is used or expires.
+ */
+const DeliveryCode = ({ code, expiresAt }: { code: string; expiresAt: string }) => (
+  <div className="mt-4 p-4 border-l-2 border-accent bg-accent-tint rounded-r-sm">
+    <p className="text-[11px] font-semibold uppercase tracking-[0.13em] text-accent-press">
+      Delivery code
+    </p>
+    <p className="mono text-[27px] font-medium tracking-[0.22em] mt-1">{code}</p>
+    <p className="text-[12px] text-ink-2 mt-1.5">
+      Read this to the rider. Expires{' '}
+      <span className="mono">
+        {new Date(expiresAt).toLocaleTimeString('en-BD', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })}
+      </span>
+      .
+    </p>
+  </div>
+)
+
+/** What was recorded at the door, once a delivery is proven. */
+const PROOF_LABEL: Record<string, string> = {
+  photo: 'Photo taken at the door',
+  otp: 'Code confirmed by the recipient',
+  signature: 'Signed for',
+}
+
+const ProofPanel = ({ proof }: { proof: ProofOfDelivery }) => (
+  <div className="mt-4 p-13px bg-delivered-bg rounded-md">
+    <p className="text-[11px] font-semibold uppercase tracking-[0.13em] text-delivered-ink">
+      Proof of delivery
+    </p>
+    <p className="text-[13px] text-delivered-ink mt-1">
+      {PROOF_LABEL[proof.method] ?? proof.method}
+      {proof.receivedBy ? ` · ${proof.receivedBy}` : ''}
+    </p>
+    {proof.photoUrl ? (
+      // The record holds a URL, so this is a link to Cloudinary rather than an
+      // image stored anywhere near our database.
+      <a
+        href={proof.photoUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-block mt-2 text-[12.5px] font-medium text-delivered-ink underline decoration-current/40 hover:decoration-current"
+      >
+        View the photo
+      </a>
+    ) : null}
+    <p className="mono text-[11.5px] text-delivered-ink/80 mt-1.5">
+      {formatDateTime(proof.capturedAt)}
+    </p>
+  </div>
+)
 
 export const TrackParcelPage = () => {
   const { parcelId } = useParams<{ parcelId: string }>()
@@ -162,6 +224,17 @@ export const TrackParcelPage = () => {
                 </p>
               </div>
             )}
+
+            {snapshot.data.otp ? (
+              <DeliveryCode
+                code={snapshot.data.otp.code}
+                expiresAt={snapshot.data.otp.expiresAt}
+              />
+            ) : null}
+
+            {delivery.proofOfDelivery ? (
+              <ProofPanel proof={delivery.proofOfDelivery} />
+            ) : null}
 
             <div>
               <KeyRow k="Tracking ID">

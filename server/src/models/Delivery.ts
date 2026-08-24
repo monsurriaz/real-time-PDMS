@@ -10,7 +10,13 @@ import { runAsSystem } from '../lib/context'
 import { optionalPoint } from './geo'
 import { ALLOW_ALL, DENY_ALL, roleScopePlugin } from './plugins/roleScope'
 
-export type DeliveryDoc = Doc<Delivery, 'parcel' | 'agent'>
+/**
+ * `podOtp` is intersected in rather than added to /shared's Delivery: /shared
+ * holds what crosses the client/server boundary, and this never does.
+ */
+export type DeliveryDoc = Doc<Delivery, 'parcel' | 'agent'> & {
+  podOtp?: PodOtp
+}
 
 const deliveryEvent = new Schema(
   {
@@ -27,13 +33,53 @@ const deliveryEvent = new Schema(
 const proofOfDelivery = new Schema(
   {
     method: { type: String, required: true, enum: podMethodSchema.options },
+    /**
+     * The Cloudinary secure URL. A URL, never the bytes: the SRS's memory
+     * constraint and CLAUDE.md section 2 both put the image on Cloudinary, and
+     * a 6 MB buffer in a document the tracking screen reads on every poll
+     * would be the single worst thing in this database.
+     */
     photoUrl: { type: String, required: false },
     otpVerifiedAt: { type: Date, required: false },
-    receivedBy: { type: String, required: true, trim: true },
+    /**
+     * Not required since M5: it IS the evidence for a signature, but for photo
+     * and OTP proof the evidence is the photo or the verified code, and forcing
+     * a name there would record an unverified claim as part of the proof.
+     * Which field each method needs is enforced by the shared Zod schema.
+     */
+    receivedBy: { type: String, required: false, trim: true },
     capturedAt: { type: Date, required: true },
   },
   { _id: false },
 )
+
+/**
+ * The pending delivery code. Never leaves the server as a whole; `select:
+ * false` keeps it out of every read that does not name it, so a handler that
+ * forgets to project cannot leak the code to the rider it is meant to check.
+ *
+ * The code is stored as typed rather than hashed, because with no SMS provider
+ * in the stack the server itself has to be able to show it to the parcel's
+ * owner — see the tracking route. It is single-purpose, expires in minutes,
+ * and is deleted the moment it verifies, which is the trade being made; the
+ * PROOF record keeps only a timestamp, so nothing replayable survives.
+ */
+const podOtp = new Schema(
+  {
+    code: { type: String, required: true },
+    issuedAt: { type: Date, required: true },
+    expiresAt: { type: Date, required: true },
+    attempts: { type: Number, required: true, default: 0, min: 0 },
+  },
+  { _id: false },
+)
+
+export interface PodOtp {
+  code: string
+  issuedAt: Date
+  expiresAt: Date
+  attempts: number
+}
 
 const deliveryMongooseSchema = new Schema<DeliveryDoc>(
   {
@@ -64,6 +110,7 @@ const deliveryMongooseSchema = new Schema<DeliveryDoc>(
     deliveredAt: { type: Date, required: false, default: null },
 
     proofOfDelivery: { type: proofOfDelivery, required: false },
+    podOtp: { type: podOtp, required: false, select: false, default: undefined },
     failureReason: { type: String, required: false, trim: true },
 
     lastKnownLocation: optionalPoint,

@@ -9,6 +9,11 @@ import { agentsRouter } from './routes/agents'
 import { authRouter } from './routes/auth'
 import { deliveriesRouter } from './routes/deliveries'
 import { parcelsRouter } from './routes/parcels'
+import {
+  paymentsRouter,
+  webhookBodyParser,
+  webhookHandler,
+} from './routes/payments'
 import { pricingRouter } from './routes/pricing'
 import { trackingRouter } from './routes/tracking'
 import { zonesRouter } from './routes/zones'
@@ -25,6 +30,16 @@ export const createApp = (): Express => {
       credentials: true,
     }),
   )
+  /**
+   * The payment webhook, mounted BEFORE the JSON parser.
+   *
+   * Its signature is computed over the raw bytes the provider sent, so the
+   * body must reach the handler unparsed. Everything else on the app still gets
+   * express.json() from the line below — this is one route with one parser, not
+   * a global change.
+   */
+  app.post('/payments/webhook', webhookBodyParser, webhookHandler)
+
   app.use(express.json({ limit: '1mb' }))
   app.use(cookieParser())
 
@@ -52,6 +67,7 @@ export const createApp = (): Express => {
   app.use('/parcels', parcelsRouter)
   app.use('/deliveries', deliveriesRouter)
   app.use('/agents', agentsRouter)
+  app.use('/payments', paymentsRouter)
   app.use('/tracking', trackingRouter)
 
   app.use(notFoundHandler)

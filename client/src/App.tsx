@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { AdminCodPage } from '@/features/admin/AdminCodPage'
 import { AdminHome } from '@/features/admin/AdminHome'
 import { AdminPricingPage } from '@/features/admin/AdminPricingPage'
 import { AgentHome } from '@/features/agent/AgentHome'
@@ -45,6 +46,15 @@ export const App = () => (
       element={
         <RequireRole roles={['admin']}>
           <AdminHome />
+        </RequireRole>
+      }
+    />
+
+    <Route
+      path="/admin/cod"
+      element={
+        <RequireRole roles={['admin']}>
+          <AdminCodPage />
         </RequireRole>
       }
     />

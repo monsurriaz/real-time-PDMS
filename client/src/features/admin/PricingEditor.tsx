@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import {
+  heaviestPricedKg,
   pricingConfigInputSchema,
+  tierFloor,
   type PricingConfigInput,
   type WeightTier,
   type ZoneName,
@@ -40,6 +42,12 @@ const collectErrors = (input: unknown): Errors => {
   return out
 }
 
+/**
+ * The documented example from CLAUDE.md section 5 — 3 km, 2 kg -> BDT 126 — is
+ * where the worked example starts. Both are editable now, because a formula
+ * tier is the one thing you cannot check with a fixed 2 kg example: an admin
+ * setting a per-kilo rate needs to type 8 kg and see what it does.
+ */
 const EXAMPLE_DISTANCE_KM = 3
 const EXAMPLE_WEIGHT_KG = 2
 
@@ -50,6 +58,8 @@ export const PricingEditor = () => {
 
   const [draft, setDraft] = useState<PricingConfigInput | null>(null)
   const [exampleZone, setExampleZone] = useState<ZoneName | ''>('')
+  const [exampleKm, setExampleKm] = useState(String(EXAMPLE_DISTANCE_KM))
+  const [exampleKg, setExampleKg] = useState(String(EXAMPLE_WEIGHT_KG))
   const [saved, setSaved] = useState(false)
 
   // The draft starts as a copy of what is stored, once it arrives.
@@ -69,12 +79,17 @@ export const PricingEditor = () => {
   )
   const isValid = Object.keys(errors).length === 0
 
+  const km = Number(exampleKm)
+  const kg = Number(exampleKg)
+  const exampleUsable =
+    Number.isFinite(km) && km >= 0 && Number.isFinite(kg) && kg > 0
+
   const preview = usePricePreview(
-    current && isValid
+    current && isValid && exampleUsable
       ? {
           ...current,
-          distanceKm: EXAMPLE_DISTANCE_KM,
-          weightKg: EXAMPLE_WEIGHT_KG,
+          distanceKm: km,
+          weightKg: kg,
           ...(exampleZone ? { zone: exampleZone } : {}),
         }
       : null,
@@ -101,9 +116,20 @@ export const PricingEditor = () => {
   const setTier = (i: number, patch: Partial<WeightTier>): void => {
     edit({
       ...current,
-      weightTiers: current.weightTiers.map((t, idx) =>
-        idx === i ? { ...t, ...patch } : t,
-      ),
+      weightTiers: current.weightTiers.map((t, idx) => {
+        if (idx !== i) return t
+        const merged = { ...t, ...patch }
+        /**
+         * A spread cannot express "remove this key": `{...t, perKgOver:
+         * undefined}` still has the key, and the schema would then see a
+         * present-but-undefined optional. Deleting it is what turns a formula
+         * tier back into a flat one.
+         */
+        if ('perKgOver' in patch && patch.perKgOver === undefined) {
+          delete merged.perKgOver
+        }
+        return merged
+      }),
     })
   }
 
@@ -188,12 +214,16 @@ export const PricingEditor = () => {
           >
             <p className="text-[12.5px] text-muted mb-4">
               Bounds are inclusive and must ascend without overlapping. A
-              parcel is charged the first tier its weight fits.
+              parcel is charged the first tier its weight fits. Leave{' '}
+              <b className="font-semibold text-ink">+ ৳/kg</b> blank for a flat
+              fee, or set it to charge by the kilo above the tier&apos;s lower
+              bound — that is what lets a heavy parcel be priced instead of
+              refused.
             </p>
 
             {/* Header row, mirroring the reference's table caps. */}
-            <div className="hidden sm:grid grid-cols-[1fr_1fr_1.4fr_auto] gap-3 mb-2">
-              {['Up to (kg)', 'Fee (৳)', 'Label', ''].map((h) => (
+            <div className="hidden sm:grid grid-cols-[1fr_1fr_1fr_1.4fr_auto] gap-3 mb-2">
+              {['Up to (kg)', 'Fee (৳)', '+ ৳/kg over', 'Label', ''].map((h) => (
                 <span
                   key={h}
                   className="text-[11px] font-semibold uppercase tracking-[0.13em] text-faint"
@@ -206,7 +236,7 @@ export const PricingEditor = () => {
             {current.weightTiers.map((tier, i) => (
               <div
                 key={i}
-                className="grid sm:grid-cols-[1fr_1fr_1.4fr_auto] gap-3 items-start border-b border-hairline last:border-b-0 py-3 first:pt-0"
+                className="grid sm:grid-cols-[1fr_1fr_1fr_1.4fr_auto] gap-3 items-start border-b border-hairline last:border-b-0 py-3 first:pt-0"
               >
                 <Field
                   label="Up to (kg)"
@@ -225,6 +255,26 @@ export const PricingEditor = () => {
                   value={String(tier.baseFee)}
                   error={errors[`weightTiers.${i}.baseFee`]}
                   onChange={(e) => setTier(i, { baseFee: Number(e.target.value) })}
+                />
+                <Field
+                  label={`+ ৳/kg over ${tierFloor(current.weightTiers, i)}`}
+                  type="number"
+                  min={0}
+                  step={1}
+                  placeholder="flat"
+                  value={tier.perKgOver === undefined ? '' : String(tier.perKgOver)}
+                  error={errors[`weightTiers.${i}.perKgOver`]}
+                  onChange={(e) => {
+                    const raw = e.target.value.trim()
+                    // Blank means flat, which the schema expresses as absent —
+                    // not as a stored 0, so the two states stay distinguishable.
+                    setTier(
+                      i,
+                      raw === ''
+                        ? { perKgOver: undefined }
+                        : { perKgOver: Math.max(0, Number(raw) || 0) },
+                    )
+                  }}
                 />
                 <Field
                   label="Label"
@@ -295,9 +345,30 @@ export const PricingEditor = () => {
         {/* ---- live worked example ---- */}
         <div className="lg:sticky lg:top-[78px] grid gap-4">
           <Panel title="Worked example">
-            <Eyebrow>
-              {formatKm(EXAMPLE_DISTANCE_KM)} · {EXAMPLE_WEIGHT_KG} kg
-            </Eyebrow>
+            <Eyebrow>What a booking would cost right now</Eyebrow>
+
+            <div className="grid grid-cols-2 gap-x-3">
+              <Field
+                label="Distance"
+                type="number"
+                min={0}
+                step={0.5}
+                inputMode="decimal"
+                suffix="km"
+                value={exampleKm}
+                onChange={(e) => setExampleKm(e.target.value)}
+              />
+              <Field
+                label="Weight"
+                type="number"
+                min={0.1}
+                step={0.5}
+                inputMode="decimal"
+                suffix="kg"
+                value={exampleKg}
+                onChange={(e) => setExampleKg(e.target.value)}
+              />
+            </div>
 
             <SelectField
               label="Zone"
@@ -315,6 +386,10 @@ export const PricingEditor = () => {
             {!isValid ? (
               <p className="text-[12.5px] text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2">
                 Fix the errors above to see the price.
+              </p>
+            ) : !exampleUsable ? (
+              <p className="text-[12.5px] text-muted">
+                Enter a distance and a weight above zero.
               </p>
             ) : preview.isPending ? (
               <p className="text-[13px] text-muted">Calculating…</p>
@@ -394,6 +469,16 @@ export const PricingEditor = () => {
           <Note>
             Prices are <b>snapshotted at booking</b>. Changing a rate here
             never alters a parcel that has already been booked.
+          </Note>
+
+          <Note>
+            The heaviest tier ends at{' '}
+            <b className="mono font-semibold">
+              {heaviestPricedKg(current.weightTiers)} kg
+            </b>
+            . Anything above that is <b>refused with that number stated</b>,
+            never quietly charged at the top tier — raise the bound here to
+            carry heavier parcels.
           </Note>
         </div>
       </div>

@@ -9,6 +9,7 @@ import { ParcelModel } from '../models/Parcel'
 import { UserModel } from '../models/User'
 import { requireAuth } from '../middleware/auth'
 import { HttpError } from '../middleware/httpError'
+import { outstandingChallenge } from '../services/pod'
 
 export const trackingRouter = Router()
 
@@ -95,6 +96,23 @@ trackingRouter.get('/:parcelId', requireAuth, async (req, res, next) => {
       : null
 
     /**
+     * The outstanding delivery code, for the parcel's owner only.
+     *
+     * This project has no SMS provider, so the code cannot be texted to the
+     * recipient — this screen stands in for that message, and the sender reads
+     * it out. The rider is explicitly excluded: the code exists to prove the
+     * rider reached the recipient, and a rider who could read it here could
+     * satisfy the proof without ever knocking on a door.
+     *
+     * `actor.role` is the check rather than scoping, because scoping decides
+     * WHICH parcels each role can see, not what each role is shown about one.
+     */
+    const otp =
+      req.actor && req.actor.role !== 'agent'
+        ? await outstandingChallenge(delivery._id)
+        : null
+
+    /**
      * The road line. Best-effort: a missing ORS key or a routing outage must
      * not blank the whole tracking screen, so the map falls back to drawing
      * just the two endpoints.
@@ -138,7 +156,9 @@ trackingRouter.get('/:parcelId', requireAuth, async (req, res, next) => {
         lastLocationAt: delivery.lastLocationAt ?? null,
         expectedBy: delivery.expectedBy,
         hasProofOfDelivery: Boolean(delivery.proofOfDelivery),
+        proofOfDelivery: delivery.proofOfDelivery ?? null,
       },
+      otp,
       rider,
       route,
     })

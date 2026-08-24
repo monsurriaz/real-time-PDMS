@@ -19,6 +19,22 @@ dotenv.config({ path: path.resolve(here, '../../../.env') })
  * Only M1's keys are required. Cloudinary and Stripe arrive in M5, so they
  * stay optional — this must boot on a machine that has never seen them.
  */
+/**
+ * An optional key that treats blank as absent.
+ *
+ * .env.example ships every key with an empty value, so a copied-but-unfilled
+ * file yields '' rather than undefined — and '' passing an `optional()` check
+ * would turn "not configured" into "configured with nothing", which surfaces
+ * later as a baffling 401 from whichever service was handed the empty string.
+ */
+const optionalKey = z
+  .string()
+  .optional()
+  .transform((v) => {
+    const trimmed = v?.trim()
+    return trimmed ? trimmed : undefined
+  })
+
 const envSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
@@ -48,7 +64,37 @@ const envSchema = z.object({
   // ---- not required until later milestones ----
   NOMINATIM_BASE_URL: z.string().url().optional(),
   NOMINATIM_USER_AGENT: z.string().optional(),
-  ORS_API_KEY: z.string().optional(),
+  ORS_API_KEY: optionalKey,
+
+  /**
+   * ---- M5: media and payments ----
+   *
+   * Still optional, for the same reason the block above is: the server must
+   * boot on a machine that has never seen these keys. What depends on them
+   * fails at the point of use with a message naming the key, rather than
+   * refusing to start the whole app because nobody is demoing payments today.
+   */
+
+  /**
+   * Photos are uploaded from the rider's phone straight to Cloudinary with an
+   * unsigned preset (CLAUDE.md section 2), so the server needs the cloud name
+   * only to VERIFY that a submitted URL belongs to our cloud — it never
+   * uploads, which is why no API secret appears here.
+   */
+  CLOUDINARY_CLOUD_NAME: optionalKey,
+
+  PAYMENT_PROVIDER: z.enum(['stripe', 'none']).default('none'),
+  /**
+   * Test mode is not a suggestion. CLAUDE.md section 2 says "Stripe test mode",
+   * and a live key in a course project is a real-money accident waiting to
+   * happen — so a key that is not `sk_test_` refuses to boot rather than
+   * quietly charging someone.
+   */
+  STRIPE_SECRET_KEY: optionalKey.refine(
+    (v) => v === undefined || v.startsWith('sk_test_'),
+    'STRIPE_SECRET_KEY must be a TEST key (sk_test_...) — this project never runs live mode',
+  ),
+  STRIPE_WEBHOOK_SECRET: optionalKey,
 })
 
 const parsed = envSchema.safeParse(process.env)
@@ -67,3 +113,17 @@ export const env = parsed.data
 export type Env = typeof env
 
 export const isProd = env.NODE_ENV === 'production'
+
+/**
+ * Read a key that is optional at boot but required here. Named after the
+ * feature rather than the variable, so the error tells whoever hits it what
+ * they were trying to do — "proof-of-delivery photos need
+ * CLOUDINARY_CLOUD_NAME" is actionable in a way that "missing env" is not.
+ */
+export const requireEnv = <K extends keyof Env>(key: K, feature: string): NonNullable<Env[K]> => {
+  const value = env[key]
+  if (value === undefined || value === '') {
+    throw new Error(`${feature} needs ${String(key)} in .env — see .env.example`)
+  }
+  return value as NonNullable<Env[K]>
+}
