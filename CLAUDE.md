@@ -204,3 +204,12 @@ spread across all lifecycle states including one Failed and one Delayed.
 - Works at 375px wide
 - Keyboard focus is visible
 - No console errors
+
+---
+
+## 11. Spacing Scale
+--space-1: 4px;   --space-2: 8px;   --space-3: 12px;
+--space-4: 16px;  --space-5: 20px;  --space-6: 24px;
+--space-7: 28px;  --space-8: 32px;  --space-10: 40px;
+--space-14: 56px; --space-16: 64px;
+
