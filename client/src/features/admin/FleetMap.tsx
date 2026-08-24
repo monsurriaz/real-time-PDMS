@@ -30,6 +30,7 @@ interface FleetRider {
   trackingId: string
   dropArea: string
   status: DeliveryStatus
+  agentId: string | null
   agentName: string | null
   point: GeoPoint
   at: string | null
@@ -102,17 +103,44 @@ export const FleetMap = () => {
     }
   }, [fleet.data, fleet.isError, qc])
 
-  const riders: MapRider[] = (fleet.data ?? []).map((r) => ({
-    id: r.deliveryId,
-    // A socket point supersedes the persisted one, which can be 30s old.
-    point: livePoints[r.deliveryId] ?? r.point,
-    label: r.agentName ?? r.trackingId,
-    sublabel: r.trackingId,
+  /**
+   * One marker per RIDER, not per delivery.
+   *
+   * A rider holding three parcels appeared three times, stacked at the same
+   * coordinates, and the panel counted deliveries while calling them riders.
+   * A person has one position, so the rows are collapsed by agent and the
+   * freshest position wins — a socket tick beating a persisted one that can be
+   * 30 seconds old.
+   */
+  const byRider = new Map<string, { r: FleetRider; point: GeoPoint; count: number }>()
+  for (const r of fleet.data ?? []) {
+    const key = r.agentId ?? `delivery:${r.deliveryId}`
+    const point = livePoints[r.deliveryId] ?? r.point
+    const existing = byRider.get(key)
+    if (!existing) {
+      byRider.set(key, { r, point, count: 1 })
+      continue
+    }
+    existing.count += 1
+    // Prefer a live socket point, then the more recent persisted one.
+    const isLive = Boolean(livePoints[r.deliveryId])
+    const newer = (r.at ?? '') > (existing.r.at ?? '')
+    if (isLive || newer) {
+      existing.r = r
+      existing.point = point
+    }
+  }
+
+  const riders: MapRider[] = [...byRider.entries()].map(([key, v]) => ({
+    id: key,
+    point: v.point,
+    label: v.r.agentName ?? v.r.trackingId,
+    sublabel: v.count > 1 ? `${v.count} parcels` : v.r.trackingId,
   }))
 
   return (
     <Panel
-      title={`Fleet · ${riders.length} rider${riders.length === 1 ? '' : 's'} with a position`}
+      title={`Fleet · ${riders.length} rider${riders.length === 1 ? '' : 's'} · ${(fleet.data ?? []).length} active deliver${(fleet.data ?? []).length === 1 ? 'y' : 'ies'}`}
       action={<ConnectionPill mode={mode} />}
       className="mb-5"
     >

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import maplibregl, { type LngLatLike, type Map as MapLibreMap } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { GeoPoint } from '@pdms/shared'
@@ -10,7 +10,7 @@ import type { GeoPoint } from '@pdms/shared'
  * The design brief for this screen is that the map is the only place saturated
  * colour appears: the base stays muted and the route line and rider marker are
  * the only strong elements. positron is already a pale basemap, so nothing is
- * restyled — the markers simply carry the accent.
+ * restyled — the markers carry the accent.
  */
 
 const STYLE_URL =
@@ -28,21 +28,13 @@ export interface MapRider {
 }
 
 interface Props {
-  /** Riders to draw. One for the customer screen, many for the admin board. */
   riders: MapRider[]
-  /** Road line from pickup to drop, as [lng, lat] pairs. */
   route?: Array<[number, number]>
   pickup?: GeoPoint | null
   drop?: GeoPoint | null
-  /** The travelled trail, from the socket history. */
   trail?: GeoPoint[]
-  /** Follow the single rider as it moves. Off for the fleet board. */
   follow?: boolean
   className?: string
-  /**
-   * Smoothly interpolate markers between updates. A marker that jumps every
-   * three seconds looks broken; this eases it along instead.
-   */
   animate?: boolean
 }
 
@@ -59,12 +51,14 @@ interface MarkerState {
 const riderElement = (label: string): HTMLElement => {
   const el = document.createElement('div')
   el.className = 'pdms-rider'
-  // A halo plus a solid dot, matching the reference's rider marker.
   el.innerHTML = `
     <span class="pdms-rider__halo"></span>
     <span class="pdms-rider__dot"></span>
-    <span class="pdms-rider__label">${label.replace(/[<>&]/g, '')}</span>
+    <span class="pdms-rider__label"></span>
   `
+  // textContent, not innerHTML: a rider's name is user data.
+  const labelEl = el.querySelector('.pdms-rider__label')
+  if (labelEl) labelEl.textContent = label
   return el
 }
 
@@ -91,7 +85,20 @@ export const TrackingMap = ({
   const endpoints = useRef<maplibregl.Marker[]>([])
   const raf = useRef<number | null>(null)
 
-  // ---- create the map once ----
+  /**
+   * Bumped every time a map instance is created.
+   *
+   * React StrictMode mounts, unmounts and remounts in development, so the
+   * first map is built and torn down before the real one. The effects below
+   * depend on props that do not change across that remount, so without this
+   * they would apply the route and endpoints to the *discarded* map and never
+   * to the live one — leaving a map with no route line, no pins and no
+   * fitBounds.
+   */
+  const [mapVersion, setMapVersion] = useState(0)
+  const [failed, setFailed] = useState<string | null>(null)
+
+  // ---- create the map ----
   useEffect(() => {
     if (!holder.current || map.current) return
 
@@ -101,28 +108,30 @@ export const TrackingMap = ({
       center: DHAKA,
       zoom: 11.5,
       /**
-       * Default control off, replaced below by one with explicit attribution.
-       *
-       * OpenFreeMap's licence requires credit, and the positron style declares
-       * none inline — it points at a TileJSON that is meant to supply it. That
-       * makes rendering depend on an upstream field this app cannot verify or
-       * control, so the credit is stated here outright instead. Anything the
-       * style does provide is still merged in and shown alongside.
+       * OpenFreeMap's licence requires credit, and it renders: the style's
+       * TileJSON supplies "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
+       * confirmed in a real browser rather than assumed. An earlier version
+       * added the same credits via customAttribution as insurance, which
+       * printed them twice — so the control is left to the style.
        */
-      attributionControl: false,
+      attributionControl: { compact: true },
     })
-    m.addControl(
-      new maplibregl.AttributionControl({
-        compact: true,
-        customAttribution: [
-          '<a href="https://openfreemap.org" target="_blank" rel="noreferrer">OpenFreeMap</a>',
-          '<a href="https://www.openmaptiles.org/" target="_blank" rel="noreferrer">OpenMapTiles</a>',
-          '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors',
-        ],
-      }),
-      'bottom-right',
-    )
+
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
+
+    /**
+     * Surface failures instead of leaving a blank rectangle. A bad style URL, a
+     * blocked tile host or a WebGL-less browser all fail silently otherwise,
+     * which is exactly the state this component was found in.
+     */
+    m.on('error', (e) => {
+      const message = e.error?.message ?? 'the map failed to load'
+      // Tile-level errors are transient and not worth blanking the panel for.
+      if (/tile|abort/i.test(message)) return
+      console.error('[map]', message)
+      setFailed(message)
+    })
+
     m.on('load', () => {
       ready.current = true
       m.addSource('pdms-route', {
@@ -133,7 +142,6 @@ export const TrackingMap = ({
         type: 'geojson',
         data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } },
       })
-      // Planned route: dashed, so it reads as "not yet travelled".
       m.addLayer({
         id: 'pdms-route-line',
         type: 'line',
@@ -146,7 +154,6 @@ export const TrackingMap = ({
         },
         layout: { 'line-cap': 'round', 'line-join': 'round' },
       })
-      // Travelled trail: solid.
       m.addLayer({
         id: 'pdms-trail-line',
         type: 'line',
@@ -154,10 +161,29 @@ export const TrackingMap = ({
         paint: { 'line-color': '#EA4E1B', 'line-width': 4 },
         layout: { 'line-cap': 'round', 'line-join': 'round' },
       })
+      // Re-run the data effects now that sources exist.
+      setMapVersion((v) => v + 1)
     })
 
     map.current = m
+    setMapVersion((v) => v + 1)
+
+    /**
+     * MapLibre measures its container once, at construction. This container is
+     * `absolute inset-0` inside a grid cell whose height comes from a sibling
+     * column, so the first measurement can legitimately be 0 — and a 0x0
+     * canvas never recovers on its own, which renders as a blank panel.
+     *
+     * A ResizeObserver fixes both that and ordinary window resizing, which
+     * would otherwise leave the canvas at its original size forever.
+     */
+    const observer = new ResizeObserver(() => {
+      m.resize()
+    })
+    observer.observe(holder.current)
+
     return () => {
+      observer.disconnect()
       if (raf.current !== null) cancelAnimationFrame(raf.current)
       m.remove()
       map.current = null
@@ -170,53 +196,49 @@ export const TrackingMap = ({
   // ---- route + endpoints ----
   useEffect(() => {
     const m = map.current
-    if (!m) return
+    if (!m || !ready.current) return
 
-    const apply = (): void => {
-      const src = m.getSource('pdms-route') as maplibregl.GeoJSONSource | undefined
-      if (src && route) {
-        src.setData({
-          type: 'Feature',
-          properties: {},
-          geometry: { type: 'LineString', coordinates: route },
-        })
-      }
-
-      for (const marker of endpoints.current) marker.remove()
-      endpoints.current = []
-      if (pickup) {
-        endpoints.current.push(
-          new maplibregl.Marker({ element: endpointElement('pickup'), anchor: 'center' })
-            .setLngLat(pickup.coordinates)
-            .addTo(m),
-        )
-      }
-      if (drop) {
-        endpoints.current.push(
-          new maplibregl.Marker({ element: endpointElement('drop'), anchor: 'center' })
-            .setLngLat(drop.coordinates)
-            .addTo(m),
-        )
-      }
-
-      // Frame the whole journey on first paint.
-      const pts: Array<[number, number]> = [
-        ...(route ?? []),
-        ...(pickup ? [pickup.coordinates] : []),
-        ...(drop ? [drop.coordinates] : []),
-      ]
-      if (pts.length >= 2) {
-        const bounds = pts.reduce(
-          (b, p) => b.extend(p),
-          new maplibregl.LngLatBounds(pts[0], pts[0]),
-        )
-        m.fitBounds(bounds, { padding: 56, maxZoom: 14, duration: 0 })
-      }
+    const src = m.getSource('pdms-route') as maplibregl.GeoJSONSource | undefined
+    if (src) {
+      src.setData({
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'LineString', coordinates: route ?? [] },
+      })
     }
 
-    if (ready.current) apply()
-    else m.once('load', apply)
-  }, [route, pickup, drop])
+    for (const marker of endpoints.current) marker.remove()
+    endpoints.current = []
+    if (pickup) {
+      endpoints.current.push(
+        new maplibregl.Marker({ element: endpointElement('pickup'), anchor: 'center' })
+          .setLngLat(pickup.coordinates)
+          .addTo(m),
+      )
+    }
+    if (drop) {
+      endpoints.current.push(
+        new maplibregl.Marker({ element: endpointElement('drop'), anchor: 'center' })
+          .setLngLat(drop.coordinates)
+          .addTo(m),
+      )
+    }
+
+    // Frame the whole journey.
+    const pts: Array<[number, number]> = [
+      ...(route ?? []),
+      ...(pickup ? [pickup.coordinates] : []),
+      ...(drop ? [drop.coordinates] : []),
+    ]
+    const first = pts[0]
+    if (pts.length >= 2 && first) {
+      const bounds = pts.reduce(
+        (b, p) => b.extend(p),
+        new maplibregl.LngLatBounds(first, first),
+      )
+      m.fitBounds(bounds, { padding: 56, maxZoom: 14, duration: 0 })
+    }
+  }, [route, pickup, drop, mapVersion])
 
   // ---- the travelled trail ----
   useEffect(() => {
@@ -228,7 +250,7 @@ export const TrackingMap = ({
       properties: {},
       geometry: { type: 'LineString', coordinates: trail.map((p) => p.coordinates) },
     })
-  }, [trail])
+  }, [trail, mapVersion])
 
   // ---- riders, eased between positions ----
   useEffect(() => {
@@ -260,8 +282,8 @@ export const TrackingMap = ({
       if (existing.to[0] === target[0] && existing.to[1] === target[1]) continue
 
       if (animate) {
-        // Start the glide from wherever the marker currently is, not from the
-        // previous target — otherwise a mid-glide update snaps backwards.
+        // Start from where the marker actually is, so a mid-glide update does
+        // not snap backwards to the previous target.
         const current = existing.marker.getLngLat()
         existing.from = [current.lng, current.lat]
         existing.to = target
@@ -273,7 +295,6 @@ export const TrackingMap = ({
       }
     }
 
-    // Drop markers for riders no longer present.
     for (const [id, state] of markers.current) {
       if (!seen.has(id)) {
         state.marker.remove()
@@ -284,7 +305,7 @@ export const TrackingMap = ({
     if (follow && riders.length === 1 && riders[0]) {
       m.easeTo({ center: riders[0].point.coordinates, duration: GLIDE_MS })
     }
-  }, [riders, animate, follow])
+  }, [riders, animate, follow, mapVersion])
 
   // ---- one animation loop for every marker ----
   useEffect(() => {
@@ -309,5 +330,40 @@ export const TrackingMap = ({
     }
   }, [animate])
 
-  return <div ref={holder} className={className} />
+  /**
+   * The wrapper must be a containing block for the holder and the failure
+   * overlay, but callers pass their own positioning — and `relative absolute`
+   * would be two `position` declarations whose winner depends on CSS source
+   * order rather than class order. So `relative` is added only when the caller
+   * has not positioned it already.
+   */
+  const positioned = /(^|\s)(absolute|fixed|relative|sticky)(\s|$)/.test(className)
+
+  return (
+    <div className={`${positioned ? '' : 'relative'} ${className}`}>
+      {/*
+        `w-full h-full`, deliberately NOT `absolute inset-0`.
+
+        MapLibre stamps `.maplibregl-map { position: relative }` onto whatever
+        element it is given. In a production build Tailwind's utilities happen
+        to come after that rule and `absolute` wins — but in dev Vite injects
+        maplibre's stylesheet when this module loads, i.e. AFTER the entry CSS,
+        so `position: relative` wins instead. `inset-0` then stops stretching
+        the box, it collapses to height 0, and the map renders as a blank
+        rectangle. Sizing by width/height instead is immune to that ordering.
+      */}
+      <div ref={holder} className="w-full h-full" />
+      {failed ? (
+        <div className="absolute inset-0 grid place-items-center p-4 bg-surface-sunk">
+          <p
+            role="alert"
+            className="text-[12.5px] text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2 max-w-[280px] text-center"
+          >
+            The map could not load. Tracking still works — the details beside it
+            are live.
+          </p>
+        </div>
+      ) : null}
+    </div>
+  )
 }

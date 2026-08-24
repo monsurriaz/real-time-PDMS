@@ -11,8 +11,9 @@ import {
   type LocationBroadcast,
   type StatusChanged,
 } from '@pdms/shared'
-import { api } from '@/lib/api'
+import { ApiError, api } from '@/lib/api'
 import { getSocket, joinParcelRoom, leaveParcelRoom, modeFor } from '@/lib/socket'
+import { useMe } from '../auth/useAuth'
 
 export interface TrackingSnapshot {
   parcel: {
@@ -61,15 +62,33 @@ export const useLiveTracking = (parcelId: string | undefined) => {
   const everConnected = useRef(false)
   const pollingWorks = useRef(true)
 
-  // The snapshot, and the REST fallback in one. `refetchInterval` is switched
-  // on only while the socket is down — polling a healthy socket would be the
-  // waste section 6 is trying to avoid.
+  /**
+   * The snapshot, and the REST fallback in one. `refetchInterval` comes on only
+   * while the socket is down — polling a healthy socket is the waste section 6
+   * is trying to avoid — and only while there is a session to poll with.
+   *
+   * Signing out closes the socket, which fires the disconnect handler below and
+   * flips `mode` to 'polling' — which would then poll /tracking/:id with a
+   * cookie that no longer exists, producing 401s in the console on the way to
+   * the login screen. Gating on the session stops that at the source rather
+   * than filtering the errors afterwards.
+   */
+  const me = useMe()
+  const signedIn = Boolean(me.data)
+
   const snapshot = useQuery({
     queryKey: parcelId ? trackingKey(parcelId) : ['tracking', 'none'],
     queryFn: () => api.get<TrackingSnapshot>(`/tracking/${parcelId}`),
-    enabled: Boolean(parcelId),
-    refetchInterval: mode === 'polling' || mode === 'offline' ? REST_POLL_INTERVAL_MS : false,
+    enabled: Boolean(parcelId) && signedIn,
+    refetchInterval:
+      signedIn && (mode === 'polling' || mode === 'offline')
+        ? REST_POLL_INTERVAL_MS
+        : false,
     refetchIntervalInBackground: false,
+    // A 401 means the session is gone, not that the server is unwell — retrying
+    // would just repeat the console error.
+    retry: (count, error) =>
+      !(error instanceof ApiError && error.isUnauthorized) && count < 2,
   })
 
   // Track whether polling itself is succeeding, so 'offline' is honest.
@@ -90,7 +109,8 @@ export const useLiveTracking = (parcelId: string | undefined) => {
   }, [snapshot.data?.delivery.lastKnownLocation])
 
   useEffect(() => {
-    if (!parcelId) return
+    // No session, no socket: the handshake would be refused anyway.
+    if (!parcelId || !signedIn) return
 
     const socket = getSocket()
     let cancelled = false
@@ -157,7 +177,7 @@ export const useLiveTracking = (parcelId: string | undefined) => {
       socket.off(SOCKET_EVENTS.locationBroadcast, onLocation)
       socket.off(SOCKET_EVENTS.statusChanged, onStatus)
     }
-  }, [parcelId, snapshot.data?.delivery._id, qc])
+  }, [parcelId, signedIn, snapshot.data?.delivery._id, qc])
 
   /**
    * While polling, the freshest thing available is the persisted position —

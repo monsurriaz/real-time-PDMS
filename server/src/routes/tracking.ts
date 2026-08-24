@@ -215,6 +215,7 @@ trackingRouter.get('/active/positions', requireAuth, async (_req, res, next) => 
             trackingId: parcel.trackingId,
             dropArea: parcel.drop.area,
             status: r.status,
+            agentId: r.agent ? r.agent.toString() : null,
             agentName: r.agent ? (names.get(r.agent.toString()) ?? 'Rider') : null,
             point: r.lastKnownLocation,
             at: r.lastLocationAt ?? null,
