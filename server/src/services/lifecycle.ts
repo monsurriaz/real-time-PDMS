@@ -10,6 +10,7 @@ import { runAsSystem } from '../lib/context'
 import { DeliveryModel } from '../models/Delivery'
 import { ParcelModel } from '../models/Parcel'
 import { HttpError } from '../middleware/httpError'
+import { broadcast } from '../sockets/broadcast'
 
 /**
  * THE state machine. CLAUDE.md section 5: legal transitions live in one map
@@ -291,7 +292,46 @@ export const advanceStatus = async (
 
   await syncAgentAvailability(delivery.agent, to)
 
+  /**
+   * Section 6: the server broadcasts status:changed to the parcel's room.
+   *
+   * Announced from here rather than from each route, so advanceStatus stays
+   * the single path — a transition cannot happen without the room hearing
+   * about it. Goes through the broadcaster registry, so this file never
+   * imports the socket server (and unit tests need no socket at all).
+   */
+  const agentName = await riderName(delivery.agent)
+  broadcast.statusChanged({
+    deliveryId: delivery._id.toString(),
+    parcelId: delivery.parcel.toString(),
+    status: to,
+    at,
+    agentName,
+    ...(note?.trim() ? { note: note.trim() } : {}),
+  })
+
   return { status: updated.status, at }
+}
+
+/** The rider's display name, for the status event's payload. */
+const riderName = async (
+  agentId: mongoose.Types.ObjectId | null,
+): Promise<string | null> => {
+  if (!agentId) return null
+  return runAsSystem('lifecycle: rider name', async () => {
+    const AgentModel = mongoose.model('Agent')
+    const UserModel = mongoose.model('User')
+    const agent = await AgentModel.findById(agentId)
+      .select('user')
+      .lean<{ user: mongoose.Types.ObjectId } | null>()
+      .exec()
+    if (!agent) return null
+    const user = await UserModel.findById(agent.user)
+      .select('name')
+      .lean<{ name: string } | null>()
+      .exec()
+    return user?.name ?? null
+  })
 }
 
 /**

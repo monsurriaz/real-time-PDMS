@@ -15,6 +15,13 @@ export interface RouteCacheDoc {
   key: string
   distanceKm: number
   durationMin: number
+  /**
+   * The road path as [lng, lat] pairs, when it has been fetched. Stored on the
+   * same row as the distance because it is the same ORS lookup for the same
+   * pair — the tracking map and the simulator would otherwise re-fetch a few
+   * hundred coordinates on every page load.
+   */
+  geometry?: Array<[number, number]>
   lookedUpAt: Date
 }
 
@@ -23,6 +30,7 @@ const routeCacheSchema = new Schema<RouteCacheDoc>(
     key: { type: String, required: true, unique: true, index: true },
     distanceKm: { type: Number, required: true, min: 0 },
     durationMin: { type: Number, required: true, min: 0 },
+    geometry: { type: [[Number]], required: false, default: undefined },
     lookedUpAt: { type: Date, required: true, default: () => new Date() },
   },
   { timestamps: true },

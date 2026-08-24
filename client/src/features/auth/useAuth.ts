@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { LoginInput, SelfUser } from '@pdms/shared'
 import { ApiError, api } from '@/lib/api'
+import { closeSocket } from '@/lib/socket'
 
 interface AuthResponse {
   user: SelfUser
@@ -50,6 +51,9 @@ export const useLogout = () => {
       // Drop everything, not just the session: cached parcels and deliveries
       // belong to the account that just signed out.
       qc.clear()
+      // Close the socket too, so the next sign-in re-handshakes with the new
+      // cookie rather than keeping the old identity's rooms.
+      closeSocket()
     },
   })
 }

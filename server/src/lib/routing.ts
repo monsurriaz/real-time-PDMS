@@ -129,3 +129,99 @@ export const routeBetween = async (
 }
 
 export const routingQueueDepth = (): number => throttle.pending()
+
+/**
+ * The road path between two points as a list of shape points.
+ *
+ * The distance cache above stores a scalar, not geometry, so this is a
+ * separate call. It exists for the simulator and for drawing the route line on
+ * the tracking map — a straight line between pickup and drop would put the
+ * rider through buildings and the Buriganga.
+ *
+ * Cached on the same RouteCache row as the distance, under the same key: it is
+ * the same ORS lookup for the same pair, and a tracking page that re-fetched a
+ * few hundred coordinates on every load would burn the free tier for nothing.
+ */
+export const routeGeometry = async (
+  from: GeoPoint,
+  to: GeoPoint,
+): Promise<GeoPoint[]> => {
+  const key = cacheKey(from, to)
+
+  const cached = await runAsSystem('routing: geometry cache read', async () =>
+    RouteCacheModel.findOne({ key }).select('geometry').lean().exec(),
+  )
+  if (cached?.geometry && cached.geometry.length > 1) {
+    return cached.geometry.map(([lng, lat]) => ({
+      type: 'Point' as const,
+      coordinates: [lng, lat] as [number, number],
+    }))
+  }
+
+  if (!env.ORS_API_KEY) {
+    throw new LookupError('provider_rejected', 'ORS_API_KEY is not set')
+  }
+
+  const call = async (): Promise<GeoPoint[]> => {
+    let res: Response
+    try {
+      res = await fetch(
+        'https://api.openrouteservice.org/v2/directions/driving-car/geojson',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: env.ORS_API_KEY as string,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ coordinates: [from.coordinates, to.coordinates] }),
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        },
+      )
+    } catch {
+      throw new LookupError('provider_unavailable', 'the routing service did not respond')
+    }
+
+    if (!res.ok) {
+      if (res.status === 404) {
+        throw new LookupError('no_route', 'no road route between those points')
+      }
+      throw new LookupError(
+        'provider_unavailable',
+        `the routing service returned ${res.status}`,
+      )
+    }
+
+    const body = (await res.json()) as {
+      features?: Array<{ geometry?: { coordinates?: Array<[number, number]> } }>
+    }
+    const coords = body.features?.[0]?.geometry?.coordinates
+    if (!coords || coords.length < 2) {
+      throw new LookupError('no_route', 'the routing service returned no geometry')
+    }
+
+    return coords.map(([lng, lat]) => ({
+      type: 'Point' as const,
+      coordinates: [lng, lat] as [number, number],
+    }))
+  }
+
+  const geometry = await throttle.run(call)
+
+  // Upsert rather than update: the geometry may be wanted for a pair whose
+  // distance was never asked for.
+  await runAsSystem('routing: geometry cache write', async () =>
+    RouteCacheModel.updateOne(
+      { key },
+      {
+        $set: {
+          geometry: geometry.map((p) => p.coordinates),
+          lookedUpAt: new Date(),
+        },
+        $setOnInsert: { distanceKm: 0, durationMin: 0 },
+      },
+      { upsert: true },
+    ).exec(),
+  )
+
+  return geometry
+}

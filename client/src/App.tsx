@@ -6,6 +6,7 @@ import { BookParcelPage } from '@/features/booking/BookParcelPage'
 import { CustomerHome } from '@/features/customer/CustomerHome'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { RequireRole } from '@/features/auth/RequireRole'
+import { TrackParcelPage } from '@/features/tracking/TrackParcelPage'
 
 /**
  * Three role-gated routes plus login. The gate is convenience only — the
@@ -53,6 +54,16 @@ export const App = () => (
       element={
         <RequireRole roles={['admin']}>
           <AdminPricingPage />
+        </RequireRole>
+      }
+    />
+
+    {/* Customers and admins both track; the server scopes what they can see. */}
+    <Route
+      path="/track/:parcelId"
+      element={
+        <RequireRole roles={['customer', 'admin']}>
+          <TrackParcelPage />
         </RequireRole>
       }
     />

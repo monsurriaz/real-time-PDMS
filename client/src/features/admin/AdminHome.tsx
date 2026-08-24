@@ -1,5 +1,6 @@
 import { RoleShell } from '@/components/RoleShell'
 import { DeliveryBoard } from './DeliveryBoard'
+import { FleetMap } from './FleetMap'
 
 export const ADMIN_NAV = [
   { to: '/admin', label: 'Operations' },
@@ -9,9 +10,11 @@ export const ADMIN_NAV = [
 export const AdminHome = () => (
   <RoleShell
     title="Operations"
-    subtitle="Assign riders, and watch what is moving. Reassignment is possible until a parcel is picked up."
+    subtitle="Every active rider on one map, and the board below. Positions arrive over the same socket the customer screen uses."
     nav={ADMIN_NAV}
   >
+    {/* The map sits above the existing board — the table is untouched. */}
+    <FleetMap />
     <DeliveryBoard />
   </RoleShell>
 )

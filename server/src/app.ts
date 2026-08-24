@@ -10,6 +10,7 @@ import { authRouter } from './routes/auth'
 import { deliveriesRouter } from './routes/deliveries'
 import { parcelsRouter } from './routes/parcels'
 import { pricingRouter } from './routes/pricing'
+import { trackingRouter } from './routes/tracking'
 import { zonesRouter } from './routes/zones'
 // Registers every model with Mongoose before any route can query one.
 import './models'
@@ -51,6 +52,7 @@ export const createApp = (): Express => {
   app.use('/parcels', parcelsRouter)
   app.use('/deliveries', deliveriesRouter)
   app.use('/agents', agentsRouter)
+  app.use('/tracking', trackingRouter)
 
   app.use(notFoundHandler)
   app.use(errorHandler)

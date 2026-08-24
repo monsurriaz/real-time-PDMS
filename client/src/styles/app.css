@@ -35,3 +35,110 @@
     outline-offset: 2px;
   }
 }
+
+/**
+ * Map markers. Defined here rather than as Tailwind classes because MapLibre
+ * builds these elements imperatively, outside React's tree, so Tailwind's
+ * scanner would never see the class names.
+ */
+@layer components {
+  .pdms-rider {
+    position: relative;
+    width: 0;
+    height: 0;
+  }
+  .pdms-rider__halo,
+  .pdms-rider__dot {
+    position: absolute;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+  }
+  /* The reference's rider marker: a 16px halo at .16 opacity behind a solid dot. */
+  .pdms-rider__halo {
+    width: 32px;
+    height: 32px;
+    background: var(--accent);
+    opacity: 0.16;
+  }
+  .pdms-rider__dot {
+    width: 13px;
+    height: 13px;
+    background: var(--accent);
+    box-shadow: 0 0 0 2.5px #fff;
+  }
+  .pdms-rider__label {
+    position: absolute;
+    left: 14px;
+    top: -9px;
+    white-space: nowrap;
+    font-family: var(--font);
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ink);
+    background: rgb(255 255 255 / 0.86);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-sm);
+    padding: 2px 6px;
+  }
+  /* Pickup is ink, drop is a hollow ink ring — the reference's endpoints. */
+  .pdms-pin {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2.5px #fff;
+  }
+  .pdms-pin--pickup {
+    background: var(--ink);
+  }
+  .pdms-pin--drop {
+    background: var(--surface);
+    border: 3.5px solid var(--ink);
+  }
+
+  /**
+   * The lifecycle rail's travelling highlight.
+   *
+   * This is a liveness indicator, not decoration: it runs only while socket
+   * updates are actually arriving. Frozen means the socket dropped and the
+   * screen is on the REST fallback — so the animation carries information the
+   * user needs, which is why it exists at all.
+   *
+   * Section 4's "no gradients" rule is about gradient FILLS on surfaces and
+   * buttons. This is a moving highlight over a solid fill, and the segment
+   * underneath stays flat.
+   */
+  .rail-live {
+    position: relative;
+    overflow: hidden;
+  }
+  .rail-live[data-live='true']::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(255 255 255 / 0.85),
+      transparent
+    );
+    transform: translateX(-100%);
+    animation: rail-sweep 1.5s ease-in-out infinite;
+  }
+  @keyframes rail-sweep {
+    to {
+      transform: translateX(100%);
+    }
+  }
+  /**
+   * Respect the user's motion preference. The information still has to land,
+   * so a reduced-motion viewer gets a static highlight instead of nothing —
+   * losing the animation must not mean losing the liveness signal.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    .rail-live[data-live='true']::after {
+      animation: none;
+      transform: none;
+      background: rgb(255 255 255 / 0.45);
+    }
+  }
+}

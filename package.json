@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Real-Time Parcel Delivery Management System — CSC 470",
+  "description": "Real-Time Parcel Delivery Management System \u2014 CSC 470",
   "workspaces": [
     "shared",
     "server",
@@ -15,7 +15,8 @@
     "dev:client": "npm run dev --workspace @pdms/client",
     "seed": "tsx scripts/seed.ts",
     "test": "node --import tsx --test \"server/src/**/*.test.ts\"",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "simulate": "tsx scripts/simulate.ts"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

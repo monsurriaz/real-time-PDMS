@@ -1,6 +1,7 @@
 import { createApp } from './app'
 import { connectDb, disconnectDb } from './lib/db'
 import { env } from './lib/env'
+import { createSocketServer } from './sockets'
 
 const main = async (): Promise<void> => {
   await connectDb()
@@ -11,6 +12,16 @@ const main = async (): Promise<void> => {
     console.log(`[server] http://localhost:${env.PORT}  (${env.NODE_ENV})`)
     console.log(`[server] cors origin: ${env.CLIENT_ORIGIN}`)
   })
+
+  // Shares the HTTP server, so one port serves REST and websockets both.
+  const io = createSocketServer(server)
+  io.on('connection', (socket) => {
+    console.log(`[socket] connected ${socket.id}`)
+    socket.on('disconnect', (reason) => {
+      console.log(`[socket] disconnected ${socket.id} (${reason})`)
+    })
+  })
+  console.log('[socket] listening on the same port')
 
   /**
    * Render sends SIGTERM on redeploy. Closing the HTTP server before the

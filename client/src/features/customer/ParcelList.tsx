@@ -149,7 +149,13 @@ export const ParcelList = () => {
             {parcels.data.map((p) => (
               <tr key={p._id} className="border-b border-hairline last:border-b-0">
                 <td className="py-3 pr-4">
-                  <span className="mono text-[12.5px] font-medium">{p.trackingId}</span>
+                  {/* Tracking is the point of the app — make the ID the way in. */}
+                  <Link
+                    to={`/track/${p._id}`}
+                    className="mono text-[12.5px] font-medium underline decoration-hairline-strong hover:decoration-ink"
+                  >
+                    {p.trackingId}
+                  </Link>
                 </td>
                 <td className="py-3 pr-4 text-[13px] text-ink-2">
                   {p.pickupArea} → {p.dropArea}
