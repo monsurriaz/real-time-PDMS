@@ -85,13 +85,13 @@ debt are all in Resolved. What is left is what M6 stopped short of, and why.
 | Loading / empty / error pass across every screen | M6 | `cd8904f` |
 | Agent mobile pass: 15 undersized tap targets → 1, 21 contrast failures → 4 | M6 | `cd8904f` |
 | `expectedBy` never set on real bookings, so nothing could be late | M6 | `cd8904f` |
-| Design debt: `rounded-[2px]`, `text-[13.5px]`, `text-[14.5px]` | M6 | `PENDING2` |
-| `.b-cancelled` badge variant now exists by name | M6 | `PENDING2` |
-| Map bundle weight — MapLibre split out, 1,571 kB → 755 kB | M6 | `PENDING2` |
-| `advanceStatus` enforced structurally, not by convention | M6 | `PENDING2` |
-| Route geometry cache had no TTL | M6 | `PENDING2` |
-| Rider marker hidden under the pickup pin | M6 | `PENDING2` |
-| Assignment ignored rider workload | M6 | `PENDING2` |
+| Design debt: `rounded-[2px]`, `text-[13.5px]`, `text-[14.5px]` | M6 | `ced8989` |
+| `.b-cancelled` badge variant now exists by name | M6 | `ced8989` |
+| Map bundle weight — MapLibre split out, 1,571 kB → 755 kB | M6 | `ced8989` |
+| `advanceStatus` enforced structurally, not by convention | M6 | `ced8989` |
+| Route geometry cache had no TTL | M6 | `ced8989` |
+| Rider marker hidden under the pickup pin | M6 | `ced8989` |
+| Assignment ignored rider workload | M6 | `ced8989` |
 | **Weight cap gap** (pulled forward from M6) | M5 | `b31345f` |
 | Real proof-of-delivery capture | M5 | `b31345f` |
 | Rehearsal check: weight cap (M7) — moot, 20 kg now prices | M5 | `b31345f` |
