@@ -78,9 +78,9 @@ weight cap pulled forward from M6 — are in Resolved.
 
 | Item | Milestone | Commit |
 |---|---|---|
-| **Weight cap gap** (pulled forward from M6) | M5 | `PENDING` |
-| Real proof-of-delivery capture | M5 | `PENDING` |
-| Rehearsal check: weight cap (M7) — moot, 20 kg now prices | M5 | `PENDING` |
+| **Weight cap gap** (pulled forward from M6) | M5 | `b31345f` |
+| Real proof-of-delivery capture | M5 | `b31345f` |
+| Rehearsal check: weight cap (M7) — moot, 20 kg now prices | M5 | `b31345f` |
 | react-router-dom v6 → v7 (2 moderate advisories) | M1 | `3bd0b92` |
 | Optional GeoJSON points materializing as empty arrays | M1 | — |
 | `runAsSystem` receiving un-executed Mongoose Query | M1 | — |
