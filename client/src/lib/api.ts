@@ -7,8 +7,14 @@
  * and Render), so requests must name the API's origin outright — which is
  * also why COOKIE_SECURE flips the cookie to SameSite=None there.
  */
-const BASE = import.meta.env.PROD
-  ? (import.meta.env.VITE_API_BASE_URL ?? '')
+/**
+ * Optional chaining because `import.meta.env` exists only under Vite. Without
+ * it, importing this module from a plain Node process — a routing test, a
+ * script — throws before anything runs. Vite still substitutes the values
+ * statically, so the production build is unaffected.
+ */
+const BASE = import.meta.env?.PROD
+  ? (import.meta.env?.VITE_API_BASE_URL ?? '')
   : '/api'
 
 /** Mirrors the server's single error shape from middleware/httpError.ts. */
