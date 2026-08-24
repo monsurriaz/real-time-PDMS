@@ -101,11 +101,11 @@ export const PricingEditor = () => {
   }
 
   if (stored.isPending) {
-    return <p className="text-muted text-[13.5px]">Loading pricing…</p>
+    return <p className="text-muted text-body">Loading pricing…</p>
   }
   if (stored.isError || !current) {
     return (
-      <p className="text-[13.5px] text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2">
+      <p className="text-body text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2">
         {stored.error instanceof ApiError
           ? stored.error.message
           : 'Pricing could not be loaded.'}

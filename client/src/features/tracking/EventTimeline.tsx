@@ -52,7 +52,7 @@ export const EventTimeline = ({ events, status, expectedBy, dropArea }: Props) =
             />
             <div className="flex-1">
               <div
-                className={`text-[13.5px] font-semibold ${now ? 'text-transit' : ''}`}
+                className={`text-body font-semibold ${now ? 'text-transit' : ''}`}
               >
                 {LABEL[e.status]}
               </div>
@@ -76,7 +76,7 @@ export const EventTimeline = ({ events, status, expectedBy, dropArea }: Props) =
         <div className="flex gap-3 relative">
           <span className="w-[13px] h-[13px] rounded-full flex-none mt-[3px] border-[2.5px] border-hairline-strong bg-surface" />
           <div className="flex-1">
-            <div className="text-[13.5px] font-semibold text-faint">Delivered</div>
+            <div className="text-body font-semibold text-faint">Delivered</div>
             <div className="text-[12px] text-muted">{dropArea}</div>
           </div>
           <span className="mono text-[11.5px] text-faint whitespace-nowrap">

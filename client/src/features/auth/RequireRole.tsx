@@ -22,7 +22,7 @@ export const RequireRole = ({ roles, children }: Props) => {
   if (me.isPending) {
     return (
       <div className="min-h-dvh grid place-items-center">
-        <p className="text-muted text-[13.5px]">Loading…</p>
+        <p className="text-muted text-body">Loading…</p>
       </div>
     )
   }

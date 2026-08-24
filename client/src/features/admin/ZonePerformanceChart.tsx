@@ -69,7 +69,7 @@ export const ZonePerformanceChart = ({ zones }: Props) => {
 
   if (zones.length === 0 || max === 0) {
     return (
-      <p className="text-[13.5px] text-muted">
+      <p className="text-body text-muted">
         No parcels have been booked into any zone yet. Book one, or run the seed
         script, and the zones appear here.
       </p>

@@ -31,7 +31,7 @@ const CAPS = 'text-[11px] font-semibold uppercase tracking-[0.13em] text-muted'
 const FIELD = [
   // min-h-12 for the same reason the tiles are min-h-12: this is a phone in a
   // rider's hand, and section 4 puts the floor at 48px.
-  'w-full min-h-12 font-sans text-[14.5px] text-ink px-13px py-11px',
+  'w-full min-h-12 font-sans text-control text-ink px-13px py-11px',
   'border border-hairline-strong rounded-sm bg-surface outline-none',
   'focus:border-accent focus:ring-[3px] focus:ring-accent-tint',
 ].join(' ')

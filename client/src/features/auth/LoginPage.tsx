@@ -40,7 +40,7 @@ export const LoginPage = () => {
     <main className="min-h-dvh grid place-items-center px-5 py-10">
       <div className="w-full max-w-[380px]">
         <div className="flex items-center gap-9px mb-7">
-          <span className="w-[9px] h-[9px] rounded-[2px] bg-accent rotate-45" />
+          <span className="w-[9px] h-[9px] rounded-xs bg-accent rotate-45" />
           <span className="font-display font-bold text-[17px] tracking-[-0.02em]">
             ParcelDelivery
           </span>
@@ -49,7 +49,7 @@ export const LoginPage = () => {
         <h1 className="text-[22px] font-semibold tracking-[-0.02em] mb-1">
           Sign in
         </h1>
-        <p className="text-muted text-[13.5px] mb-6">
+        <p className="text-muted text-body mb-6">
           Use a seeded demo account.
         </p>
 
@@ -71,7 +71,7 @@ export const LoginPage = () => {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full font-sans text-[14.5px] text-ink px-13px py-11px
+              className="w-full font-sans text-control text-ink px-13px py-11px
                          border border-hairline-strong rounded-sm bg-surface outline-none
                          focus:border-accent focus:ring-[3px] focus:ring-accent-tint"
             />
@@ -90,7 +90,7 @@ export const LoginPage = () => {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full font-sans text-[14.5px] text-ink px-13px py-11px
+              className="w-full font-sans text-control text-ink px-13px py-11px
                          border border-hairline-strong rounded-sm bg-surface outline-none
                          focus:border-accent focus:ring-[3px] focus:ring-accent-tint"
             />

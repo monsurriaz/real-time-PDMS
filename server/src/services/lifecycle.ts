@@ -7,7 +7,7 @@ import {
 } from '@pdms/shared'
 import type { Actor } from '../lib/context'
 import { runAsSystem } from '../lib/context'
-import { DeliveryModel } from '../models/Delivery'
+import { DeliveryModel, LIFECYCLE_WRITE } from '../models/Delivery'
 import { ParcelModel } from '../models/Parcel'
 import { HttpError } from '../middleware/httpError'
 import { broadcast } from '../sockets/broadcast'
@@ -292,7 +292,9 @@ export const advanceStatus = async (
           },
         },
       },
-      { new: true },
+      // The marker that identifies this as THE lifecycle write. Delivery's
+      // pre-hook refuses any status change that arrives without it.
+      { new: true, [LIFECYCLE_WRITE]: true },
     )
       .select('status')
       .lean<{ status: DeliveryStatus } | null>()

@@ -224,7 +224,7 @@ export const ParcelList = () => {
   if (parcels.isPending) {
     return (
       <Panel>
-        <p className="text-[13.5px] text-muted">Loading your parcels…</p>
+        <p className="text-body text-muted">Loading your parcels…</p>
       </Panel>
     )
   }
@@ -244,7 +244,7 @@ export const ParcelList = () => {
   if (parcels.data.length === 0) {
     return (
       <Panel>
-        <p className="text-[13.5px] text-muted mb-4">
+        <p className="text-body text-muted mb-4">
           You have not booked anything yet.
         </p>
         <Link to="/book">
@@ -302,7 +302,7 @@ export const ParcelList = () => {
                     <Badge status={asStatus(p.status)} />
                   </td>
                   <td className="py-3 pr-4">
-                    <span className="mono text-[13.5px]">{formatTaka(p.total)}</span>
+                    <span className="mono text-body">{formatTaka(p.total)}</span>
                     {p.isCod ? (
                       <span className="block text-[11px] text-faint mono">
                         COD {formatTaka(p.codAmount)}

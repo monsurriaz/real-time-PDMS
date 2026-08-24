@@ -10,7 +10,8 @@ import {
   type StatusChanged,
 } from '@pdms/shared'
 import { Panel } from '@/components/Panel'
-import { TrackingMap, type MapRider } from '@/components/TrackingMap'
+import { LazyTrackingMap } from '@/components/LazyTrackingMap'
+import type { MapRider } from '@/components/TrackingMap'
 import { ApiError, api } from '@/lib/api'
 import { getSocket, joinParcelRoom, modeFor } from '@/lib/socket'
 import { ConnectionPill } from '../tracking/ConnectionPill'
@@ -152,7 +153,7 @@ export const FleetMap = () => {
         </p>
       ) : (
         <div className="relative h-[380px] rounded-md overflow-hidden border border-hairline bg-surface-sunk">
-          <TrackingMap className="absolute inset-0" riders={riders} animate />
+          <LazyTrackingMap className="absolute inset-0" riders={riders} animate />
           {/*
             Three states over one map, not two: an empty fleet and a fleet that
             has not loaded yet look identical on the canvas, and telling an admin

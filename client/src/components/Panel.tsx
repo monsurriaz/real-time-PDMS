@@ -70,7 +70,7 @@ export const KeyValue = ({
 }) => (
   <div className="flex justify-between items-baseline py-10px border-b border-hairline last:border-b-0">
     <span className="text-[12.5px] text-muted">{k}</span>
-    <span className="text-[13.5px]">{children}</span>
+    <span className="text-body">{children}</span>
   </div>
 )
 
@@ -79,7 +79,7 @@ export const KeyValue = ({
  * is the only place orange appears outside a primary button.
  */
 export const Note = ({ children }: { children: ReactNode }) => (
-  <div className="mt-22px py-15px px-17px border-l-2 border-accent bg-accent-tint rounded-r-sm text-[13.5px] text-ink-2">
+  <div className="mt-22px py-15px px-17px border-l-2 border-accent bg-accent-tint rounded-r-sm text-body text-ink-2">
     {children}
   </div>
 )

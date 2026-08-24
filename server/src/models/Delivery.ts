@@ -126,6 +126,90 @@ deliveryMongooseSchema.index({ lastKnownLocation: '2dsphere' }, { sparse: true }
 deliveryMongooseSchema.index({ status: 1, updatedAt: -1 })
 
 /**
+ * The marker advanceStatus() passes so its own writes are recognised.
+ *
+ * A Mongoose query option rather than a field on the document: it must travel
+ * with the WRITE and leave no trace in the data. Anything writing `status`
+ * without it is refused below.
+ */
+export const LIFECYCLE_WRITE = '__lifecycleWrite' as const
+
+/** Does this update touch `status`, by any operator or as a bare assignment? */
+const touchesStatus = (update: Record<string, unknown>): boolean => {
+  if ('status' in update) return true
+  for (const [op, block] of Object.entries(update)) {
+    if (!op.startsWith('$') || typeof block !== 'object' || block === null) continue
+    if ('status' in (block as Record<string, unknown>)) return true
+  }
+  return false
+}
+
+/**
+ * CLAUDE.md section 5 says "no route mutates status directly". Until now that
+ * was discipline: `DeliveryModel` is exported, and any future handler could
+ * `$set: { status }` and skip the transition map, the authority check, the
+ * Delivered precondition, the event append and the broadcast in one line.
+ *
+ * This turns the sentence into an enforced rule. Exported as a pure function so
+ * it can be unit-tested without a database — the hook below is a one-line call.
+ */
+export const assertLifecycleWrite = (
+  update: Record<string, unknown> | null | undefined,
+  options: Record<string, unknown>,
+): void => {
+  if (!update || !touchesStatus(update)) return
+  if (options[LIFECYCLE_WRITE] === true) return
+  throw new Error(
+    'delivery.status may only be changed by advanceStatus() — it owns the transition map, ' +
+      'the authority check and the event trail (CLAUDE.md section 5). ' +
+      'If this really is a lifecycle write, pass the LIFECYCLE_WRITE option.',
+  )
+}
+
+deliveryMongooseSchema.pre(
+  ['updateOne', 'updateMany', 'findOneAndUpdate', 'replaceOne'],
+  function (next) {
+    const update = this.getUpdate()
+    if (Array.isArray(update)) {
+      // An aggregation pipeline update. Nothing here uses one, and letting it
+      // through would be a hole in exactly the wall this hook is.
+      next(new Error('pipeline updates are not allowed on Delivery'))
+      return
+    }
+    try {
+      assertLifecycleWrite(
+        update as Record<string, unknown> | null,
+        this.getOptions() as Record<string, unknown>,
+      )
+      next()
+    } catch (err) {
+      next(err as Error)
+    }
+  },
+)
+
+/**
+ * The same rule for `doc.status = x; await doc.save()`.
+ *
+ * No marker exists for this path because nothing should use it: advanceStatus
+ * works through findOneAndUpdate, conditionally on the status it validated
+ * against, which is also the optimistic lock that stops two riders both
+ * winning. A read-modify-save would quietly lose that.
+ */
+deliveryMongooseSchema.pre('save', function (next) {
+  if (!this.isNew && this.isModified('status')) {
+    next(
+      new Error(
+        'delivery.status cannot be changed with save() — go through advanceStatus(), ' +
+          'which updates conditionally on the status it checked',
+      ),
+    )
+    return
+  }
+  next()
+})
+
+/**
  * events[] is append-only (CLAUDE.md section 5).
  *
  * Mongoose has no built-in append-only array, so this compares the saved

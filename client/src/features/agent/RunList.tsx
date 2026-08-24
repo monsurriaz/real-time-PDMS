@@ -25,7 +25,7 @@ export const RunList = () => {
 
       {deliveries.isPending ? (
         <Panel>
-          <p className="text-[13.5px] text-muted">Loading your runs…</p>
+          <p className="text-body text-muted">Loading your runs…</p>
         </Panel>
       ) : deliveries.isError ? (
         <Panel>
@@ -56,7 +56,7 @@ export const RunList = () => {
                   </>
                 ) : (
                   <Panel className="mb-5">
-                    <p className="text-[13.5px] text-muted">
+                    <p className="text-body text-muted">
                       Nothing to carry right now. Go available and set your
                       location — new bookings are assigned by proximity.
                     </p>

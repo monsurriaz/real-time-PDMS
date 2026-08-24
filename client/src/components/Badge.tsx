@@ -5,10 +5,12 @@ import type { DeliveryStatus } from '@pdms/shared'
  * variant, including the 6px dot. Padding, gap, size and radius are the
  * reference's own values, expressed through spacing tokens.
  *
- * The design system defines six variants and the lifecycle has seven states:
- * there is no `.b-cancelled`. Cancelled reuses the neutral grey of Booked,
- * which is the only defensible choice in the existing palette — a cancelled
- * parcel is inert, not failed, so borrowing the red would misreport it.
+ * The lifecycle has seven states and design-system.html drew six variants, so
+ * Cancelled used to borrow Booked's classes outright. It now has its own name,
+ * `cancelled-*`, aliased to Booked's values in tokens.css: the appearance is
+ * unchanged and deliberately so — a cancelled parcel is inert, not failed, and
+ * borrowing the red would misreport it — but the map below no longer has two
+ * states pointing at one variant's name.
  */
 const VARIANT: Record<DeliveryStatus, string> = {
   Booked: 'bg-booked-bg text-booked-ink',
@@ -16,7 +18,7 @@ const VARIANT: Record<DeliveryStatus, string> = {
   PickedUp: 'bg-picked-bg text-picked-ink',
   InTransit: 'bg-transit-bg text-transit-ink',
   Delivered: 'bg-delivered-bg text-delivered-ink',
-  Cancelled: 'bg-booked-bg text-booked-ink',
+  Cancelled: 'bg-cancelled-bg text-cancelled-ink',
   Failed: 'bg-failed-bg text-failed-ink',
 }
 

@@ -24,6 +24,19 @@
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-pill: 999px;
+
+  /**
+   * Two type sizes design-system.html uses constantly and tokens.css never
+   * named, so every screen wrote them as `text-body` / `text-control`.
+   * Rule 1 covers fonts as much as it covers spacing: an arbitrary-value
+   * bracket in a diff should be a signal, and it stops being one when 34 of
+   * them are load-bearing.
+   *
+   * Named by the job rather than the number, because that is what a component
+   * is choosing — reading text, or a form control.
+   */
+  --text-body: 13.5px;
+  --text-control: 14.5px;
 }
 
 :root {
@@ -64,6 +77,20 @@
   --s-failed: #c9342c;
   --s-failed-bg: #fcebea;
   --s-failed-ink: #7a1c17;
+
+  /**
+   * Cancelled, by name.
+   *
+   * design-system.html defines six badge variants for seven lifecycle states,
+   * and Cancelled has always borrowed Booked's neutral grey — the right
+   * appearance (a cancelled parcel is inert, not failed; red would misreport
+   * it), reached by aliasing rather than by choice. These are var() references
+   * on purpose: identical to Booked today, and a single place to change if the
+   * two ever need to differ.
+   */
+  --s-cancelled: var(--s-booked);
+  --s-cancelled-bg: var(--s-booked-bg);
+  --s-cancelled-ink: var(--s-booked-ink);
 
   /* The design system calls the 12px radius --radius; Tailwind's scale calls
      it --radius-md. Same value, both names resolve. */
@@ -166,6 +193,9 @@
   --color-failed: var(--s-failed);
   --color-failed-bg: var(--s-failed-bg);
   --color-failed-ink: var(--s-failed-ink);
+  --color-cancelled: var(--s-cancelled);
+  --color-cancelled-bg: var(--s-cancelled-bg);
+  --color-cancelled-ink: var(--s-cancelled-ink);
 
   --font-sans: var(--font);
   --font-mono: var(--mono);

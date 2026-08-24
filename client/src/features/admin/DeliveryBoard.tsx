@@ -121,6 +121,10 @@ const AssignPanel = ({
                         {c.distanceMetres !== null
                           ? ` · ${formatKm(c.distanceMetres / 1000)}`
                           : ' · zone match'}
+                        {/* Why this rider is where they are in the list. */}
+                        {c.activeDeliveries > 0
+                          ? ` · carrying ${c.activeDeliveries}`
+                          : ' · free'}
                       </span>
                     </div>
                     <Button
@@ -178,7 +182,7 @@ export const DeliveryBoard = () => {
 
       {deliveries.isPending ? (
         <Panel>
-          <p className="text-[13.5px] text-muted">Loading deliveries…</p>
+          <p className="text-body text-muted">Loading deliveries…</p>
         </Panel>
       ) : deliveries.isError ? (
         <Panel>
@@ -190,7 +194,7 @@ export const DeliveryBoard = () => {
         </Panel>
       ) : deliveries.data.length === 0 ? (
         <Panel>
-          <p className="text-[13.5px] text-muted">
+          <p className="text-body text-muted">
             {filter === 'all'
               ? 'No deliveries yet. Run the seed script or book a parcel.'
               : `Nothing is ${filter}.`}

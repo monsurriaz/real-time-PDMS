@@ -100,7 +100,7 @@ export const CodReconciliation = () => {
   if (data.isPending) {
     return (
       <Panel>
-        <p className="text-[13.5px] text-muted">Counting the cash…</p>
+        <p className="text-body text-muted">Counting the cash…</p>
       </Panel>
     )
   }
@@ -148,7 +148,7 @@ export const CodReconciliation = () => {
 
       {rows.length === 0 ? (
         <Panel title="Per rider">
-          <p className="text-[13.5px] text-muted">
+          <p className="text-body text-muted">
             No COD has been collected yet. Deliver a cash-on-delivery parcel and
             the rider appears here.
           </p>
@@ -230,7 +230,7 @@ export const CodReconciliation = () => {
               : 'The settlement trail could not be loaded.'}
           </p>
         ) : trail.data.length === 0 ? (
-          <p className="text-[13.5px] text-muted">
+          <p className="text-body text-muted">
             Nothing settled yet. Each hand-in is recorded here with what it
             covered — totals are never edited in place.
           </p>

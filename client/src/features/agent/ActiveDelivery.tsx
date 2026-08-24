@@ -86,7 +86,7 @@ export const ActiveDelivery = ({ d }: { d: DeliveryListItem }) => {
         <div className="text-[17px] font-semibold mt-5px tracking-[-0.015em]">
           {d.recipientName}
         </div>
-        <div className="text-[13.5px] text-muted mt-0.5">
+        <div className="text-body text-muted mt-0.5">
           {d.dropArea}, {d.dropZone}
         </div>
 
@@ -177,7 +177,7 @@ export const ActiveDelivery = ({ d }: { d: DeliveryListItem }) => {
                 value={failureNote}
                 placeholder="Recipient not reachable"
                 onChange={(e) => setFailureNote(e.target.value)}
-                className="w-full min-h-12 font-sans text-[14.5px] text-ink px-13px py-11px mb-3
+                className="w-full min-h-12 font-sans text-control text-ink px-13px py-11px mb-3
                            border border-hairline-strong rounded-sm bg-surface outline-none
                            focus:border-accent focus:ring-[3px] focus:ring-accent-tint"
               />

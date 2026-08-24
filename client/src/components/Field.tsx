@@ -8,7 +8,7 @@ import { useId } from 'react'
  */
 
 const CONTROL = [
-  'w-full font-sans text-[14.5px] text-ink px-13px py-11px',
+  'w-full font-sans text-control text-ink px-13px py-11px',
   'border rounded-sm bg-surface outline-none',
   'focus:border-accent focus:ring-[3px] focus:ring-accent-tint',
 ].join(' ')

@@ -42,6 +42,22 @@
  * scanner would never see the class names.
  */
 @layer components {
+  /**
+   * The rider draws above the endpoint pins.
+   *
+   * MapLibre stacks markers in DOM order, so a rider parked at the pick-up
+   * point disappeared under the ink pin and read as a black dot — the one
+   * moment in a delivery when someone is most likely to be looking. z-index is
+   * on the marker element MapLibre positions, not on this inner node, which is
+   * why the rule reaches up with :has().
+   */
+  .maplibregl-marker:has(.pdms-rider) {
+    z-index: 2;
+  }
+  .maplibregl-marker:has(.pdms-pin) {
+    z-index: 1;
+  }
+
   .pdms-rider {
     position: relative;
     width: 0;

@@ -323,7 +323,7 @@ export const BookingPage = () => {
             onChange={(e) => set('description', e.target.value)}
           />
 
-          <label className="flex items-center gap-2 mb-15px text-[13.5px] cursor-pointer">
+          <label className="flex items-center gap-2 mb-15px text-body cursor-pointer">
             <input
               type="checkbox"
               checked={draft.isCod}

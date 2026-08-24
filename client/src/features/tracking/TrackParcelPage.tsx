@@ -3,7 +3,8 @@ import type { GeoPoint, ProofOfDelivery } from '@pdms/shared'
 import { Badge } from '@/components/Badge'
 import { Button } from '@/components/Button'
 import { LifecycleRail } from '@/components/LifecycleRail'
-import { TrackingMap, type MapRider } from '@/components/TrackingMap'
+import { LazyTrackingMap } from '@/components/LazyTrackingMap'
+import type { MapRider } from '@/components/TrackingMap'
 import { ApiError } from '@/lib/api'
 import { formatDateTime, formatKg, formatTaka } from '@/lib/format'
 import { RoleShell } from '@/components/RoleShell'
@@ -114,7 +115,7 @@ export const TrackParcelPage = () => {
   if (snapshot.isPending) {
     return (
       <RoleShell title="Tracking" nav={NAV}>
-        <p className="text-[13.5px] text-muted">Loading…</p>
+        <p className="text-body text-muted">Loading…</p>
       </RoleShell>
     )
   }
@@ -207,7 +208,7 @@ export const TrackParcelPage = () => {
               <div className="flex items-center gap-11px p-[13px] bg-surface-sunk rounded-md my-4">
                 <div className="w-9 h-9 rounded-full bg-hairline-strong flex-none" />
                 <div className="flex-1 min-w-0">
-                  <div className="text-[13.5px] font-semibold truncate">
+                  <div className="text-body font-semibold truncate">
                     {rider.name}
                   </div>
                   <div className="text-[12px] text-muted">
@@ -272,7 +273,7 @@ export const TrackParcelPage = () => {
 
           {/* The map: largest object on the page. */}
           <div className="relative min-h-[430px] lg:min-h-[560px] bg-surface-sunk">
-            <TrackingMap
+            <LazyTrackingMap
               className="absolute inset-0"
               riders={riders}
               route={route}

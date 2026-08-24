@@ -29,6 +29,8 @@ export interface Candidate {
   vehicle: string
   zones: ZoneName[]
   distanceMetres: number | null
+  /** What this rider is already carrying — shown so the ranking is explicable. */
+  activeDeliveries: number
 }
 
 export interface CandidatesResponse {

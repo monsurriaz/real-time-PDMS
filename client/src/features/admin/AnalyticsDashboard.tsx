@@ -58,10 +58,10 @@ export const AnalyticsDashboard = () => {
     return (
       <div className="grid gap-5">
         <Panel>
-          <p className="text-[13.5px] text-muted">Counting deliveries…</p>
+          <p className="text-body text-muted">Counting deliveries…</p>
         </Panel>
         <Panel>
-          <p className="text-[13.5px] text-muted">Measuring the zones…</p>
+          <p className="text-body text-muted">Measuring the zones…</p>
         </Panel>
       </div>
     )
@@ -126,7 +126,7 @@ export const AnalyticsDashboard = () => {
 
       {nothingYet ? (
         <Panel title="Nothing to measure yet">
-          <p className="text-[13.5px] text-muted mb-2">
+          <p className="text-body text-muted mb-2">
             No parcels have been booked, so there is nothing to chart. Run{' '}
             <span className="mono text-[12.5px]">npm run seed</span> for the demo
             data, or book a parcel as a customer.
@@ -148,7 +148,7 @@ export const AnalyticsDashboard = () => {
               }
             >
               {d.delayed.count === 0 ? (
-                <p className="text-[13.5px] text-muted">
+                <p className="text-body text-muted">
                   Nothing is past its promised time. Parcels appear here once
                   they are overdue and still moving.
                 </p>

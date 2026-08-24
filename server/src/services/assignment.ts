@@ -18,6 +18,15 @@ import { advanceStatus, type TransitionActor } from './lifecycle'
 /** Section 5's radius, past which proximity stops being the deciding factor. */
 export const NEAR_RADIUS_METRES = 5_000
 
+/**
+ * How close two riders must be before distance stops deciding between them.
+ *
+ * 300 m is roughly a block in Dhaka and comfortably above GPS drift, so two
+ * riders inside it are the same answer to "who is nearest" — which is what lets
+ * workload break the tie without ever contradicting section 5's rule.
+ */
+export const TIE_BREAK_METRES = 300
+
 export interface Candidate {
   agentId: string
   userId: string
@@ -26,6 +35,16 @@ export interface Candidate {
   zones: ZoneName[]
   /** Metres from the pickup point, or null when matched by zone alone. */
   distanceMetres: number | null
+  /**
+   * Deliveries this rider is already holding — Assigned, PickedUp or InTransit.
+   *
+   * Availability flips at PickedUp rather than at Assigned (see lifecycle.ts),
+   * which is deliberate: a rider can hold several upcoming jobs but only one in
+   * hand. The side effect was that "available" said nothing about how much
+   * somebody was already carrying, so the nearest rider could absorb every
+   * booking in their zone. Shown to the admin, and used as a tie-break below.
+   */
+  activeDeliveries: number
 }
 
 /** How a candidate was found — surfaced so an admin sees why it was offered. */
@@ -63,6 +82,36 @@ const haversineMetres = (a: GeoPoint, b: GeoPoint): number => {
   return 2 * R * Math.asin(Math.sqrt(h))
 }
 
+/** Statuses that mean a rider is already carrying something. */
+const ACTIVE_STATUSES = ['Assigned', 'PickedUp', 'InTransit'] as const
+
+/**
+ * How many active deliveries each of these riders holds.
+ *
+ * One query for the whole candidate list rather than a countDocuments per
+ * rider: the list is at most five, but this runs on every booking.
+ */
+const loadFor = async (
+  agentIds: readonly mongoose.Types.ObjectId[],
+): Promise<Map<string, number>> => {
+  if (agentIds.length === 0) return new Map()
+  const DeliveryModel = mongoose.model('Delivery')
+  const rows = await DeliveryModel.find({
+    agent: { $in: agentIds },
+    status: { $in: ACTIVE_STATUSES },
+  })
+    .select('agent')
+    .lean<Array<{ agent: mongoose.Types.ObjectId }>>()
+    .exec()
+
+  const counts = new Map<string, number>()
+  for (const r of rows) {
+    const key = r.agent.toString()
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return counts
+}
+
 const withNames = async (rows: AgentRow[], pickup: GeoPoint | null): Promise<Candidate[]> => {
   if (rows.length === 0) return []
   const UserModel = mongoose.model('User')
@@ -70,6 +119,7 @@ const withNames = async (rows: AgentRow[], pickup: GeoPoint | null): Promise<Can
     .select('name')
     .lean<UserRow[]>()
     .exec()
+  const load = await loadFor(rows.map((r) => r._id))
   const nameById = new Map(users.map((u) => [u._id.toString(), u.name]))
 
   return rows.map((r) => ({
@@ -82,6 +132,7 @@ const withNames = async (rows: AgentRow[], pickup: GeoPoint | null): Promise<Can
       pickup && r.currentLocation
         ? Math.round(haversineMetres(pickup, r.currentLocation))
         : null,
+    activeDeliveries: load.get(r._id.toString()) ?? 0,
   }))
 }
 
@@ -92,6 +143,27 @@ const withNames = async (rows: AgentRow[], pickup: GeoPoint | null): Promise<Can
  * cannot otherwise see. Authorisation happens at the route (admin only), not
  * by relying on query scoping.
  */
+/**
+ * Rank candidates: nearest first, workload breaking ties.
+ *
+ * Pure and exported so the rule can be tested directly. `$near` has already
+ * ordered the input by distance; this re-sorts with the tie-break applied, and
+ * because the comparison falls back to distance whenever the gap exceeds
+ * TIE_BREAK_METRES, the section 5 ordering is preserved wherever distance
+ * actually distinguishes two riders.
+ */
+export const rankCandidates = (candidates: readonly Candidate[]): Candidate[] =>
+  [...candidates].sort((a, b) => {
+    const da = a.distanceMetres ?? Number.POSITIVE_INFINITY
+    const db = b.distanceMetres ?? Number.POSITIVE_INFINITY
+    // Both unknown: nothing to compare on but load.
+    if (!Number.isFinite(da) && !Number.isFinite(db)) {
+      return a.activeDeliveries - b.activeDeliveries
+    }
+    if (Math.abs(da - db) > TIE_BREAK_METRES) return da - db
+    return a.activeDeliveries - b.activeDeliveries || da - db
+  })
+
 export const suggestAgents = async (args: {
   pickup?: GeoPoint
   zone: ZoneName
@@ -118,8 +190,18 @@ export const suggestAgents = async (args: {
         .exec()
 
       if (near.length > 0) {
-        // $near returns nearest-first, so the order is already the ranking.
-        return { strategy: 'near', candidates: await withNames(near, args.pickup) }
+        /**
+         * $near returns nearest-first, which is the ranking section 5 asks for.
+         * Workload breaks TIES within it rather than overriding it: two riders
+         * within a couple of hundred metres of the pick-up are equivalent as
+         * far as the customer is concerned, and handing the parcel to the one
+         * carrying less spreads the work without ever sending a rider further
+         * than the rule allows.
+         *
+         * The threshold is what makes this a tie-break and not a re-sort. Below
+         * it, distance is noise — GPS drift alone is tens of metres.
+         */
+        return { strategy: 'near', candidates: rankCandidates(await withNames(near, args.pickup)) }
       }
     }
 
@@ -136,13 +218,13 @@ export const suggestAgents = async (args: {
       .exec()
 
     if (inZone.length > 0) {
-      const candidates = await withNames(inZone, args.pickup ?? null)
-      // No $near ordering here, so sort by known distance where we have it.
-      candidates.sort((a, b) => {
-        if (a.distanceMetres === null) return 1
-        if (b.distanceMetres === null) return -1
-        return a.distanceMetres - b.distanceMetres
-      })
+      /**
+       * Same ranking. This branch often has no distance at all — it is the
+       * fallback for a parcel with no geocoded pick-up — and where distance is
+       * unknown for everyone, workload is the only thing left to rank on, which
+       * is a better answer than document order.
+       */
+      const candidates = rankCandidates(await withNames(inZone, args.pickup ?? null))
       return { strategy: 'zone-only', candidates }
     }
 

@@ -95,6 +95,25 @@ const callOrs = async (from: GeoPoint, to: GeoPoint): Promise<RouteResult> => {
   }
 }
 
+/**
+ * How long a cached route stays trustworthy.
+ *
+ * `lookedUpAt` has always been written and never read, so a route cached once
+ * was served forever — a closed road or a new flyover would keep producing the
+ * old line and the old distance indefinitely. Thirty days is long enough that
+ * the free-tier request budget is unaffected (a demo re-seeds against warm
+ * cache) and short enough that a real change surfaces within a month.
+ *
+ * Note what a stale entry does NOT do: it is not deleted. A refresh that fails
+ * falls back to the stale value, because a month-old road line beats a blank
+ * map — see the catch in routeGeometry.
+ */
+export const ROUTE_CACHE_TTL_DAYS = 30
+const TTL_MS = ROUTE_CACHE_TTL_DAYS * 24 * 3_600_000
+
+export const isFresh = (lookedUpAt: Date | undefined | null, now = Date.now()): boolean =>
+  lookedUpAt instanceof Date && now - lookedUpAt.getTime() < TTL_MS
+
 /** Road distance between two geocoded points, cached per pair. */
 export const routeBetween = async (
   from: GeoPoint,
@@ -105,11 +124,28 @@ export const routeBetween = async (
   const cached = await runAsSystem('routing: cache read', async () =>
     RouteCacheModel.findOne({ key }).lean().exec(),
   )
-  if (cached) {
+  if (cached && isFresh(cached.lookedUpAt)) {
     return { distanceKm: cached.distanceKm, durationMin: cached.durationMin }
   }
 
-  const result = await throttle.run(() => callOrs(from, to))
+  let result: RouteResult
+  try {
+    result = await throttle.run(() => callOrs(from, to))
+  } catch (err) {
+    /**
+     * The refresh failed. If we hold a stale answer, serve it: a distance from
+     * last month is a far better booking experience than refusing to price the
+     * parcel at all, and the alternative is a customer blocked by somebody
+     * else's outage.
+     */
+    if (cached) {
+      console.warn(
+        `[routing] serving a stale cached route for ${key} — refresh failed`,
+      )
+      return { distanceKm: cached.distanceKm, durationMin: cached.durationMin }
+    }
+    throw err
+  }
 
   await runAsSystem('routing: cache write', async () =>
     RouteCacheModel.updateOne(
@@ -149,14 +185,17 @@ export const routeGeometry = async (
   const key = cacheKey(from, to)
 
   const cached = await runAsSystem('routing: geometry cache read', async () =>
-    RouteCacheModel.findOne({ key }).select('geometry').lean().exec(),
+    RouteCacheModel.findOne({ key }).select('geometry lookedUpAt').lean().exec(),
   )
-  if (cached?.geometry && cached.geometry.length > 1) {
-    return cached.geometry.map(([lng, lat]) => ({
-      type: 'Point' as const,
-      coordinates: [lng, lat] as [number, number],
-    }))
-  }
+  const cachedGeometry =
+    cached?.geometry && cached.geometry.length > 1
+      ? cached.geometry.map(([lng, lat]) => ({
+          type: 'Point' as const,
+          coordinates: [lng, lat] as [number, number],
+        }))
+      : null
+
+  if (cachedGeometry && isFresh(cached?.lookedUpAt)) return cachedGeometry
 
   if (!env.ORS_API_KEY) {
     throw new LookupError('provider_rejected', 'ORS_API_KEY is not set')
@@ -205,7 +244,17 @@ export const routeGeometry = async (
     }))
   }
 
-  const geometry = await throttle.run(call)
+  let geometry: GeoPoint[]
+  try {
+    geometry = await throttle.run(call)
+  } catch (err) {
+    // Same trade as the distance path: a stale line beats no line.
+    if (cachedGeometry) {
+      console.warn(`[routing] serving stale cached geometry for ${key}`)
+      return cachedGeometry
+    }
+    throw err
+  }
 
   // Upsert rather than update: the geometry may be wanted for a pair whose
   // distance was never asked for.

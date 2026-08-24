@@ -40,7 +40,7 @@ export const RoleShell = ({ title, subtitle, nav = [], children }: Props) => {
       <header className="sticky top-0 z-50 bg-paper/[0.88] backdrop-blur-[10px] border-b border-hairline">
         <div className="max-w-[1180px] mx-auto px-5 sm:px-7 h-[62px] flex items-center gap-5 sm:gap-7">
           <Link to="/" className="flex items-center gap-9px flex-none">
-            <span className="w-[9px] h-[9px] rounded-[2px] bg-accent rotate-45" />
+            <span className="w-[9px] h-[9px] rounded-xs bg-accent rotate-45" />
             <span className="font-display font-bold text-[17px] tracking-[-0.02em]">
               ParcelDelivery
             </span>
@@ -51,7 +51,7 @@ export const RoleShell = ({ title, subtitle, nav = [], children }: Props) => {
               <Link
                 key={n.to}
                 to={n.to}
-                className="text-[13.5px] font-medium text-muted hover:text-ink"
+                className="text-body font-medium text-muted hover:text-ink"
               >
                 {n.label}
               </Link>
@@ -91,7 +91,7 @@ export const RoleShell = ({ title, subtitle, nav = [], children }: Props) => {
           {title}
         </h1>
         {subtitle ? (
-          <p className="text-muted text-[13.5px] mb-7">{subtitle}</p>
+          <p className="text-muted text-body mb-7">{subtitle}</p>
         ) : (
           <div className="mb-7" />
         )}
