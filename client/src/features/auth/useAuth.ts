@@ -100,6 +100,23 @@ export const useUpdateAccount = () => {
   })
 }
 
+/**
+ * The one-time welcome has been seen. See WelcomeNotice for why this fires on
+ * appearance rather than on dismissal.
+ *
+ * The response is the refreshed self user, so the cache is seeded from it —
+ * there is nothing to refetch just to learn a banner is spent.
+ */
+export const useDismissWelcome = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.post<AuthResponse>('/auth/me/welcome'),
+    onSuccess: (data) => {
+      qc.setQueryData(meQueryKey, data)
+    },
+  })
+}
+
 /** The Password tab — its own mutation, its own Save button. */
 export const useChangePassword = () =>
   useMutation({

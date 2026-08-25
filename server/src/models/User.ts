@@ -52,6 +52,11 @@ const userSchema = new Schema<UserDoc>(
     role: { type: String, required: true, enum: roleSchema.options },
     zone: { type: String, enum: zoneName.options, required: false },
     isActive: { type: Boolean, required: true, default: true },
+    /**
+     * Null until the account dismisses its one-time welcome. See the shared
+     * schema's note for why this is not "firstLoginAt".
+     */
+    welcomeSeenAt: { type: Date, required: false, default: null },
     savedAddresses: { type: [savedAddress], required: true, default: [] },
     passwordHash: {
       type: String,

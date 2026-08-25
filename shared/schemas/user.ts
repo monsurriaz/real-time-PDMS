@@ -19,6 +19,19 @@ export const userSchema = z.object({
   /** Customers get a home zone so booking can default the pickup area. */
   zone: zoneName.optional(),
   isActive: z.boolean().default(true),
+  /**
+   * When this account dismissed its one-time welcome. Null means it has not
+   * seen one yet.
+   *
+   * Named after what it gates rather than "firstLoginAt", because a first
+   * login is the wrong moment for a rider: registration signs them straight
+   * in while their application is still pending, so a flag stamped then would
+   * be spent on the pending screen and the "you're approved" notice would
+   * never appear. This is only written when a welcome is actually shown and
+   * dismissed, which makes "first login after approval" true for a rider and
+   * "first login" true for a customer, from one field.
+   */
+  welcomeSeenAt: z.coerce.date().nullable().default(null),
   ...timestamps,
 })
 export type User = z.infer<typeof userSchema>
@@ -40,6 +53,12 @@ export type PublicUser = z.infer<typeof publicUserSchema>
 /** GET /auth/me — your own record, so your own phone is fair game. */
 export const selfUserSchema = publicUserSchema.extend({
   phone: phone,
+  /**
+   * Whether this session should show the one-time welcome. A boolean rather
+   * than the timestamp itself: the client's only question is "show it or not",
+   * and when the account was welcomed is nobody's business but the server's.
+   */
+  showWelcome: z.boolean(),
 })
 export type SelfUser = z.infer<typeof selfUserSchema>
 

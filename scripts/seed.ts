@@ -165,7 +165,22 @@ const upsertUser = async (u: SeedUser): Promise<UserDoc> => {
   if (existing) {
     await UserModel.updateOne(
       { _id: existing._id },
-      { $set: { name: u.name, phone: u.phone, role: u.role, zone: u.zone, isActive: true } },
+      {
+        $set: {
+          name: u.name,
+          phone: u.phone,
+          role: u.role,
+          zone: u.zone,
+          isActive: true,
+          /**
+           * Reset, so a rehearsal always gets the one-time welcome back. Every
+           * other field here is restored to its seeded value on re-seed; a
+           * flag that stayed spent would make the second run-through of the
+           * demo quietly different from the first.
+           */
+          welcomeSeenAt: null,
+        },
+      },
     )
     const refreshed = await UserModel.findById(existing._id)
     if (!refreshed) throw new Error(`user vanished mid-seed: ${u.email}`)
@@ -179,6 +194,7 @@ const upsertUser = async (u: SeedUser): Promise<UserDoc> => {
     role: u.role,
     zone: u.zone,
     isActive: true,
+    welcomeSeenAt: null,
     passwordHash: await hashPassword(DEMO_PASSWORD),
   })
 }

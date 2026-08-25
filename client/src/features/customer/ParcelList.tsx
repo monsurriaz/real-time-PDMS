@@ -23,6 +23,7 @@ import {
   paginate,
 } from '@/components/Table'
 import { ApiError } from '@/lib/api'
+import { WelcomeNotice } from '../auth/WelcomeNotice'
 import { formatDateTime, formatKg, formatTaka } from '@/lib/format'
 import { useParcels } from '../booking/useBooking'
 import { useAdvanceStatus } from '../deliveries/useDeliveries'
@@ -321,7 +322,19 @@ export const ParcelList = () => {
    * still in flight, and the copy sharpens on its own once the row it names
    * turns up.
    */
-  const banner = <BookingReturn rows={parcels.data ?? []} />
+  const banner = (
+    <>
+      {/* Once per account, on the screen a new customer lands on. */}
+      <WelcomeNotice>
+        <p className="font-semibold text-ink">Welcome to ParcelDelivery.</p>
+        <p className="mt-0.5">
+          Book a parcel and you can watch the rider move on a live map from the
+          moment one is assigned.
+        </p>
+      </WelcomeNotice>
+      <BookingReturn rows={parcels.data ?? []} />
+    </>
+  )
 
   if (parcels.isPending) {
     return (

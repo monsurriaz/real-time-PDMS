@@ -3,6 +3,7 @@ import type { DeliveryStatus } from '@pdms/shared'
 import { AppShell, PageHead } from '@/components/AppShell'
 import { Card } from '@/components/Card'
 import { ApiError } from '@/lib/api'
+import { WelcomeNotice } from '../auth/WelcomeNotice'
 import { useDeliveries } from '../deliveries/useDeliveries'
 import { DeliveryActions } from './DeliveryActions'
 import { DeliveryDetail } from './DeliveryDetail'
@@ -67,6 +68,21 @@ export const RiderWorkspace = () => {
         title="Today's runs"
         sub={`${active.length} active · ${finishedCount} finished today`}
       />
+
+      {/*
+        The approval welcome, once per rider. This screen is the right place
+        for it precisely because only an approved rider reaches it — a pending
+        one is redirected to /agent/pending by RequireRole — so "the first time
+        this renders" and "their first visit after approval" are the same
+        moment. See WelcomeNotice.
+      */}
+      <WelcomeNotice>
+        <p className="font-semibold text-ink">You're approved.</p>
+        <p className="mt-0.5">
+          Go available from the shift panel and set your location — jobs in
+          your zone will start arriving.
+        </p>
+      </WelcomeNotice>
 
       {current ? (
         <div className="bg-surface border border-border rounded-lg overflow-hidden">

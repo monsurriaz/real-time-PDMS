@@ -58,6 +58,14 @@ building for its own sake.
 
 ---
 
+## Post-course — not this project's scope
+
+| Item | Origin | Notes |
+|---|---|---|
+| **Email verification / OTP by email** | M6.9 | Descoped on purpose, four days from the demo. It needs an outbound mail service (a provider account, a domain, a sender identity, deliverability that does not land in spam), which is a new external dependency and a new failure mode in the one path every account has to walk through. M6.9 shipped a one-time welcome instead — `User.welcomeSeenAt`, server-decided, no mail involved — which is what the flow was actually going to *use* the email for. Real verification is post-course work, not M7. |
+
+---
+
 ## M7 — Deploy + rehearse
 
 | Item | Origin | Notes |

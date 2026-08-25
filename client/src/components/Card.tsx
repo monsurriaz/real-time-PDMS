@@ -86,8 +86,21 @@ export const KeyValue = ({ k, children }: { k: string; children: ReactNode }) =>
  * one of the few places the accent appears outside a primary button and the
  * in-transit state.
  */
-export const Note = ({ children }: { children: ReactNode }) => (
-  <div className="mt-5 py-14px px-4 border-l-2 border-accent bg-accent-tint rounded-r-sm text-body text-ink-2">
+export const Note = ({
+  children,
+  className = 'mt-5',
+}: {
+  children: ReactNode
+  /**
+   * Overrides only the outer margin. v3 draws this callout under a card's
+   * content, hence the `mt-5` default; a callout that opens a screen needs the
+   * space underneath it instead. Everything else about the box is fixed.
+   */
+  className?: string
+}) => (
+  <div
+    className={`${className} py-14px px-4 border-l-2 border-accent bg-accent-tint rounded-r-sm text-body text-ink-2`}
+  >
     {children}
   </div>
 )

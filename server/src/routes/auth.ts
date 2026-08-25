@@ -34,6 +34,9 @@ const toSelfUser = (doc: UserDoc): SelfUser =>
     phone: doc.phone,
     role: doc.role,
     zone: doc.zone,
+    // The timestamp itself never crosses the wire — only the answer to the
+    // one question a client has about it.
+    showWelcome: doc.welcomeSeenAt === null,
   })
 
 const toSavedAddress = (a: UserDoc['savedAddresses'][number]): SavedAddress => ({
@@ -243,6 +246,34 @@ authRouter.patch('/me/password', requireAuth, async (req, res, next) => {
     })
 
     res.json({ ok: true })
+  } catch (err) {
+    next(err)
+  }
+})
+
+/**
+ * POST /auth/me/welcome — the one-time welcome has been seen.
+ *
+ * Idempotent, and conditional on the field still being null, so a double
+ * click or a second tab cannot move the timestamp once it is set. Returns the
+ * refreshed self user rather than `{ ok: true }`, so the client seeds its
+ * session cache from the response instead of refetching /auth/me purely to
+ * learn that a banner is gone.
+ */
+authRouter.post('/me/welcome', requireAuth, async (req, res, next) => {
+  try {
+    const actor = req.actor
+    if (!actor) throw unauthorized()
+
+    const user = await UserModel.findById(actor.id).exec()
+    if (!user) throw unauthorized('session no longer valid')
+
+    if (user.welcomeSeenAt === null) {
+      user.welcomeSeenAt = new Date()
+      await user.save()
+    }
+
+    res.json({ user: toSelfUser(user) })
   } catch (err) {
     next(err)
   }
