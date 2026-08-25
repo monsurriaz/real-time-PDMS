@@ -11,11 +11,11 @@ Course project, CSC 470. Seven-day build. Demo-ready beats feature-complete.
 
 1. **Never invent a color, font, radius, or spacing value.** Everything comes from
    `client/src/styles/tokens.css`. If a value you need isn't there, stop and ask.
-2. **The design system is v3 Meridian, in docs/design-system-v3.html.** It fully
-   supersedes the previous system — the warm paper palette, the orange accent, and
-   the header-only layout are all retired. Every screen rebuilds against v3. Do not
-   invent colors, radii, fonts, or spacing outside it. Once M6.5c ships, the freeze
-   from the original rule 2 applies to v3 instead.
+2. **The design system is v3 Meridian, in docs/design-system-v3-meridian.html, and it
+   is frozen.** M6.5c shipped — every screen in the route table now matches it, and
+   the freeze from the original rule 2 applies to v3 in full: do not restyle a
+   component because it "could look better," and do not invent colors, radii, fonts,
+   or spacing outside it. Visual changes require an explicit request.
 3. **The delivery state machine is enforced server-side.** The client never decides what
    transition is legal.
 4. **TypeScript strict mode. No `any`.** If a type is hard, model it properly.
@@ -201,8 +201,10 @@ Rules:
 ### Assignment
 
 Nearest available agent to the pickup point via `$near` on a `2dsphere` index over
-`agent.currentLocation`, filtered to `status: 'available'` and matching zone. Falls back
-to zone-only if no agent is within 5 km. Admin can override.
+`agent.currentLocation`, filtered to `status: 'available'`, `approvalStatus: 'approved'`,
+and matching zone. Falls back to zone-only if no agent is within 5 km. Admin can override,
+but the override is still bound by the same approval check. A self-registered rider starts
+`pending` and is invisible to both paths until an admin approves them from `/admin/agents`.
 
 ---
 
@@ -252,8 +254,9 @@ If M3 slips, cut M6 before cutting anything in M4. Live tracking is the flagship
 
 Dhaka zones: Dhanmondi, Mirpur, Uttara, Bashundhara, Gulshan, Mohammadpur.
 Currency ৳ (BDT), `en-BD` formatting. Tracking ID format `PD-XXXX-XX`.
-Seed 3 customers, 4 agents (2 available, 1 on delivery, 1 offline), 1 admin, ~20 parcels
-spread across all lifecycle states including one Failed and one Delayed.
+Seed 3 customers, 5 agents (2 available, 1 on delivery, 1 offline, 1 pending approval),
+1 admin, ~20 parcels spread across all lifecycle states including one Failed and one
+Delayed.
 
 ---
 

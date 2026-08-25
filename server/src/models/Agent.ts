@@ -1,10 +1,25 @@
 import mongoose, { Schema } from 'mongoose'
-import { agentStatusSchema, vehicleSchema, zoneName, type Agent } from '@pdms/shared'
+import {
+  agentApprovalStatusSchema,
+  agentStatusSchema,
+  vehicleSchema,
+  zoneName,
+  type Agent,
+} from '@pdms/shared'
 import type { Doc } from './types'
 import { optionalPoint } from './geo'
 import { ALLOW_ALL, DENY_ALL, roleScopePlugin } from './plugins/roleScope'
 
 export type AgentDoc = Doc<Agent, 'user'>
+
+const approvalEventSchema = new Schema(
+  {
+    status: { type: String, required: true, enum: ['approved', 'rejected'] },
+    at: { type: Date, required: true },
+    by: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  },
+  { _id: false },
+)
 
 const agentMongooseSchema = new Schema<AgentDoc>(
   {
@@ -26,6 +41,21 @@ const agentMongooseSchema = new Schema<AgentDoc>(
       default: 'offline',
       index: true,
     },
+    /**
+     * A self-registered rider starts pending and is invisible to assignment
+     * (services/assignment.ts filters on this directly — see the tests
+     * there) until an admin approves them from /admin/agents.
+     */
+    approvalStatus: {
+      type: String,
+      required: true,
+      enum: agentApprovalStatusSchema.options,
+      default: 'pending',
+      index: true,
+    },
+    nid: { type: String, required: true, trim: true },
+    /** Append-only, per approve/reject decision. Never edited in place. */
+    approvalHistory: { type: [approvalEventSchema], required: true, default: [] },
     currentLocation: optionalPoint,
     locationUpdatedAt: { type: Date, required: false },
   },
@@ -39,8 +69,8 @@ const agentMongooseSchema = new Schema<AgentDoc>(
  */
 agentMongooseSchema.index({ currentLocation: '2dsphere' }, { sparse: true })
 
-/** Compound: assignment always filters status + zone before going geo. */
-agentMongooseSchema.index({ status: 1, zones: 1 })
+/** Compound: assignment always filters status + approval + zone before going geo. */
+agentMongooseSchema.index({ status: 1, approvalStatus: 1, zones: 1 })
 
 /**
  * An agent reads only their own record. Customers get DENY_ALL here — during

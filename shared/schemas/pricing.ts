@@ -105,6 +105,20 @@ export type PricingConfigInput = z.infer<typeof pricingConfigInputSchema>
  * change what a customer was quoted (CLAUDE.md section 5) and so the invoice
  * can show its own arithmetic.
  */
+/**
+ * GET /pricing/summary — the three numbers the landing page's stat band
+ * shows, from a route that needs no session (the landing page is public).
+ * Deliberately smaller than pricingConfigSchema: a visitor gets the floor
+ * fee and the weight cap, not the full tier ladder or the per-zone
+ * overrides an admin edits from the dashboard.
+ */
+export const pricingSummarySchema = z.object({
+  zoneCount: z.number().int().nonnegative(),
+  floorFee: taka,
+  weightCapKg: z.number().positive(),
+})
+export type PricingSummary = z.infer<typeof pricingSummarySchema>
+
 export const priceBreakdownSchema = z.object({
   zoneBase: taka,
   distanceKm: z.number().nonnegative(),

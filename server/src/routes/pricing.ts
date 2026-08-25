@@ -1,12 +1,14 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import {
+  heaviestPricedKg,
   pricingConfigInputSchema,
   zoneName,
   type PricingConfigInput,
 } from '@pdms/shared'
 import { runAsSystem } from '../lib/context'
 import { PricingConfigModel, type PricingConfigDoc } from '../models/PricingConfig'
+import { ZoneModel } from '../models/Zone'
 import type { Timestamped } from '../models/types'
 import { requireAuth, requireRole } from '../middleware/auth'
 import { HttpError, badRequest } from '../middleware/httpError'
@@ -39,6 +41,39 @@ const serialise = (
     baseFare: o.baseFare,
   })),
   updatedAt: doc.updatedAt,
+})
+
+/**
+ * GET /pricing/summary — the landing page's stat band, unauthenticated
+ * because the landing page is. Deliberately smaller than the full config: a
+ * visitor gets the floor fee, the weight cap and the zone count, not the
+ * tier ladder or the per-zone overrides an admin edits from the dashboard.
+ * Registered before the parameterless `/` below only for readability —
+ * Express matches by exact path, so the order does not actually matter here.
+ */
+pricingRouter.get('/summary', async (_req, res, next) => {
+  try {
+    const [config, zoneCount] = await runAsSystem('pricing: public summary', async () =>
+      Promise.all([
+        PricingConfigModel.findOne({ key: 'default' })
+          .select('weightTiers')
+          .lean<{ weightTiers: PricingDoc['weightTiers'] } | null>()
+          .exec(),
+        ZoneModel.countDocuments({ isServiceable: true }).exec(),
+      ]),
+    )
+    if (!config) {
+      throw new HttpError(503, 'pricing is not configured — run `npm run seed`')
+    }
+
+    res.json({
+      zoneCount,
+      floorFee: config.weightTiers[0]?.baseFee ?? 0,
+      weightCapKg: heaviestPricedKg(config.weightTiers),
+    })
+  } catch (err) {
+    next(err)
+  }
 })
 
 /**

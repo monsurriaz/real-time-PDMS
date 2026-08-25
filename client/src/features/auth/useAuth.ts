@@ -1,5 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { LoginInput, SelfUser } from '@pdms/shared'
+import type {
+  ChangePasswordInput,
+  LoginInput,
+  RegisterInput,
+  SavedAddress,
+  SavedAddressInput,
+  SelfUser,
+  UpdateAccountInput,
+} from '@pdms/shared'
 import { ApiError, api } from '@/lib/api'
 import { closeSocket } from '@/lib/socket'
 
@@ -43,6 +51,23 @@ export const useLogin = () => {
   })
 }
 
+/**
+ * Signup — customer or rider, one mutation for the discriminated union
+ * registerInputSchema describes. The response is exactly what login's would
+ * be, so the same cache-seeding trick applies: no immediate refetch of
+ * /auth/me right after registering.
+ */
+export const useRegister = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: RegisterInput) =>
+      api.post<AuthResponse>('/auth/register', input),
+    onSuccess: (data) => {
+      qc.setQueryData(meQueryKey, data)
+    },
+  })
+}
+
 export const useLogout = () => {
   const qc = useQueryClient()
   return useMutation({
@@ -55,5 +80,56 @@ export const useLogout = () => {
       // cookie rather than keeping the old identity's rooms.
       closeSocket()
     },
+  })
+}
+
+/**
+ * The profile's Account tab. A successful save with a changed email carries
+ * a freshly re-issued auth cookie (the server sets it; there is nothing for
+ * the client to do about the cookie itself), so seeding the cache is enough
+ * to keep the UI in step with the new session.
+ */
+export const useUpdateAccount = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: UpdateAccountInput) =>
+      api.patch<AuthResponse>('/auth/me', input),
+    onSuccess: (data) => {
+      qc.setQueryData(meQueryKey, data)
+    },
+  })
+}
+
+/** The Password tab — its own mutation, its own Save button. */
+export const useChangePassword = () =>
+  useMutation({
+    mutationFn: (input: ChangePasswordInput) =>
+      api.patch<{ ok: true }>('/auth/me/password', input),
+  })
+
+const addressesKey = ['auth', 'me', 'addresses'] as const
+
+export const useSavedAddresses = () =>
+  useQuery({
+    queryKey: addressesKey,
+    queryFn: () => api.get<{ addresses: SavedAddress[] }>('/auth/me/addresses'),
+    select: (d) => d.addresses,
+  })
+
+export const useAddSavedAddress = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: SavedAddressInput) =>
+      api.post<{ addresses: SavedAddress[] }>('/auth/me/addresses', input),
+    onSuccess: (data) => qc.setQueryData(addressesKey, data),
+  })
+}
+
+export const useDeleteSavedAddress = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (addressId: string) =>
+      api.delete<{ addresses: SavedAddress[] }>(`/auth/me/addresses/${addressId}`),
+    onSuccess: (data) => qc.setQueryData(addressesKey, data),
   })
 }

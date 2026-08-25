@@ -150,13 +150,7 @@ const NAV: Record<Role, readonly NavGroup[]> = {
     {
       title: 'Manage',
       items: [
-        {
-          to: '/admin/agents',
-          label: 'Riders',
-          icon: 'riders',
-          count: 'pendingRiders',
-          soon: 'M6.5c',
-        },
+        { to: '/admin/agents', label: 'Riders', icon: 'riders', count: 'pendingRiders' },
         { to: '/admin/pricing', label: 'Pricing', icon: 'taka' },
       ],
     },
@@ -167,6 +161,12 @@ const ROLE_LABEL: Record<Role, string> = {
   customer: 'Customer',
   agent: 'Delivery agent',
   admin: 'Administrator',
+}
+
+const PROFILE_PATH: Record<Role, string> = {
+  customer: '/customer/profile',
+  agent: '/agent/profile',
+  admin: '/admin/profile',
 }
 
 /** The wordmark: v3's rotated accent square beside the name, in Inter Tight. */
@@ -242,18 +242,14 @@ const AccountMenu = ({
           className="absolute bottom-full left-0 right-0 mb-2 bg-chrome-2 border border-chrome-3 rounded-sm p-1"
           role="menu"
         >
-          {/*
-            Profile is M6.5c. Shown disabled rather than omitted so the menu
-            does not visibly gain an item later — but disabled, because a link
-            to a screen that does not exist is worse than a greyed one.
-          */}
-          <span
-            title="Profile — arriving in M6.5c"
-            className="block px-3 py-2 text-body text-chrome-faint cursor-not-allowed"
-            aria-disabled="true"
+          <Link
+            to={PROFILE_PATH[role]}
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="block px-3 py-2 text-body text-chrome-ink rounded-sm hover:bg-chrome-3"
           >
             Profile
-          </span>
+          </Link>
           <button
             type="button"
             role="menuitem"

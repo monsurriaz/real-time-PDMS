@@ -164,6 +164,24 @@ export const rankCandidates = (candidates: readonly Candidate[]): Candidate[] =>
     return a.activeDeliveries - b.activeDeliveries || da - db
   })
 
+/**
+ * Every field assignment requires of a candidate BEFORE distance or zone
+ * even enter the question: on shift, and approved.
+ *
+ * Exported so services/assignment.test.ts can build the exact
+ * `AgentModel.find(...)` queries this file runs and inspect their filter
+ * with `.getFilter()` — the same technique roleScope.test.ts uses for the
+ * socket-room fix, proving the real query object rather than a
+ * re-implementation of it. A rider whose application is `pending` or
+ * `rejected` must never be a candidate, however close or however free —
+ * this is the one line that keeps that true everywhere suggestAgents reads
+ * from the roster.
+ */
+export const ASSIGNABLE_AGENT_FILTER = {
+  status: 'available',
+  approvalStatus: 'approved',
+} as const
+
 export const suggestAgents = async (args: {
   pickup?: GeoPoint
   zone: ZoneName
@@ -175,7 +193,7 @@ export const suggestAgents = async (args: {
     // ---- 1. nearest available agent in the zone, within 5 km ----
     if (args.pickup) {
       const near = await AgentModel.find({
-        status: 'available',
+        ...ASSIGNABLE_AGENT_FILTER,
         zones: args.zone,
         currentLocation: {
           $near: {
@@ -211,7 +229,7 @@ export const suggestAgents = async (args: {
      * also when the parcel has no geocoded pickup point at all — in which
      * case proximity is not a question we can ask.
      */
-    const inZone = await AgentModel.find({ status: 'available', zones: args.zone })
+    const inZone = await AgentModel.find({ ...ASSIGNABLE_AGENT_FILTER, zones: args.zone })
       .limit(limit)
       .select('user vehicle zones currentLocation')
       .lean<AgentRow[]>()
@@ -437,11 +455,20 @@ export const validateOverride = async (agentId: string): Promise<Candidate> => {
 
   return runAsSystem('assignment: validate override', async () => {
     const agent = await AgentModel.findById(agentId)
-      .select('user vehicle zones currentLocation status')
-      .lean<(AgentRow & { status: string }) | null>()
+      .select('user vehicle zones currentLocation status approvalStatus')
+      .lean<(AgentRow & { status: string; approvalStatus: string }) | null>()
       .exec()
 
     if (!agent) throw new HttpError(404, 'agent not found')
+    /**
+     * An admin choosing a specific rider is still bound by the same rule
+     * suggestAgents enforces automatically: pending and rejected riders are
+     * not assignable, full stop. Checked before the offline check so the
+     * message names the actual reason rather than a coincidental one.
+     */
+    if (agent.approvalStatus !== 'approved') {
+      throw new HttpError(422, `that rider's application is ${agent.approvalStatus} and cannot be assigned`)
+    }
     if (agent.status === 'offline') {
       throw new HttpError(422, 'that rider is offline and cannot be assigned')
     }

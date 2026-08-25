@@ -1,14 +1,22 @@
-import { Router } from 'express'
+import { Router, type NextFunction, type Request, type Response } from 'express'
 import mongoose from 'mongoose'
 import {
+  maskNid,
+  updateAgentDetailsInputSchema,
   setAgentLocationInputSchema,
   setAgentStatusInputSchema,
+  type AgentApprovalStatus,
+  type AgentRosterItem,
   type AgentSelf,
+  type AgentStatus,
   type GeoPoint,
+  type Vehicle,
+  type ZoneName,
 } from '@pdms/shared'
 import { runAsSystem } from '../lib/context'
 import { AgentModel } from '../models/Agent'
 import { DeliveryModel } from '../models/Delivery'
+import { UserModel } from '../models/User'
 import { ZoneModel } from '../models/Zone'
 import { requireAuth, requireRole } from '../middleware/auth'
 import { HttpError, unauthorized } from '../middleware/httpError'
@@ -26,14 +34,23 @@ export const agentsRouter = Router()
 interface AgentLean {
   _id: mongoose.Types.ObjectId
   user: mongoose.Types.ObjectId
-  status: 'available' | 'on_delivery' | 'offline'
-  vehicle: 'bicycle' | 'motorcycle' | 'van'
-  zones: string[]
+  status: AgentStatus
+  approvalStatus: AgentApprovalStatus
+  vehicle: Vehicle
+  zones: ZoneName[]
+  nid: string
   currentLocation?: GeoPoint
   locationUpdatedAt?: Date
 }
 
 const ACTIVE_STATUSES = ['Assigned', 'PickedUp', 'InTransit'] as const
+
+const objectIdParam = (raw: string | undefined): string => {
+  if (!raw || !mongoose.Types.ObjectId.isValid(raw)) {
+    throw new HttpError(400, 'not a valid id')
+  }
+  return raw
+}
 
 /** The Agent document belonging to the signed-in rider. */
 const myAgent = async (userId: string): Promise<AgentLean> => {
@@ -62,8 +79,10 @@ const toSelf = async (agent: AgentLean): Promise<AgentSelf> => {
   return {
     _id: agent._id.toString(),
     status: agent.status,
+    approvalStatus: agent.approvalStatus,
     vehicle: agent.vehicle,
     zones: agent.zones as AgentSelf['zones'],
+    nid: agent.nid,
     ...(agent.currentLocation ? { currentLocation: agent.currentLocation } : {}),
     ...(agent.locationUpdatedAt ? { locationUpdatedAt: agent.locationUpdatedAt } : {}),
     activeCount,
@@ -73,14 +92,10 @@ const toSelf = async (agent: AgentLean): Promise<AgentSelf> => {
 /**
  * GET /agents/counts — what the admin rail shows beside "Riders".
  *
- * `pendingApproval` counts riders waiting to be let in. The approval flow is
- * M6.5c and no rider carries an approval field yet, so the honest answer today
- * is 0 — but it is REPORTED as a query rather than assumed, because the first
- * attempt here was `countDocuments({ approvalStatus: 'pending' })` and Mongoose
- * silently dropped the unknown path under strictQuery and counted every rider
- * instead. A filter on a field that does not exist does not mean "none"; it
- * means "no filter". Hence the explicit `strictQuery: false`, which makes Mongo
- * evaluate the condition it was given and answer 0 until the field is real.
+ * `pendingApproval` counts riders waiting on a decision. approvalStatus is a
+ * real, indexed field now, so this is a plain count — no strictQuery
+ * workaround needed, unlike when this comment described a field that did
+ * not exist yet.
  */
 agentsRouter.get('/counts', requireAuth, requireRole('admin'), async (_req, res, next) => {
   try {
@@ -90,9 +105,7 @@ agentsRouter.get('/counts', requireAuth, requireRole('admin'), async (_req, res,
         Promise.all([
           AgentModel.countDocuments({}).exec(),
           AgentModel.countDocuments({ status: { $ne: 'offline' } }).exec(),
-          AgentModel.countDocuments({ approvalStatus: 'pending' })
-            .setOptions({ strictQuery: false })
-            .exec(),
+          AgentModel.countDocuments({ approvalStatus: 'pending' }).exec(),
         ]),
     )
     res.json({ total, onShift, pendingApproval })
@@ -110,6 +123,37 @@ agentsRouter.get('/me', requireAuth, requireRole('agent'), async (req, res, next
     next(err)
   }
 })
+
+/**
+ * PATCH /agents/me/details — the profile's "Rider details" tab: vehicle and
+ * the zones this rider covers. NID is deliberately not accepted here — see
+ * agentApplicationFieldsSchema's own note, it is not re-editable once
+ * submitted.
+ */
+agentsRouter.patch(
+  '/me/details',
+  requireAuth,
+  requireRole('agent'),
+  async (req, res, next) => {
+    try {
+      const actor = req.actor
+      if (!actor) throw unauthorized()
+      const input = updateAgentDetailsInputSchema.parse(req.body)
+      const agent = await myAgent(actor.id)
+
+      await AgentModel.updateOne(
+        { _id: agent._id },
+        { $set: { vehicle: input.vehicle, zones: input.zones } },
+      )
+
+      res.json({
+        agent: await toSelf({ ...agent, vehicle: input.vehicle, zones: input.zones }),
+      })
+    } catch (err) {
+      next(err)
+    }
+  },
+)
 
 /**
  * POST /agents/me/location — drop a pin, by zone centre or by coordinates.
@@ -171,7 +215,10 @@ agentsRouter.post(
  *
  * Refused while `on_delivery`: that state means a parcel is physically in the
  * rider's hands, and letting them vanish from the roster mid-run would strand
- * it with nobody accountable.
+ * it with nobody accountable. A pending or rejected rider CAN still toggle
+ * this — it costs nothing, since suggestAgents excludes them regardless of
+ * shift status — but going available never actually produces work until an
+ * admin approves them.
  */
 agentsRouter.post(
   '/me/status',
@@ -203,3 +250,116 @@ agentsRouter.post(
     }
   },
 )
+
+interface UserNameRow {
+  _id: mongoose.Types.ObjectId
+  name: string
+  phone: string
+  email: string
+}
+
+/**
+ * GET /agents — the admin roster AND the approval queue in one list; the
+ * client buckets by `approvalStatus` into the two tables /admin/agents draws,
+ * the same way the rider workspace buckets one delivery list into active and
+ * finished rather than this route offering two shapes.
+ *
+ * `maskedNid` is the only form the NID leaves the server in — see maskNid's
+ * own note. There is no "give me the full number" variant of this route.
+ */
+agentsRouter.get('/', requireAuth, requireRole('admin'), async (_req, res, next) => {
+  try {
+    const rows = await AgentModel.find({})
+      .select('user vehicle zones status approvalStatus nid createdAt')
+      .sort({ createdAt: -1 })
+      .lean<
+        Array<{
+          _id: mongoose.Types.ObjectId
+          user: mongoose.Types.ObjectId
+          vehicle: Vehicle
+          zones: ZoneName[]
+          status: AgentStatus
+          approvalStatus: AgentApprovalStatus
+          nid: string
+          createdAt: Date
+        }>
+      >()
+
+    const users = await UserModel.find({ _id: { $in: rows.map((r) => r.user) } })
+      .select('name phone email')
+      .lean<UserNameRow[]>()
+    const byUser = new Map(users.map((u) => [u._id.toString(), u]))
+
+    const agents: AgentRosterItem[] = rows.flatMap((r) => {
+      const u = byUser.get(r.user.toString())
+      // A rider whose User record vanished is not one to show — should not
+      // happen outside a corrupted seed, but flatMap lets it drop silently
+      // rather than crashing the whole roster on one bad row.
+      if (!u) return []
+      return [
+        {
+          _id: r._id.toString(),
+          userId: u._id.toString(),
+          name: u.name,
+          phone: u.phone,
+          email: u.email,
+          vehicle: r.vehicle,
+          zones: r.zones,
+          status: r.status,
+          approvalStatus: r.approvalStatus,
+          maskedNid: maskNid(r.nid),
+          appliedAt: r.createdAt,
+        },
+      ]
+    })
+
+    res.json({ agents })
+  } catch (err) {
+    next(err)
+  }
+})
+
+/**
+ * Approve or reject one application. Both append to `approvalHistory` rather
+ * than overwrite anything — the same append-only shape Delivery's events use
+ * — naming the acting admin, which is the audit trail CLAUDE.md's spirit for
+ * section 5 (every lifecycle change records who and when) asks for here too.
+ */
+const decide = (nextStatus: 'approved' | 'rejected') =>
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const actor = req.actor
+      if (!actor) throw unauthorized()
+      const id = objectIdParam(req.params.id)
+
+      const agent = await AgentModel.findById(id).select('approvalStatus').lean<{
+        approvalStatus: AgentApprovalStatus
+      } | null>()
+      if (!agent) throw new HttpError(404, 'agent not found')
+      if (agent.approvalStatus !== 'pending') {
+        throw new HttpError(422, `this application is already ${agent.approvalStatus}`)
+      }
+
+      const at = new Date()
+      await AgentModel.updateOne(
+        { _id: id },
+        {
+          $set: { approvalStatus: nextStatus },
+          $push: {
+            approvalHistory: {
+              status: nextStatus,
+              at,
+              by: new mongoose.Types.ObjectId(actor.id),
+            },
+          },
+        },
+      )
+
+      res.json({ approvalStatus: nextStatus, at })
+    } catch (err) {
+      next(err)
+    }
+  }
+
+agentsRouter.post('/:id/approve', requireAuth, requireRole('admin'), decide('approved'))
+agentsRouter.post('/:id/reject', requireAuth, requireRole('admin'), decide('rejected'))

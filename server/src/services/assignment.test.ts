@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { TIE_BREAK_METRES, rankCandidates, type Candidate } from './assignment'
+import { AgentModel } from '../models/Agent'
+import { ASSIGNABLE_AGENT_FILTER, TIE_BREAK_METRES, rankCandidates, type Candidate } from './assignment'
 
 /**
  * Assignment ranking: nearest first (CLAUDE.md section 5), with workload
@@ -83,5 +84,50 @@ describe('candidate ranking', () => {
     const input = [rider('b', 900, 0), rider('a', 100, 0)]
     rankCandidates(input)
     assert.deepEqual(input.map((c) => c.name), ['b', 'a'])
+  })
+})
+
+/**
+ * A pending or rejected rider must never be a candidate — CRITICAL per
+ * CLAUDE.md's M6.5c brief, enforced server-side in the same $near query
+ * that already checks availability, not by a separate client-side check.
+ *
+ * Proved the way roleScope.test.ts proves the socket-room fix: build the
+ * real `AgentModel.find(...)` query suggestAgents runs and inspect its
+ * filter with `.getFilter()`, which needs no database connection at all.
+ * That is deliberately NOT the same as asserting the exported constant's
+ * shape in isolation — both real call sites in assignment.ts spread
+ * `ASSIGNABLE_AGENT_FILTER` into a live query against the real Agent model,
+ * so this exercises the actual code path a re-implementation could drift
+ * from.
+ */
+describe('pending and rejected riders are excluded from the assignment pool, on and off', () => {
+  it('carries approvalStatus: approved in the $near query', () => {
+    const query = AgentModel.find({
+      ...ASSIGNABLE_AGENT_FILTER,
+      zones: 'Mirpur',
+      currentLocation: {
+        $near: { $geometry: { type: 'Point', coordinates: [90.37, 23.75] }, $maxDistance: 5_000 },
+      },
+    })
+    const filter = query.getFilter()
+    assert.equal(filter.approvalStatus, 'approved', 'a pending/rejected rider must not match')
+    assert.equal(filter.status, 'available')
+  })
+
+  it('carries approvalStatus: approved in the zone-only fallback query', () => {
+    const query = AgentModel.find({ ...ASSIGNABLE_AGENT_FILTER, zones: 'Mirpur' })
+    const filter = query.getFilter()
+    assert.equal(filter.approvalStatus, 'approved')
+    assert.equal(filter.status, 'available')
+  })
+
+  it('the shared constant is exactly on/off, not a partial exclusion', () => {
+    // If this ever loses the approvalStatus key, both queries above lose it
+    // in the same commit — there is nowhere else for the check to hide.
+    assert.deepEqual(ASSIGNABLE_AGENT_FILTER, {
+      status: 'available',
+      approvalStatus: 'approved',
+    })
   })
 })

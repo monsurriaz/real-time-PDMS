@@ -1,15 +1,22 @@
 import { Navigate, Route, Routes, useParams } from 'react-router-dom'
+import { AdminAgentsPage } from '@/features/admin/AdminAgentsPage'
 import { AdminAnalyticsPage } from '@/features/admin/AdminAnalyticsPage'
 import { AdminCodPage } from '@/features/admin/AdminCodPage'
 import { AdminHome } from '@/features/admin/AdminHome'
 import { AdminPricingPage } from '@/features/admin/AdminPricingPage'
+import { AdminProfilePage } from '@/features/admin/AdminProfilePage'
 import { AgentFinishedPage } from '@/features/agent/AgentFinishedPage'
+import { AgentPendingPage } from '@/features/agent/AgentPendingPage'
+import { AgentProfilePage } from '@/features/agent/AgentProfilePage'
 import { BookParcelPage } from '@/features/booking/BookParcelPage'
 import { CustomerHome } from '@/features/customer/CustomerHome'
-import { LandingPlaceholder } from '@/features/public/LandingPlaceholder'
+import { CustomerProfilePage } from '@/features/customer/CustomerProfilePage'
+import { LandingPage } from '@/features/public/LandingPage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { RequireRole } from '@/features/auth/RequireRole'
 import { RiderWorkspace } from '@/features/agent/RiderWorkspace'
+import { SignupPage } from '@/features/auth/SignupPage'
+import { PublicTrackPage } from '@/features/tracking/PublicTrackPage'
 import { TrackParcelPage } from '@/features/tracking/TrackParcelPage'
 
 /**
@@ -25,17 +32,33 @@ import { TrackParcelPage } from '@/features/tracking/TrackParcelPage'
  * restructure is supposed to avoid rather than cause.
  */
 
-/** `/track/:parcelId` kept its parameter; only its prefix moved. */
-const TrackRedirect = () => {
-  const { parcelId } = useParams<{ parcelId: string }>()
-  return <Navigate to={`/customer/track/${parcelId ?? ''}`} replace />
+/**
+ * `/track/:id` serves two different eras of link at the same path shape.
+ *
+ * The pre-v3 bookmark was `/track/:parcelId` — a Mongo ObjectId — redirecting
+ * to the authenticated customer screen. v3's `/track/:trackingId` is a NEW,
+ * public route at the exact same single-segment shape, so the two cannot be
+ * two separate <Route>s (react-router has no way to prefer one over the
+ * other by param name — they are the same pattern). A 24-char hex id can
+ * never collide with a real tracking ID (CLAUDE.md section 9:
+ * `PD-XXXX-XX`), so that shape is what decides which era a given link is
+ * from.
+ */
+const TrackByIdRoute = () => {
+  const { id } = useParams<{ id: string }>()
+  if (id && /^[0-9a-fA-F]{24}$/.test(id)) {
+    return <Navigate to={`/customer/track/${id}`} replace />
+  }
+  return <PublicTrackPage trackingId={id ?? ''} />
 }
 
 export const App = () => (
   <Routes>
     {/* ---------- public ---------- */}
-    <Route path="/" element={<LandingPlaceholder />} />
+    <Route path="/" element={<LandingPage />} />
     <Route path="/login" element={<LoginPage />} />
+    <Route path="/signup" element={<SignupPage />} />
+    <Route path="/track/:id" element={<TrackByIdRoute />} />
 
     {/* ---------- customer ---------- */}
     <Route
@@ -60,6 +83,14 @@ export const App = () => (
       element={
         <RequireRole roles={['customer', 'admin']}>
           <TrackParcelPage />
+        </RequireRole>
+      }
+    />
+    <Route
+      path="/customer/profile"
+      element={
+        <RequireRole roles={['customer']}>
+          <CustomerProfilePage />
         </RequireRole>
       }
     />
@@ -90,6 +121,28 @@ export const App = () => (
         </RequireRole>
       }
     />
+    {/*
+      Also wrapped in RequireRole: an approved rider hitting this URL by
+      habit bounces to /agent/runs (see RequireRole's own note), and a
+      customer or admin gets the usual wrong-role redirect rather than a
+      403.
+    */}
+    <Route
+      path="/agent/pending"
+      element={
+        <RequireRole roles={['agent']}>
+          <AgentPendingPage />
+        </RequireRole>
+      }
+    />
+    <Route
+      path="/agent/profile"
+      element={
+        <RequireRole roles={['agent']}>
+          <AgentProfilePage />
+        </RequireRole>
+      }
+    />
 
     {/* ---------- admin ---------- */}
     <Route
@@ -117,10 +170,26 @@ export const App = () => (
       }
     />
     <Route
+      path="/admin/agents"
+      element={
+        <RequireRole roles={['admin']}>
+          <AdminAgentsPage />
+        </RequireRole>
+      }
+    />
+    <Route
       path="/admin/pricing"
       element={
         <RequireRole roles={['admin']}>
           <AdminPricingPage />
+        </RequireRole>
+      }
+    />
+    <Route
+      path="/admin/profile"
+      element={
+        <RequireRole roles={['admin']}>
+          <AdminProfilePage />
         </RequireRole>
       }
     />
@@ -133,12 +202,12 @@ export const App = () => (
     <Route path="/book" element={<Navigate to="/customer/book" replace />} />
     <Route path="/agent" element={<Navigate to="/agent/runs" replace />} />
     <Route path="/admin" element={<Navigate to="/admin/board" replace />} />
-    <Route path="/track/:parcelId" element={<TrackRedirect />} />
 
     {/*
-      Anything else goes to the landing placeholder, which forwards a signed-in
-      visitor to their own default. Sending an unknown URL straight to a role
-      home would be wrong for a signed-out visitor, who has no role yet.
+      Anything else goes to the landing page, which now shows the public page
+      to everyone — a signed-in visitor gets a link to their own dashboard
+      rather than an automatic redirect (v3's own note: they are still
+      allowed to read the marketing copy).
     */}
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>

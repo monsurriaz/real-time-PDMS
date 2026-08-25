@@ -1,5 +1,5 @@
 import mongoose, { Schema } from 'mongoose'
-import { role as roleSchema, zoneName, type User } from '@pdms/shared'
+import { role as roleSchema, zoneName, type SavedAddress, type User } from '@pdms/shared'
 import type { Doc } from './types'
 import { ALLOW_ALL, roleScopePlugin } from './plugins/roleScope'
 
@@ -10,7 +10,28 @@ import { ALLOW_ALL, roleScopePlugin } from './plugins/roleScope'
  */
 export type UserDoc = Doc<User> & {
   passwordHash: string
+  /** Customer only in practice; the field exists on every role for simplicity. */
+  savedAddresses: Array<Doc<SavedAddress>>
 }
+
+/**
+ * A customer's saved address (profile's role-specific tab). Same shape as the
+ * booking form's own address, plus a label — no `point`: a saved address is
+ * a template a booking re-geocodes, not a pre-resolved location that could go
+ * stale between when it was saved and when it is next used.
+ */
+const savedAddress = new Schema(
+  {
+    label: { type: String, required: true, trim: true, minlength: 2, maxlength: 40 },
+    line1: { type: String, required: true, trim: true },
+    area: { type: String, required: true, trim: true },
+    zone: { type: String, required: true, enum: zoneName.options },
+    city: { type: String, required: true, default: 'Dhaka', trim: true },
+    contactName: { type: String, required: true, trim: true },
+    contactPhone: { type: String, required: true, trim: true },
+  },
+  { timestamps: false },
+)
 
 const userSchema = new Schema<UserDoc>(
   {
@@ -31,6 +52,7 @@ const userSchema = new Schema<UserDoc>(
     role: { type: String, required: true, enum: roleSchema.options },
     zone: { type: String, enum: zoneName.options, required: false },
     isActive: { type: Boolean, required: true, default: true },
+    savedAddresses: { type: [savedAddress], required: true, default: [] },
     passwordHash: {
       type: String,
       required: true,

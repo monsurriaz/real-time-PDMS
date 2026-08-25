@@ -1,6 +1,13 @@
 import { Router } from 'express'
 import mongoose from 'mongoose'
-import type { DeliveryEvent, DeliveryStatus, GeoPoint, ZoneName } from '@pdms/shared'
+import type {
+  DeliveryEvent,
+  DeliveryStatus,
+  GeoPoint,
+  PublicTrackingSnapshot,
+  Vehicle,
+  ZoneName,
+} from '@pdms/shared'
 import { runAsSystem } from '../lib/context'
 import { routeGeometry } from '../lib/routing'
 import { AgentModel } from '../models/Agent'
@@ -48,6 +55,105 @@ interface DeliveryDoc {
   expectedBy: Date | null
   proofOfDelivery?: unknown
 }
+
+/**
+ * GET /tracking/by-id/:trackingId — v3's `/track/:trackingId`, public: no
+ * session, no requireAuth, and by construction a smaller answer than the
+ * authenticated snapshot below returns. What it deliberately withholds,
+ * beyond the obvious (no OTP — that channel exists to prove the RIDER
+ * reached the recipient, and anonymous is a third case beyond "owner" and
+ * "admin" that also gets none of it):
+ *
+ *   - the recipient's name and phone (drop.contactName/contactPhone) — a
+ *     third party's PII, not the tracker's business
+ *   - street-level addresses (line1) — area + zone is enough to answer
+ *     "where is it", and a bare tracking ID should not resolve to a house
+ *   - weight, price and COD amount — financial/shipment detail nobody
+ *     needs to locate a parcel
+ *   - the rider's phone and the full event log's notes — an admin's or a
+ *     rider's free text can name people or places the badge + rail already
+ *     say without.
+ *
+ * Registered ahead of `/:parcelId` below for readability; the two never
+ * collide since one is `/by-id/<id>` and the other `/<id>` — Express
+ * matches on path shape, not registration order, when the shapes differ.
+ */
+trackingRouter.get('/by-id/:trackingId', async (req, res, next) => {
+  try {
+    const trackingIdParam = req.params.trackingId
+    if (!trackingIdParam) throw new HttpError(400, 'a tracking ID is required')
+
+    // Unscoped: there is no actor to scope to, and this route is meant to
+    // answer for ANY parcel given its tracking ID, not just one this
+    // (nonexistent) caller could otherwise see.
+    const found = await runAsSystem('tracking: public lookup', async () => {
+      const parcel = await ParcelModel.findOne({ trackingId: trackingIdParam })
+        .select('trackingId pickup.area pickup.zone pickup.point drop.area drop.zone drop.point')
+        .lean<{
+          _id: mongoose.Types.ObjectId
+          trackingId: string
+          pickup: { area: string; zone: ZoneName; point?: GeoPoint }
+          drop: { area: string; zone: ZoneName; point?: GeoPoint }
+        } | null>()
+        .exec()
+      if (!parcel) return null
+
+      const delivery = await DeliveryModel.findOne({ parcel: parcel._id })
+        .select('agent status lastKnownLocation')
+        .lean<{
+          agent: mongoose.Types.ObjectId | null
+          status: DeliveryStatus
+          lastKnownLocation?: GeoPoint
+        } | null>()
+        .exec()
+      if (!delivery) return null
+
+      const rider = delivery.agent
+        ? await (async () => {
+            const agent = await AgentModel.findById(delivery.agent)
+              .select('user vehicle')
+              .lean<{ user: mongoose.Types.ObjectId; vehicle: Vehicle } | null>()
+              .exec()
+            if (!agent) return null
+            const user = await UserModel.findById(agent.user)
+              .select('name')
+              .lean<{ name: string } | null>()
+              .exec()
+            return { name: user?.name ?? 'Unknown rider', vehicle: agent.vehicle }
+          })()
+        : null
+
+      let route: Array<[number, number]> = []
+      if (parcel.pickup.point && parcel.drop.point) {
+        try {
+          const geometry = await routeGeometry(parcel.pickup.point, parcel.drop.point)
+          route = geometry.map((p) => p.coordinates)
+        } catch {
+          route = []
+        }
+      }
+
+      const snapshot: PublicTrackingSnapshot = {
+        trackingId: parcel.trackingId as PublicTrackingSnapshot['trackingId'],
+        status: delivery.status,
+        pickup: { area: parcel.pickup.area, zone: parcel.pickup.zone },
+        drop: { area: parcel.drop.area, zone: parcel.drop.zone },
+        rider,
+        // Only when there is actually someone assigned — lastKnownLocation
+        // can otherwise be a stray point (e.g. seeded demo data) with no
+        // rider behind it, and "point" here means the rider's position.
+        point: rider ? delivery.lastKnownLocation ?? null : null,
+        route,
+      }
+      return snapshot
+    })
+
+    if (!found) throw new HttpError(404, 'no parcel with that tracking ID')
+    res.json(found)
+  } catch (err) {
+    next(err)
+  }
+})
 
 trackingRouter.get('/:parcelId', requireAuth, async (req, res, next) => {
   try {

@@ -70,14 +70,21 @@ const ADMIN: SeedUser = {
 }
 
 /**
- * 2 available, 1 on delivery, 1 offline — the mix CLAUDE.md section 9 asks
- * for, so assignment has both a hit and a near-miss to demonstrate.
+ * 2 available, 1 on delivery, 1 offline, 1 pending — the four-status mix
+ * CLAUDE.md section 9 asks for, plus one M6.5c adds: a pending applicant, so
+ * the admin's approval queue is never empty on a fresh seed. The pending
+ * one is deliberately `offline` — it cannot be assigned work either way
+ * (services/assignment.ts checks approvalStatus, not this), but "waiting to
+ * even go on shift" is the honest state for an application nobody has acted
+ * on yet.
  */
 const AGENTS: ReadonlyArray<
   SeedUser & {
     zones: ZoneName[]
     vehicle: Vehicle
     status: AgentStatus
+    approvalStatus: 'approved' | 'pending'
+    nid: string
     at?: GeoPoint
   }
 > = [
@@ -89,6 +96,8 @@ const AGENTS: ReadonlyArray<
     zones: ['Dhanmondi', 'Mohammadpur'],
     vehicle: 'motorcycle',
     status: 'available',
+    approvalStatus: 'approved',
+    nid: '1990234567123',
     at: point(90.3728, 23.7489),
   },
   {
@@ -99,6 +108,8 @@ const AGENTS: ReadonlyArray<
     zones: ['Gulshan', 'Bashundhara'],
     vehicle: 'motorcycle',
     status: 'available',
+    approvalStatus: 'approved',
+    nid: '1991345678234',
     at: point(90.4138, 23.7941),
   },
   {
@@ -109,6 +120,8 @@ const AGENTS: ReadonlyArray<
     zones: ['Uttara'],
     vehicle: 'van',
     status: 'on_delivery',
+    approvalStatus: 'approved',
+    nid: '1988456789345',
     at: point(90.3991, 23.8712),
   },
   {
@@ -119,8 +132,23 @@ const AGENTS: ReadonlyArray<
     zones: ['Mirpur'],
     vehicle: 'bicycle',
     status: 'offline',
+    approvalStatus: 'approved',
+    nid: '1992567891456',
     // No position: an offline rider who has not reported one yet. This is
     // also what keeps the sparse 2dsphere index honest.
+  },
+  {
+    name: 'Jubair Rahman',
+    email: 'jubair.applicant@demo.pdms',
+    phone: '01811000005',
+    role: 'agent',
+    zones: ['Mirpur'],
+    vehicle: 'bicycle',
+    status: 'offline',
+    approvalStatus: 'pending',
+    nid: '1994678912567',
+    // No position either — an application nobody has approved has never
+    // been asked to go on shift.
   },
 ]
 
@@ -260,6 +288,13 @@ const seed = async (): Promise<void> => {
             zones: a.zones,
             vehicle: a.vehicle,
             status: a.status,
+            approvalStatus: a.approvalStatus,
+            nid: a.nid,
+            // Reset alongside approvalStatus, for the same "restore to a
+            // known state" reason status/zones/vehicle are reset above —
+            // an approve/reject clicked against a seed account during a
+            // dev cycle should not survive the next `npm run seed`.
+            approvalHistory: [],
             ...(a.at
               ? { currentLocation: a.at, locationUpdatedAt: new Date() }
               : {}),
@@ -277,8 +312,12 @@ const seed = async (): Promise<void> => {
         { upsert: true },
       )
     }
+    /** Shift status only means anything for an approved rider — a pending
+     *  one is grouped by approvalStatus instead, so it reads as "1 pending"
+     *  rather than folding invisibly into "2 offline". */
     const counts = AGENTS.reduce<Record<string, number>>((acc, a) => {
-      acc[a.status] = (acc[a.status] ?? 0) + 1
+      const key = a.approvalStatus === 'approved' ? a.status : a.approvalStatus
+      acc[key] = (acc[key] ?? 0) + 1
       return acc
     }, {})
     console.log(
@@ -302,7 +341,10 @@ const seed = async (): Promise<void> => {
     console.log(`    admin      ${admin.email}`)
     console.log('\n  other accounts:')
     for (const c of CUSTOMERS.slice(1)) console.log(`    customer   ${c.email}`)
-    for (const a of AGENTS.slice(1)) console.log(`    agent      ${a.email}  (${a.status})`)
+    for (const a of AGENTS.slice(1))
+      console.log(
+        `    agent      ${a.email}  (${a.approvalStatus === 'approved' ? a.status : a.approvalStatus})`,
+      )
   })
 }
 

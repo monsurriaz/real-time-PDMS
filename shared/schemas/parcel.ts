@@ -68,7 +68,7 @@ export type Parcel = z.infer<typeof parcelSchema>
  * never trusts a client-supplied amount. Neither is `point` — geocoding is
  * server-side, on submit, to respect Nominatim's 1 req/sec limit.
  */
-const addressInputSchema = addressSchema.omit({
+export const addressInputSchema = addressSchema.omit({
   point: true,
   resolvedLabel: true,
 })

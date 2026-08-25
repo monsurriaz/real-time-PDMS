@@ -41,20 +41,20 @@ debt are all in Resolved. What is left is what M6 stopped short of, and why.
 
 ---
 
-## M6.5b / M6.5c — the rest of the v3 rebuild
+## Post-M6.5 — open backlog, no milestone attached
 
-M6.5a did foundations, routes, the shell and the screens that already existed.
-These are the pieces it deliberately stopped before.
+M6.5a, b and c between them did every screen v3's route table names. These
+three were never part of any of the three sessions' task lists — they stay
+presentational, and now that M6.5 itself is closed there is no next v3
+sub-session to pencil them into. Pick them up whenever the functionality
+they need (server search, a notification store, a Zones screen) is worth
+building for its own sake.
 
-| Item | Target | Notes |
-|---|---|---|
-| **Landing page at `/`** | M6.5c | `/` currently forwards a signed-in visitor to their role default. v3 says it should show the public page with a link to the dashboard instead — a signed-in person is still allowed to read the marketing copy. That needs copy to exist, so `LandingPlaceholder` is replaced rather than edited. |
-| Sign-up and the approval flow | M6.5c | `/signup`, `/agent/pending`, `/admin/agents`. The rail's Riders item is dimmed and its pending count is already wired — it reads 0 because no rider carries an approval field yet, which is the honest answer until the flow exists. |
-| Profiles | M6.5c | `/customer/profile`, `/agent/profile`, `/admin/profile`. The account menu's Profile item is present and disabled, and now says when it's arriving (M6.5b) rather than just refusing. |
-| **Public tracking by tracking ID** | M6.5c | v3's route table has `/track/:trackingId` as PUBLIC — track without logging in. Today `/track/:parcelId` redirects to the customer screen, which needs a session. The public version needs an unauthenticated lookup endpoint, which is server work this session was scoped out of. |
-| Search field | M6.5c | Presentational. A real input, disabled, labelled "coming in M6.5c" rather than a decorative box that swallows keystrokes. Wiring it means a server search across tracking IDs, customers and riders. |
-| Notification bell | M6.5c | Presentational and disabled. There is no notification store; v3 draws an unread dot, and showing one over nothing would be a lie. |
-| Zones nav item | M6.5c | v3's admin rail has Operations / Analytics / COD, then Riders / Pricing / **Zones**. Zones has no screen and no count, so it is omitted rather than dimmed — an empty row for a screen nobody has asked for is noise. |
+| Item | Notes |
+|---|---|
+| Search field | Presentational. A real input, disabled, labelled "coming in M6.5c" — that label is now stale copy rather than a real target; it means "not yet built", full stop. Wiring it means a server search across tracking IDs, customers and riders. |
+| Notification bell | Presentational and disabled. There is no notification store; v3 draws an unread dot, and showing one over nothing would be a lie. |
+| Zones nav item | v3's admin rail has Operations / Analytics / COD, then Riders / Pricing / **Zones**. Zones has no screen and no count, so it is omitted rather than dimmed — an empty row for a screen nobody has asked for is noise. |
 
 ---
 
@@ -95,6 +95,16 @@ These are the pieces it deliberately stopped before.
 | The Shift rail popover is `fixed`, not anchored to the 216px rail | Deliberate. Below 768px the rail collapses to a 64px icon strip (a pre-existing, all-roles convention — see AppShell), and the location form's zone select and two coordinate fields cannot fit anchored to that box without being clipped. `fixed` positioning lets one trigger and one editor (`ShiftEditor`) work at every width instead of the phone needing a second copy of the control. |
 | The run queue includes the CURRENT delivery, not just the ones behind it | Deliberate, and the reason it isn't called "Up next" the way the static reference labels it: when it is also how a rider switches which parcel is on the left, the selected one has to be in the list, highlighted, or there is nothing to click back to. |
 | `/agent/runs/:id` for an id that isn't (or is no longer) one of the rider's active runs | Falls back to the first active run rather than 404ing. A rider is never looking at nothing just because a bookmark outlived the delivery it named; there is no dedicated detail view a finished run's id could point to instead. |
+| `/track/:id` serves the pre-v3 `/track/:parcelId` redirect AND v3's new public `/track/:trackingId` at the same route | They are the identical path shape — react-router has no way to prefer one over the other by param name — so one component decides by shape: a 24-char hex id (a Mongo ObjectId) redirects to `/customer/track/:id` the way it always did; anything else is treated as a real tracking ID and hits the new public lookup. `PD-XXXX-XX` can never collide with 24 hex characters. |
+| Public tracking (`/track/:trackingId`) withholds recipient name/phone, street addresses, weight, price, COD amount, and event notes | Deliberate, and stricter than the authenticated customer view — see `publicTrackingSnapshotSchema`'s own note. A stranger with a tracking ID gets enough to answer "where is it", not the parcel's contents or who is receiving it. `point` is also null whenever no agent is assigned, even if `lastKnownLocation` happens to hold a stray value (seeded demo data can), because this field means "the rider's position" and there is no rider to mean it. |
+| Rider details (profile) absorbs `ShiftEditor` rather than a second implementation | The same component now renders in two places — the rail's popover and the profile's "Rider details" tab — which is what "absorbs... don't duplicate" asked for. Vehicle and covered zones are new fields the profile adds; status and location stay exactly the form M6.5b built. |
+| Rider details / signup keep "zone covered" as a single select, not a multi-select | Signup only ever collects one "preferred zone", and `Agent.zones` is a list mostly so a rider can be asked to cover more later — no UI in this build has ever needed to pick more than one at a time, so a multi-select control was not built just to sit unused. Editing writes a one-element array. |
+| Saved addresses (customer profile) are CRUD only, not wired into booking's autofill | The tab lets a customer create, list and remove addresses; BookParcelPage still asks for pickup/drop by hand. Autofill is real, separate work — reading a saved address into the booking form's fields — parked here rather than rushed into this session. |
+| "Change photo" stays a disabled button, not a real upload | Consistent with `Table.tsx`'s own reasoning for the plain-circle `Avatar`: there are no uploaded profile images anywhere in this build, and a generated initial would imply an identity the record does not carry. Photo upload was never asked for; the button exists because v3 draws it, and disabling it says so honestly rather than omitting a control the reference shows. |
+| Seed now has 5 agents, not the 4 CLAUDE.md section 9 names | The brief for this session asked for exactly this: "add one pending agent so the approval queue isn't empty on a fresh seed." The four original (2 available, 1 on delivery, 1 offline) are unchanged; a fifth, pending, sits alongside them. |
+| `VITE_SHOW_DEMO_LOGINS` defaults to shown, not hidden | The login screen's demo panel is gated "so an examiner isn't hunting for credentials" — which only holds if it is ON by default for the course demo. The flag exists to turn it OFF for a hypothetical real deploy, not to require opting in during the one context (grading) this project actually runs in. |
+| Rejected is terminal — no un-reject in this build | Same reasoning DEFERRED.md already records for "no admin unassign": reinstating a rejected application is a decision to take on purpose, not a status enum offering it by default. |
+| The agent-approval decision buttons match the HTML exactly: Reject is quiet, Approve is ink | Not both ink. CLAUDE.md's own prose paraphrase groups them against "not accent"; the frozen HTML — which wins on any disagreement per rule 2 — draws only Approve as `.btn-ink`. |
 
 ---
 
@@ -102,6 +112,13 @@ These are the pieces it deliberately stopped before.
 
 | Item | Milestone | Commit |
 |---|---|---|
+| **Landing page at `/`** — dark hero, LifecycleRail as the hero graphic, real stat band from `GET /pricing/summary` | M6.5c | `PENDING` |
+| Login rebuilt to v3 exactly — demo panel gated behind `VITE_SHOW_DEMO_LOGINS`, link to signup | M6.5c | `PENDING` |
+| Signup — role picker, rider-specific fields, `registerInputSchema` discriminated union with no admin branch | M6.5c | `PENDING` |
+| **Agent approval flow** — `approvalStatus` on Agent, `/agent/pending`, `/admin/agents` approval queue + roster, pending/rejected excluded from the assignment pool at the query level | M6.5c | `PENDING` |
+| **Public tracking by tracking ID** (`/track/:trackingId`, no auth) | M6.5c | `PENDING` |
+| Profiles for all three roles — shared Account/Password tabs, saved addresses, rider details absorbing `ShiftEditor` | M6.5c | `PENDING` |
+| Seed adds one pending agent | M6.5c | `PENDING` |
 | **Rider workspace rebuild** — route map beside the active delivery, `/agent/runs/:id`, shift folded into the rail | M6.5b | `9b4e696` |
 | `/agent/finished` | M6.5b | `9b4e696` |
 | Seed leaves settlement records behind | M6.5b | `09ba383` |

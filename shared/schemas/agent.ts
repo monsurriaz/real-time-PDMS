@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { geoPoint, objectId, timestamps, zoneName } from './common'
+import { geoPoint, objectId, phone, timestamps, zoneName } from './common'
 
 /**
  * Agent availability. `available` is the only status the $near assignment
@@ -12,6 +12,51 @@ export const vehicleSchema = z.enum(['bicycle', 'motorcycle', 'van'])
 export type Vehicle = z.infer<typeof vehicleSchema>
 
 /**
+ * A self-registered rider starts `pending` and cannot be assigned work —
+ * enforced in services/assignment.ts's own filter, not by convention — until
+ * an admin approves them. `rejected` is terminal; there is no un-reject in
+ * this build (CLAUDE.md's "no admin unassign" reasoning applies the same way
+ * here: reinstating a rejected application is a decision to take on purpose,
+ * not part of a status enum).
+ */
+export const agentApprovalStatusSchema = z.enum(['pending', 'approved', 'rejected'])
+export type AgentApprovalStatus = z.infer<typeof agentApprovalStatusSchema>
+
+/**
+ * NID or driving-licence number. Loose on purpose — this project has no
+ * document-verification integration, so the field records what the
+ * applicant typed rather than validating a specific national ID format.
+ */
+export const agentNidSchema = z
+  .string()
+  .trim()
+  .min(6, 'must be at least 6 characters')
+  .max(30)
+  .regex(/^[A-Za-z0-9-]+$/, 'letters, numbers and hyphens only')
+
+/**
+ * Shows the first 4 and last 2 characters, masking the rest — the shape
+ * v3's approval-queue mockup draws ("1990••••••34"). An admin needs enough
+ * of the number to eyeball it against a physical document without this
+ * screen becoming a second place the full number is exposed.
+ */
+export const maskNid = (nid: string): string =>
+  nid.length <= 6 ? '•'.repeat(nid.length) : `${nid.slice(0, 4)}${'•'.repeat(nid.length - 6)}${nid.slice(-2)}`
+
+/**
+ * One approve/reject decision, appended to `approvalHistory`. Same shape as
+ * Delivery's `events[]` — append-only, actor named, never edited — so a
+ * decision naming which admin made it survives even if the status changes
+ * again later.
+ */
+export const agentApprovalEventSchema = z.object({
+  status: z.enum(['approved', 'rejected']),
+  at: z.coerce.date(),
+  by: objectId,
+})
+export type AgentApprovalEvent = z.infer<typeof agentApprovalEventSchema>
+
+/**
  * A rider. One Agent document per agent-role User — the login lives on User,
  * the delivery-capacity state lives here.
  */
@@ -22,6 +67,9 @@ export const agentSchema = z.object({
   zones: z.array(zoneName).min(1),
   vehicle: vehicleSchema,
   status: agentStatusSchema,
+  approvalStatus: agentApprovalStatusSchema,
+  nid: agentNidSchema,
+  approvalHistory: z.array(agentApprovalEventSchema).default([]),
   /**
    * Last known position, carrying a 2dsphere index. Written at most once per
    * 30s per CLAUDE.md section 6 — the socket tick does NOT persist.
@@ -31,6 +79,47 @@ export const agentSchema = z.object({
   ...timestamps,
 })
 export type Agent = z.infer<typeof agentSchema>
+
+/**
+ * What a signup submits for the rider path, beyond the fields every account
+ * shares (name/email/phone/password — see registerInputSchema in user.ts).
+ * `zone` is singular — one "preferred zone" at signup — while `Agent.zones`
+ * is a list; registration seeds it with that one zone, and the profile's
+ * rider-details tab can add more later.
+ */
+export const agentApplicationFieldsSchema = z.object({
+  vehicle: vehicleSchema,
+  zone: zoneName,
+  nid: agentNidSchema,
+})
+export type AgentApplicationFields = z.infer<typeof agentApplicationFieldsSchema>
+
+/** What the agent-details tab on /agent/profile may change. NID is not here — it is not re-editable once submitted. */
+export const updateAgentDetailsInputSchema = z.object({
+  vehicle: vehicleSchema,
+  zones: z.array(zoneName).min(1),
+})
+export type UpdateAgentDetailsInput = z.infer<typeof updateAgentDetailsInputSchema>
+
+/**
+ * One row of the admin's roster / approval queue. NID arrives already
+ * masked — see maskNid — so the wire shape itself cannot leak the full
+ * number regardless of what the screen does with it.
+ */
+export const agentRosterItemSchema = z.object({
+  _id: objectId,
+  userId: objectId,
+  name: z.string(),
+  phone: phone,
+  email: z.string().email(),
+  vehicle: vehicleSchema,
+  zones: z.array(zoneName),
+  status: agentStatusSchema,
+  approvalStatus: agentApprovalStatusSchema,
+  maskedNid: z.string(),
+  appliedAt: z.coerce.date(),
+})
+export type AgentRosterItem = z.infer<typeof agentRosterItemSchema>
 
 /** Agent as shown to a customer tracking a parcel: no phone, no email. */
 export const publicAgentSchema = z.object({
@@ -70,12 +159,19 @@ export const setAgentStatusInputSchema = z.object({
 })
 export type SetAgentStatusInput = z.infer<typeof setAgentStatusInputSchema>
 
-/** GET /agents/me — the rider's own record, behind the shift controls. */
+/**
+ * GET /agents/me — the rider's own record, behind the shift controls AND the
+ * profile's rider-details tab. `nid` is shown here unmasked — it is the
+ * rider reading their own record, not an admin's list — and `approvalStatus`
+ * is what /agent/pending and the RequireRole approval gate both key off.
+ */
 export const agentSelfSchema = z.object({
   _id: objectId,
   status: agentStatusSchema,
+  approvalStatus: agentApprovalStatusSchema,
   vehicle: vehicleSchema,
   zones: z.array(zoneName),
+  nid: agentNidSchema,
   currentLocation: geoPoint.optional(),
   locationUpdatedAt: z.coerce.date().optional(),
   /** Deliveries they are currently holding, so the toggle is an informed one. */

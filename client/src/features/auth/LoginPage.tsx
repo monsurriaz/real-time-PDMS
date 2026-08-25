@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { loginInputSchema } from '@pdms/shared'
 import { Button } from '@/components/Button'
 import { Field } from '@/components/Field'
@@ -9,6 +9,13 @@ import { useLogin, useMe } from './useAuth'
 
 /** Every seeded account shares one password (scripts/seed.ts). */
 const DEMO_PASSWORD = 'pdms-demo-2026'
+
+/**
+ * Gated behind an env flag so an examiner isn't hunting for credentials —
+ * shown by default (this IS the course demo), off only when a real deploy
+ * explicitly sets VITE_SHOW_DEMO_LOGINS=false.
+ */
+const SHOW_DEMO_LOGINS = import.meta.env?.VITE_SHOW_DEMO_LOGINS !== 'false'
 
 /**
  * Sign in. Validates with the same Zod schema the server uses, so the client's
@@ -99,39 +106,44 @@ export const LoginPage = () => {
             </Button>
           </form>
 
-          {/*
-            v3's `.demo` block. Signing up is M6.5c, so the alternative offered
-            here is the seeded accounts rather than a link to a screen that
-            does not exist yet.
-          */}
-          <div className="mt-14px bg-surface-sunk rounded-md px-15px py-13px">
-            <div className="text-micro font-semibold uppercase tracking-[0.11em] text-faint mb-2">
-              Demo accounts
+          {/* v3's `.demo` block, gated behind VITE_SHOW_DEMO_LOGINS. */}
+          {SHOW_DEMO_LOGINS ? (
+            <div className="mt-14px bg-surface-sunk rounded-md px-15px py-13px">
+              <div className="text-micro font-semibold uppercase tracking-[0.11em] text-faint mb-2">
+                Demo accounts
+              </div>
+              {[
+                { role: 'Customer', email: 'nusrat@demo.pdms' },
+                { role: 'Rider', email: 'rakib@demo.pdms' },
+                { role: 'Admin', email: 'admin@demo.pdms' },
+              ].map((d) => (
+                <button
+                  key={d.email}
+                  type="button"
+                  onClick={() => {
+                    setEmail(d.email)
+                    setPassword(DEMO_PASSWORD)
+                    setFieldError(null)
+                  }}
+                  className="w-full flex justify-between items-center py-0.5 text-small hover:text-accent"
+                >
+                  <span className="text-muted">{d.role}</span>
+                  <span className="mono text-tiny">{d.email}</span>
+                </button>
+              ))}
+              <div className="flex justify-between items-center py-0.5 text-small mt-1 border-t border-border-strong pt-2">
+                <span className="text-muted">Password</span>
+                <span className="mono text-tiny">{DEMO_PASSWORD}</span>
+              </div>
             </div>
-            {[
-              { role: 'Customer', email: 'nusrat@demo.pdms' },
-              { role: 'Rider', email: 'rakib@demo.pdms' },
-              { role: 'Admin', email: 'admin@demo.pdms' },
-            ].map((d) => (
-              <button
-                key={d.email}
-                type="button"
-                onClick={() => {
-                  setEmail(d.email)
-                  setPassword(DEMO_PASSWORD)
-                  setFieldError(null)
-                }}
-                className="w-full flex justify-between items-center py-0.5 text-small hover:text-accent"
-              >
-                <span className="text-muted">{d.role}</span>
-                <span className="mono text-tiny">{d.email}</span>
-              </button>
-            ))}
-            <div className="flex justify-between items-center py-0.5 text-small mt-1 border-t border-border-strong pt-2">
-              <span className="text-muted">Password</span>
-              <span className="mono text-tiny">{DEMO_PASSWORD}</span>
-            </div>
-          </div>
+          ) : null}
+
+          <p className="text-body text-muted text-center mt-4">
+            New here?{' '}
+            <Link to="/signup" className="text-accent-hover font-medium hover:underline">
+              Create an account
+            </Link>
+          </p>
         </div>
       </div>
     </main>
