@@ -110,19 +110,30 @@
     padding: 2px 6px;
   }
 
-  /* Pickup is an ink dot with a white centre; drop is v3's ink teardrop. */
-  .pdms-pin {
+  /**
+   * Pickup is an ink dot with a white centre; drop is v3.1's ink teardrop.
+   *
+   * The drop marker used to be this same circle with the fill and the ring
+   * swapped — `background: var(--surface)` behind an ink border — which
+   * rendered as a hollow ring rather than a placed pin. The addendum is
+   * explicit that a hollow marker reads as disabled, so drop-off is now a
+   * genuinely different, solid shape (an inline SVG, built in
+   * TrackingMap.tsx's `DROP_PIN_SVG`) rather than the same div styled to look
+   * different — the two markers are different enough now that one shared
+   * class + a modifier stopped fitting.
+   */
+  .pdms-pin--pickup {
     width: 13px;
     height: 13px;
     border-radius: 50%;
     box-shadow: 0 0 0 2.5px #fff;
-  }
-  .pdms-pin--pickup {
     background: var(--ink);
   }
-  .pdms-pin--drop {
-    background: var(--surface);
-    border: 3.5px solid var(--ink);
+  .pdms-pin-body {
+    fill: var(--ink);
+  }
+  .pdms-pin-hole {
+    fill: #fff;
   }
 
   /**

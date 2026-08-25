@@ -203,7 +203,17 @@ export const useLiveTracking = (parcelId: string | undefined) => {
     mode,
     /** The position to draw. */
     point,
-    /** The trail, for the travelled polyline. */
+    /**
+     * Every position received this session, capped at 200 points (section
+     * 6). No longer fed into the map as its own line — the v3.1 addendum's
+     * fix for the route rendering bug is to split the PLANNED route at the
+     * rider's current position (TrackingMap's `splitRouteByProgress`),
+     * which needs only `point`, not a raw history of past ones. Kept here
+     * because the accumulate-and-cap behaviour is section 6's own rule, not
+     * something that exists only to feed a map layer, and a played-back
+     * "where this rider actually went" view is the obvious thing to build on
+     * it later.
+     */
     history,
     /** When the last socket tick arrived; null while polling. */
     lastTickAt: mode === 'live' ? lastTickAt : null,
