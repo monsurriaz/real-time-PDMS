@@ -26,7 +26,12 @@ interface CustomerLean {
   _id: mongoose.Types.ObjectId
   name: string
   email: string
-  status: UserStatus
+  /**
+   * Optional because `.lean()` skips the schema default, so an account
+   * created before this field existed comes back without it. See
+   * middleware/auth.ts — absent means active, there and here.
+   */
+  status?: UserStatus
   accountHistory: Array<{ status: UserStatus; at: Date; by: mongoose.Types.ObjectId }>
   createdAt: Date
 }
@@ -71,7 +76,7 @@ customersRouter.get('/', requireAuth, requireRole('admin'), async (_req, res, ne
         _id: r._id.toString(),
         name: r.name,
         email: r.email,
-        status: r.status,
+        status: r.status ?? 'active',
         parcelCount: counts.get(r._id.toString()) ?? 0,
         joinedAt: r.createdAt,
         lastDecision: last
@@ -115,12 +120,15 @@ const decide = (nextStatus: UserStatus) =>
 
       const target = await UserModel.findById(id)
         .select('role status')
-        .lean<{ role: string; status: UserStatus } | null>()
+        .lean<{ role: string; status?: UserStatus } | null>()
       if (!target) throw new HttpError(404, 'customer not found')
       if (target.role !== 'customer') {
         throw new HttpError(422, 'only a customer account can be suspended from here')
       }
-      if (target.status === nextStatus) {
+      // Absent means active — see CustomerLean. Normalised before the
+      // comparison, or Reactivate on an account that never had the field would
+      // "succeed" and append a decision that changed nothing.
+      if ((target.status ?? 'active') === nextStatus) {
         throw new HttpError(422, `this account is already ${nextStatus}`)
       }
 

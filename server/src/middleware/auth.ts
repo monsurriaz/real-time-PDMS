@@ -61,11 +61,24 @@ const accountStatus = async (actorId: string): Promise<UserStatus | null> => {
   if (!mongoose.Types.ObjectId.isValid(actorId)) return null
   const user = await runAsSystem('auth: account status', async () =>
     UserModel.findById(actorId)
-      .select('status')
-      .lean<{ status: UserStatus } | null>()
+      .select('_id status')
+      .lean<{ _id: mongoose.Types.ObjectId; status?: UserStatus } | null>()
       .exec(),
   )
-  return user?.status ?? null
+  if (!user) return null
+  /**
+   * `.lean()` skips document hydration, which is where Mongoose would apply
+   * the schema default — so an account created before `status` existed comes
+   * back with the field simply absent. Absent means active: this field was
+   * introduced to take a capability AWAY, and defaulting the other way would
+   * lock every pre-existing account out of its own session the moment the
+   * middleware shipped.
+   *
+   * `_id` is selected so "no such user" stays distinguishable from "user with
+   * no status yet" — they get a 401 and a pass respectively, and collapsing
+   * them is exactly the bug this comment exists to prevent.
+   */
+  return user.status ?? 'active'
 }
 
 /**
