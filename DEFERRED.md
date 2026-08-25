@@ -112,13 +112,13 @@ building for its own sake.
 
 | Item | Milestone | Commit |
 |---|---|---|
-| **Landing page at `/`** — dark hero, LifecycleRail as the hero graphic, real stat band from `GET /pricing/summary` | M6.5c | `PENDING` |
-| Login rebuilt to v3 exactly — demo panel gated behind `VITE_SHOW_DEMO_LOGINS`, link to signup | M6.5c | `PENDING` |
-| Signup — role picker, rider-specific fields, `registerInputSchema` discriminated union with no admin branch | M6.5c | `PENDING` |
-| **Agent approval flow** — `approvalStatus` on Agent, `/agent/pending`, `/admin/agents` approval queue + roster, pending/rejected excluded from the assignment pool at the query level | M6.5c | `PENDING` |
-| **Public tracking by tracking ID** (`/track/:trackingId`, no auth) | M6.5c | `PENDING` |
-| Profiles for all three roles — shared Account/Password tabs, saved addresses, rider details absorbing `ShiftEditor` | M6.5c | `PENDING` |
-| Seed adds one pending agent | M6.5c | `PENDING` |
+| **Landing page at `/`** — dark hero, LifecycleRail as the hero graphic, real stat band from `GET /pricing/summary` | M6.5c | `8eabbc5` |
+| Login rebuilt to v3 exactly — demo panel gated behind `VITE_SHOW_DEMO_LOGINS`, link to signup | M6.5c | `8eabbc5` |
+| Signup — role picker, rider-specific fields, `registerInputSchema` discriminated union with no admin branch | M6.5c | `8eabbc5` |
+| **Agent approval flow** — `approvalStatus` on Agent, `/agent/pending`, `/admin/agents` approval queue + roster, pending/rejected excluded from the assignment pool at the query level | M6.5c | `8eabbc5` |
+| **Public tracking by tracking ID** (`/track/:trackingId`, no auth) | M6.5c | `8eabbc5` |
+| Profiles for all three roles — shared Account/Password tabs, saved addresses, rider details absorbing `ShiftEditor` | M6.5c | `8eabbc5` |
+| Seed adds one pending agent | M6.5c | `8eabbc5` |
 | **Rider workspace rebuild** — route map beside the active delivery, `/agent/runs/:id`, shift folded into the rail | M6.5b | `9b4e696` |
 | `/agent/finished` | M6.5b | `9b4e696` |
 | Seed leaves settlement records behind | M6.5b | `09ba383` |
