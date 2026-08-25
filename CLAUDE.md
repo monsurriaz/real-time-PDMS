@@ -10,9 +10,7 @@ Course project, CSC 470. Seven-day build. Demo-ready beats feature-complete.
 ## 1. Non-negotiable rules
 
 1. **Never invent a color, font, radius, or spacing value.** Everything comes from
-   `client/src/styles/tokens.css`. If a value you need isn't there, stop and ask.\
-~~2. **The design system is frozen.** Do not restyle a component because it "could look
-   better." Visual changes require an explicit request.~~
+   `client/src/styles/tokens.css`. If a value you need isn't there, stop and ask.
 2. **The design system is v3 Meridian, in docs/design-system-v3.html.** It fully
    supersedes the previous system — the warm paper palette, the orange accent, and
    the header-only layout are all retired. Every screen rebuilds against v3. Do not
@@ -26,8 +24,9 @@ Course project, CSC 470. Seven-day build. Demo-ready beats feature-complete.
 7. **Vertical slices, not layers.** "Booking works end to end" before "all models exist."
 8. **Deferred work lives in DEFERRED.md, not in the current milestone.** When you defer
    something, append it there with a target milestone and a one-line reason — don't fix
-   it in the current session unless I ask. At the start of M5, M6, and M7, read that
-   file's matching section and confirm scope with me before starting.
+   it in the current session unless I ask. At the start of every milestone session listed
+   in section 8, read that file's matching section and confirm scope with me before
+   starting.
 
 ---
 
@@ -240,6 +239,7 @@ to zone-only if no agent is within 5 km. Admin can override.
 | M4 | Live tracking + simulator | Rooms, GPS stream, animated customer map, admin live board, `simulate.ts` works |
 | M5 | POD + payments | Photo/OTP stored, Stripe test checkout, COD flag, reconciliation table per agent |
 | M6 | Analytics + polish | Stat cards, one chart, delayed alerts, loading/empty/error states, agent mobile pass |
+| M6.5 | Visual system replacement (Meridian v3), three sessions: **a** shell + routes + re-skin existing screens, **b** rider workspace rebuild, **c** landing + signup + approval flow + profiles | Every screen matches docs/design-system-v3-meridian.html; no v1 token survives in the codebase |
 | M7 | Deploy + rehearse | Live on Vercel + Render + Atlas, demo data seeded, run-through twice |
 
 See DEFERRED.md for work parked out of each milestone.
@@ -265,4 +265,3 @@ spread across all lifecycle states including one Failed and one Delayed.
 - Works at 375px wide
 - Keyboard focus is visible
 - No console errors
-
