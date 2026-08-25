@@ -331,69 +331,81 @@ export const AppShell = ({ title, titleAside, children }: Props) => {
   return (
     <div className="min-h-dvh grid grid-cols-[64px_1fr] md:grid-cols-[216px_1fr] bg-page">
       {/* ---------- the rail ---------- */}
-      <aside className="on-chrome bg-chrome px-3 py-4 flex flex-col">
+      {/*
+        `sticky top-0 h-dvh`, not just a tall block in the grid flow.
+        The grid row auto-sizes to its tallest cell, and on a page whose main
+        content runs past one screen that cell is `<main>`'s — so without this
+        the whole rail grew past the viewport too and scrolled away with the
+        page, dragging the account block down with it. Pinning the aside to
+        the viewport and letting only the nav list beneath scroll internally
+        (via `overflow-y-auto` + `min-h-0` below) keeps the account block at
+        the foot of the screen no matter how long the page gets.
+      */}
+      <aside className="on-chrome bg-chrome px-3 py-4 flex flex-col sticky top-0 h-dvh">
         <Wordmark to={role ? homeForRole(role) : '/'} />
 
-        {groups.map((group, gi) => (
-          <div key={group.title ?? `group-${gi}`}>
-            {group.title ? (
-              <div className="text-rail font-semibold uppercase tracking-[0.12em] text-chrome-muted px-2.5 pt-3.5 pb-6px max-md:hidden">
-                {group.title}
-              </div>
-            ) : null}
-            <nav className="flex flex-col gap-px">
-              {group.items.map((item) => {
-                const shared = [
-                  'group flex items-center gap-10px px-2.5 py-9px rounded-sm',
-                  'text-body font-medium max-md:justify-center',
-                  touch ? 'min-h-12' : 'min-h-11',
-                ].join(' ')
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {groups.map((group, gi) => (
+            <div key={group.title ?? `group-${gi}`}>
+              {group.title ? (
+                <div className="text-rail font-semibold uppercase tracking-[0.12em] text-chrome-muted px-2.5 pt-3.5 pb-6px max-md:hidden">
+                  {group.title}
+                </div>
+              ) : null}
+              <nav className="flex flex-col gap-px">
+                {group.items.map((item) => {
+                  const shared = [
+                    'group flex items-center gap-10px px-2.5 py-9px rounded-sm',
+                    'text-body font-medium max-md:justify-center',
+                    touch ? 'min-h-12' : 'min-h-11',
+                  ].join(' ')
 
-                const inner = (
-                  <>
-                    <NavIcon name={item.icon} />
-                    <span className="truncate max-md:hidden">{item.label}</span>
-                    <span className="max-md:hidden contents">
-                      <Count value={item.count ? counts[item.count] : null} />
-                    </span>
-                  </>
-                )
+                  const inner = (
+                    <>
+                      <NavIcon name={item.icon} />
+                      <span className="truncate max-md:hidden">{item.label}</span>
+                      <span className="max-md:hidden contents">
+                        <Count value={item.count ? counts[item.count] : null} />
+                      </span>
+                    </>
+                  )
 
-                if (item.soon) {
+                  if (item.soon) {
+                    return (
+                      <span
+                        key={item.to}
+                        title={`${item.label} — arriving in ${item.soon}`}
+                        aria-disabled="true"
+                        className={`${shared} text-chrome-faint cursor-not-allowed`}
+                      >
+                        {inner}
+                      </span>
+                    )
+                  }
+
                   return (
-                    <span
+                    <NavLink
                       key={item.to}
-                      title={`${item.label} — arriving in ${item.soon}`}
-                      aria-disabled="true"
-                      className={`${shared} text-chrome-faint cursor-not-allowed`}
+                      to={item.to}
+                      end={item.end}
+                      title={item.label}
+                      className={({ isActive }) =>
+                        [
+                          shared,
+                          isActive
+                            ? 'bg-chrome-3 text-white'
+                            : 'text-chrome-muted hover:text-chrome-ink hover:bg-chrome-2',
+                        ].join(' ')
+                      }
                     >
                       {inner}
-                    </span>
+                    </NavLink>
                   )
-                }
-
-                return (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    end={item.end}
-                    title={item.label}
-                    className={({ isActive }) =>
-                      [
-                        shared,
-                        isActive
-                          ? 'bg-chrome-3 text-white'
-                          : 'text-chrome-muted hover:text-chrome-ink hover:bg-chrome-2',
-                      ].join(' ')
-                    }
-                  >
-                    {inner}
-                  </NavLink>
-                )
-              })}
-            </nav>
-          </div>
-        ))}
+                })}
+              </nav>
+            </div>
+          ))}
+        </div>
 
         <div className="mt-auto border-t border-chrome-3 pt-3">
           {me.data ? (
