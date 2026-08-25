@@ -41,6 +41,16 @@ debt are all in Resolved. What is left is what M6 stopped short of, and why.
 
 ---
 
+## M6.96 — UI corrections (v3.1 addendum)
+
+| Item | Notes |
+|---|---|
+| **Header search wired on 4 screens, not every table** | `/customer/parcels`, `/admin/board`, `/admin/agents`, `/admin/customers` claim the header box via `useSearchable`. The rider's own `/agent/runs` run queue, `/agent/finished`, and admin's `/admin/cod` reconciliation table do not yet — the box shows its honest "nothing to search here" disabled state on those screens rather than a fake claim. Same one-line change as the four already done (`useSearchable('placeholder…')` plus a filter predicate in the existing `useMemo`) whenever those screens matter enough to justify the pass. |
+| Notification subtitle omits the rider's name | The addendum's own mock shows one example as "Rakib Hasan · Dhanmondi" (agent + area); routes/notifications.ts reads only `parcel.drop.area`, skipping an Agent→User join to keep the route's first cut lean. Add `riderNames`-style lookup (see payments.ts's private helper of the same shape) if the extra context earns its cost. |
+| Landing page now loads MapLibre for every visitor | Deliberate, not overlooked. The showcase card asked for the REAL map component, and `/track/:trackingId` already does the same unauthenticated-visitor-loads-MapLibre thing with no controversy — this extends that accepted pattern to the highest-traffic public page instead of introducing a new one. `LazyTrackingMap`'s Suspense boundary keeps the rest of the hero (nav, headline, stat band) rendering immediately regardless. Revisit only if real traffic makes the extra ~250 kB gz felt. |
+
+---
+
 ## Post-M6.5 — open backlog, no milestone attached
 
 M6.5a, b and c between them did every screen v3's route table names. These
@@ -82,6 +92,9 @@ building for its own sake.
 
 | Item | Decision |
 |---|---|
+| The landing hero drops its separate "Send a parcel" CTA button | Deliberate, M6.96. The v3.1 addendum's own corrected mock has no such button in the hero body — the nav's primary button already carries it, and the track-by-ID row takes the slot under the subcopy instead. Repeating the button twice on one screen was the kind of redundancy the addendum's own header-avatar note calls out elsewhere ("two doors to one room"). |
+| The landing showcase's "completed vs remaining" split is computed by projection, not by drawing the raw GPS trail | Deliberate, M6.96 — see TrackingMap's own `splitRouteByProgress` comment for the full reasoning. The addendum's mock draws ONE road-snapped path that turns from solid to dashed at the rider's position, not a second, independently-sourced line laid over the planned route; a raw GPS trail (jittery, sparse, sometimes off-road) would not visually read as "the same route, cut at the rider" the way the mock shows. `useLiveTracking`'s `history`/`trail` accumulation stays — section 6 mandates the cap regardless of how it's rendered — but nothing feeds it into the map's line any more. |
+| Header search's placeholder claim runs in a real hook, not a prop AppShell forwards | Deliberate, M6.96. Two admin pages (`AdminAgentsPage`, `AdminCustomersPage`) called `<AppShell>` directly from the same component that fetched their data, with the tables inline — meaning `useSearchable`, if called at that same level, would run BEFORE AppShell's context provider exists in the tree and silently see nothing. Both were split into a thin outer component plus an inner one actually rendered as AppShell's `children`, which is also where `ParcelList` and `DeliveryBoard` already lived. Get this wrong and the failure is silent (the box just never claims a placeholder) rather than a crash — worth documenting precisely because it's easy to reintroduce on a future screen. |
 | `--space-8` (32px), `--space-10` (40px) unused | Harmless headroom. Unused tokens in a scale aren't drift. |
 | Zone base sourced from **pickup**, not drop | Deliberate. "Getting a rider to the parcel" is the right model, and it matches how assignment keys off pickup location. |
 | Cancelled reuses Booked's grey, not Failed's red | Deliberate. A cancelled parcel is inert, not failed; red would misreport it. |
@@ -128,6 +141,15 @@ building for its own sake.
 
 | Item | Milestone | Commit |
 |---|---|---|
+| **Map route rendering — the actual bug** — a WebGL-less browser threw synchronously out of `new maplibregl.Map(...)`, before there was a map to attach the existing `on('error')` handler to; React 18 unmounts the whole tree on an uncaught render-phase error, so the failure was a blank page everywhere a map sat, not the friendly "could not load" message the component's own comment says it should show. Fixed with a try/catch around construction. Found by screenshotting this session's own work in a WebGL-less headless browser — the same failure mode a real visitor with WebGL disabled would hit. | M6.96 | — |
+| **Map route/marker rendering — the addendum's items** — completed route now a solid 4px line (`splitRouteByProgress` projects the rider's position onto the planned route and cuts there), remaining route dashed at 45% opacity, drop-off an solid ink teardrop pin instead of a hollow ring, rider disc confirmed already z-ordered above both endpoints | M6.96 | — |
+| **Footer**, public pages only — `PublicFooter`, full link set on `/login`/`/signup`/`/track/:id`, wordmark-only on `/` (its own nav already carries those links) | M6.96 | — |
+| **Landing hero** — two-column grid, a live showcase card built from real `TrackingMap`/`Badge`/`LifecycleRail`, bordered stat band, ink-filled feature chips (accent on the first only), track-by-ID inline under the subcopy | M6.96 | — |
+| **Login/signup split screen** — one `AuthSplit` shell, chrome-dark proposition panel + white form panel, collapses to a wordmark-only band below 860px | M6.96 | — |
+| **Header search** — real client-side filtering via `useSearchable`/`HeaderSearchContext`, ⌘K/Ctrl+K focus, honest disabled state where nothing is claimed; wired on 4 screens (see backlog above for the rest) | M6.96 | — |
+| **Header notifications** — `GET /notifications`, role-scoped through the ordinary `DeliveryModel.find()` + roleScope middleware (no `runAsSystem`), overdue alerts admin-only, unread dot from a client-side last-seen timestamp | M6.96 | — |
+| **Header avatar removed** — the rail's own account menu was always the one place identity lived; the header's copy was dead weight | M6.96 | — |
+| **`LifecycleRail` compact variant** — one continuous filled track for every table row, `full` unchanged for detail views/cards | M6.96 | — |
 | **Payment / booking success redirect** — both paths land on `/customer/parcels?payment=success&parcel=:id`, banner reads the parcel's real state, URL cleaned on mount | M6.9 | — |
 | **Customer account suspension** — `User.status`, `/admin/customers`, append-only `accountHistory`, checked in `requireAuth` on every request and on the socket handshake | M6.9 | — |
 | **COD amount integrity gap** — a customer could declare what a rider must collect; `codAmount` is now set from the price snapshot and absent from the input schema | M6.9 | — |
