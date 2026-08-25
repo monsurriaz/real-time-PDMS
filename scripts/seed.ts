@@ -171,7 +171,7 @@ const upsertUser = async (u: SeedUser): Promise<UserDoc> => {
           phone: u.phone,
           role: u.role,
           zone: u.zone,
-          isActive: true,
+          status: 'active',
           /**
            * Reset, so a rehearsal always gets the one-time welcome back. Every
            * other field here is restored to its seeded value on re-seed; a
@@ -193,7 +193,7 @@ const upsertUser = async (u: SeedUser): Promise<UserDoc> => {
     phone: u.phone,
     role: u.role,
     zone: u.zone,
-    isActive: true,
+    status: 'active',
     welcomeSeenAt: null,
     passwordHash: await hashPassword(DEMO_PASSWORD),
   })

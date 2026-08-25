@@ -7,12 +7,20 @@ import { LookupError, statusForLookup } from '../lib/lookupError'
 export class HttpError extends Error {
   readonly status: number
   readonly details?: unknown
+  /**
+   * A machine-readable tag for the cases where the UI must do something
+   * specific rather than just print the message — the same job `reason` does
+   * on a LookupError below. Optional, because most errors are only ever read
+   * by a person.
+   */
+  readonly reason?: string
 
-  constructor(status: number, message: string, details?: unknown) {
+  constructor(status: number, message: string, details?: unknown, reason?: string) {
     super(message)
     this.name = 'HttpError'
     this.status = status
     this.details = details
+    this.reason = reason
   }
 }
 
@@ -75,6 +83,7 @@ export const errorHandler = (
     res.status(err.status).json({
       error: err.message,
       ...(err.details === undefined ? {} : { details: err.details }),
+      ...(err.reason === undefined ? {} : { reason: err.reason }),
     })
     return
   }

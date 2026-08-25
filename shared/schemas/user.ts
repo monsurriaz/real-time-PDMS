@@ -4,6 +4,36 @@ import { objectId, phone, role as roleSchema, timestamps, zoneName } from './com
 import { addressInputSchema } from './parcel'
 
 /**
+ * Whether this account may be used at all.
+ *
+ * Replaces the old boolean `isActive`, which said the same thing less
+ * precisely and, more to the point, was only ever consulted at login — so a
+ * disabled account kept working for as long as its cookie lasted. Two names
+ * for one fact would have been worse than one: the check now lives in
+ * requireAuth, and it reads this.
+ *
+ * `suspended` is reversible on purpose, unlike an agent's `rejected`. An
+ * admin suspends an account to stop it doing something now, not to close it
+ * forever, so /admin/customers offers Reactivate on the same row.
+ */
+export const userStatusSchema = z.enum(['active', 'suspended'])
+export type UserStatus = z.infer<typeof userStatusSchema>
+
+/**
+ * One suspend/reactivate decision, appended to the account's history.
+ *
+ * The same append-only shape as an agent's `approvalHistory` and a delivery's
+ * `events[]`, for the same reason: the current status says what is true now,
+ * and only a trail says who made it true and when.
+ */
+export const accountEventSchema = z.object({
+  status: userStatusSchema,
+  at: z.coerce.date(),
+  by: objectId,
+})
+export type AccountEvent = z.infer<typeof accountEventSchema>
+
+/**
  * A User is anyone who can log in. Agents get an extra Agent document keyed
  * back to their User; admins and customers do not.
  *
@@ -18,7 +48,8 @@ export const userSchema = z.object({
   role: roleSchema,
   /** Customers get a home zone so booking can default the pickup area. */
   zone: zoneName.optional(),
-  isActive: z.boolean().default(true),
+  status: userStatusSchema.default('active'),
+  accountHistory: z.array(accountEventSchema).default([]),
   /**
    * When this account dismissed its one-time welcome. Null means it has not
    * seen one yet.
@@ -158,3 +189,33 @@ export const savedAddressSchema = savedAddressInputSchema.extend({
   _id: objectId,
 })
 export type SavedAddress = z.infer<typeof savedAddressSchema>
+
+/**
+ * One row of /admin/customers.
+ *
+ * Deliberately narrower than the agent roster's row: that one carries a phone
+ * number because an admin approving an application may need to call the
+ * applicant, and nothing on this screen needs a customer's phone to decide
+ * whether to suspend them. Section 7 says the fewest fields that answer the
+ * question.
+ */
+export const customerRowSchema = z.object({
+  _id: objectId,
+  name: z.string(),
+  email: z.string().email(),
+  status: userStatusSchema,
+  /** Everything they have ever sent, not just what is moving. */
+  parcelCount: z.number().int().nonnegative(),
+  joinedAt: z.coerce.date(),
+  /** The most recent suspend/reactivate, if the account has ever had one. */
+  lastDecision: accountEventSchema.nullable(),
+})
+export type CustomerRow = z.infer<typeof customerRowSchema>
+
+/**
+ * The `reason` a suspended caller's 403 carries, so the client can tell "your
+ * account is suspended" apart from "you are not allowed to do that" without
+ * matching on prose. Same idea as a geocoding failure's `reason` — see
+ * middleware/httpError.ts.
+ */
+export const ACCOUNT_SUSPENDED = 'account_suspended' as const

@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react'
-import { Navigate, useLocation } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import type { Role } from '@pdms/shared'
+import { Button } from '@/components/Button'
+import { ApiError } from '@/lib/api'
 import { useAgentSelf } from '../agent/useAgentSelf'
 import { homeForRole } from './roles'
-import { useMe } from './useAuth'
+import { useLogout, useMe } from './useAuth'
 
 interface Props {
   roles: readonly Role[]
@@ -11,6 +13,44 @@ interface Props {
 }
 
 const AGENT_PENDING_PATH = '/agent/pending'
+
+/**
+ * What a suspended account sees instead of being bounced to /login.
+ *
+ * The bounce was the old behaviour by accident: /auth/me failed, `me.data` was
+ * undefined, and the gate could not tell "not signed in" from "signed in and
+ * refused". Sending them to a login form they can pass and then be refused
+ * behind again reads as a broken app. This says what happened once, and offers
+ * the only action that makes sense.
+ */
+const Suspended = ({ message }: { message: string }) => {
+  const logout = useLogout()
+  const navigate = useNavigate()
+
+  return (
+    <div className="min-h-dvh grid place-items-center p-6 bg-page">
+      <div className="max-w-md bg-surface border border-border rounded-lg p-6">
+        <h1 className="text-title font-semibold tracking-[-0.03em]">
+          Account suspended
+        </h1>
+        <p role="alert" className="text-body text-ink-2 mt-2">
+          {message}
+        </p>
+        <Button
+          className="mt-5"
+          disabled={logout.isPending}
+          onClick={() =>
+            logout.mutate(undefined, {
+              onSuccess: () => navigate('/login', { replace: true }),
+            })
+          }
+        >
+          {logout.isPending ? 'Signing out…' : 'Sign out'}
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 /**
  * Route gate. This is a convenience for the person using the app, NOT a
@@ -41,6 +81,17 @@ export const RequireRole = ({ roles, children }: Props) => {
         <p className="text-muted text-body">Loading…</p>
       </div>
     )
+  }
+
+  /**
+   * Suspended is its own answer, ahead of the login redirect: the account is
+   * perfectly well identified, so "we do not know who you are" would be the
+   * wrong thing to tell them. Every other authenticated request behind this
+   * gate is refused the same way by requireAuth — this is only the screen that
+   * explains it.
+   */
+  if (me.error instanceof ApiError && me.error.isSuspended) {
+    return <Suspended message={me.error.message} />
   }
 
   if (!me.data) return <Navigate to="/login" replace />

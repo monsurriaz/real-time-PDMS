@@ -74,6 +74,14 @@ const ICON = {
     </>
   ),
   check: <path d="M20 6 9 17l-5-5" />,
+  people: (
+    <>
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M3 20a6 6 0 0 1 12 0" />
+      <path d="M16.5 5.3a3.2 3.2 0 0 1 0 5.4" />
+      <path d="M18 14.6A6 6 0 0 1 21 20" />
+    </>
+  ),
 } as const
 
 type IconName = keyof typeof ICON
@@ -151,6 +159,13 @@ const NAV: Record<Role, readonly NavGroup[]> = {
       title: 'Manage',
       items: [
         { to: '/admin/agents', label: 'Riders', icon: 'riders', count: 'pendingRiders' },
+        /*
+          No count. v3's rule is that a count means "needs attention", and a
+          suspended account needs nothing — an admin suspended it on purpose
+          and it stays that way until they say otherwise. The screen's own
+          header carries the number for whoever opens it.
+        */
+        { to: '/admin/customers', label: 'Customers', icon: 'people' },
         { to: '/admin/pricing', label: 'Pricing', icon: 'taka' },
       ],
     },

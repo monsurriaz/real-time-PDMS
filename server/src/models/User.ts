@@ -1,5 +1,11 @@
 import mongoose, { Schema } from 'mongoose'
-import { role as roleSchema, zoneName, type SavedAddress, type User } from '@pdms/shared'
+import {
+  role as roleSchema,
+  userStatusSchema,
+  zoneName,
+  type SavedAddress,
+  type User,
+} from '@pdms/shared'
 import type { Doc } from './types'
 import { ALLOW_ALL, roleScopePlugin } from './plugins/roleScope'
 
@@ -33,6 +39,19 @@ const savedAddress = new Schema(
   { timestamps: false },
 )
 
+/**
+ * One suspend/reactivate decision. Append-only, never edited in place — the
+ * same shape and the same reasoning as Agent's `approvalHistory`.
+ */
+const accountEvent = new Schema(
+  {
+    status: { type: String, required: true, enum: userStatusSchema.options },
+    at: { type: Date, required: true },
+    by: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  },
+  { _id: false },
+)
+
 const userSchema = new Schema<UserDoc>(
   {
     name: { type: String, required: true, trim: true, minlength: 2, maxlength: 80 },
@@ -51,7 +70,18 @@ const userSchema = new Schema<UserDoc>(
      */
     role: { type: String, required: true, enum: roleSchema.options },
     zone: { type: String, enum: zoneName.options, required: false },
-    isActive: { type: Boolean, required: true, default: true },
+    /**
+     * Indexed because requireAuth reads it on EVERY authenticated request —
+     * see the middleware's own note on why a login-time check was not enough.
+     */
+    status: {
+      type: String,
+      required: true,
+      enum: userStatusSchema.options,
+      default: 'active',
+      index: true,
+    },
+    accountHistory: { type: [accountEvent], required: true, default: [] },
     /**
      * Null until the account dismisses its one-time welcome. See the shared
      * schema's note for why this is not "firstLoginAt".

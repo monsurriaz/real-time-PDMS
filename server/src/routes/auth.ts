@@ -15,7 +15,7 @@ import { UserModel, type UserDoc } from '../models'
 import { runAsSystem } from '../lib/context'
 import { hashPassword, verifyPassword, wasteTimeLikeAVerify } from '../lib/password'
 import { AUTH_COOKIE, cookieOptions, signToken } from '../lib/token'
-import { requireAuth, requireRole } from '../middleware/auth'
+import { requireAuth, requireRole, suspended } from '../middleware/auth'
 import { conflict, HttpError, unauthorized } from '../middleware/httpError'
 
 export const authRouter = Router()
@@ -76,7 +76,7 @@ authRouter.post('/register', async (req, res, next) => {
         phone: input.phone,
         role: input.role,
         ...(input.role === 'customer' && input.zone ? { zone: input.zone } : {}),
-        isActive: true,
+        status: 'active',
         passwordHash,
       })
 
@@ -136,7 +136,17 @@ authRouter.post('/login', async (req, res, next) => {
 
     const ok = await verifyPassword(input.password, user.passwordHash)
     if (!ok) throw unauthorized('invalid email or password')
-    if (!user.isActive) throw unauthorized('this account is disabled')
+    /**
+     * Checked AFTER the password, so a wrong password on a suspended account
+     * still answers "invalid email or password" — otherwise this endpoint
+     * would confirm which addresses have accounts to anyone who guesses.
+     *
+     * Still checked here at all, even though requireAuth now checks it on
+     * every request: without this, a suspended customer would be handed a
+     * fresh cookie and a 200 and then be refused by everything behind it,
+     * which reads as a broken app rather than as a suspension.
+     */
+    if (user.status === 'suspended') throw suspended()
 
     res
       .cookie(AUTH_COOKIE, signToken(user._id.toString(), user.role), cookieOptions())
@@ -163,8 +173,10 @@ authRouter.get('/me', requireAuth, async (req, res, next) => {
     if (!actor) throw unauthorized()
 
     // Scoped read: the customer/agent rules resolve to "only yourself".
+    // Suspension is not re-checked here — requireAuth already did, for this
+    // route and every other one behind a cookie.
     const user = await UserModel.findById(actor.id)
-    if (!user || !user.isActive) throw unauthorized('session no longer valid')
+    if (!user) throw unauthorized('session no longer valid')
 
     res.json({ user: toSelfUser(user) })
   } catch (err) {

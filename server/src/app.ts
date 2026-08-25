@@ -8,6 +8,7 @@ import { errorHandler, notFoundHandler } from './middleware/httpError'
 import { agentsRouter } from './routes/agents'
 import { analyticsRouter } from './routes/analytics'
 import { authRouter } from './routes/auth'
+import { customersRouter } from './routes/customers'
 import { deliveriesRouter } from './routes/deliveries'
 import { parcelsRouter } from './routes/parcels'
 import {
@@ -68,6 +69,7 @@ export const createApp = (): Express => {
   app.use('/parcels', parcelsRouter)
   app.use('/deliveries', deliveriesRouter)
   app.use('/agents', agentsRouter)
+  app.use('/customers', customersRouter)
   app.use('/payments', paymentsRouter)
   app.use('/analytics', analyticsRouter)
   app.use('/tracking', trackingRouter)

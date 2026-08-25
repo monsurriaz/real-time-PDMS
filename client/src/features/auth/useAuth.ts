@@ -29,11 +29,12 @@ export const useMe = () =>
     queryFn: () => api.get<AuthResponse>('/auth/me'),
     select: (d) => d.user,
     /**
-     * A 401 is the expected answer for a visitor, not a failure worth
-     * retrying — retrying it just delays the login screen.
+     * No client error is worth retrying here. A 401 is the expected answer for
+     * a visitor, and a 403 means the account is suspended — retrying either
+     * only delays the screen that explains it, three times over.
      */
     retry: (_count, error) =>
-      !(error instanceof ApiError && error.isUnauthorized),
+      !(error instanceof ApiError && error.status >= 400 && error.status < 500),
     staleTime: 60_000,
   })
 

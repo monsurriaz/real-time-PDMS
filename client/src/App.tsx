@@ -2,6 +2,7 @@ import { Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { AdminAgentsPage } from '@/features/admin/AdminAgentsPage'
 import { AdminAnalyticsPage } from '@/features/admin/AdminAnalyticsPage'
 import { AdminCodPage } from '@/features/admin/AdminCodPage'
+import { AdminCustomersPage } from '@/features/admin/AdminCustomersPage'
 import { AdminHome } from '@/features/admin/AdminHome'
 import { AdminPricingPage } from '@/features/admin/AdminPricingPage'
 import { AdminProfilePage } from '@/features/admin/AdminProfilePage'
@@ -174,6 +175,14 @@ export const App = () => (
       element={
         <RequireRole roles={['admin']}>
           <AdminAgentsPage />
+        </RequireRole>
+      }
+    />
+    <Route
+      path="/admin/customers"
+      element={
+        <RequireRole roles={['admin']}>
+          <AdminCustomersPage />
         </RequireRole>
       }
     />

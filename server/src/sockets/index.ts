@@ -120,7 +120,22 @@ export const createSocketServer = (httpServer: HttpServer): Server => {
     transports: ['websocket', 'polling'],
   })
 
-  // ---- handshake authentication (section 7) ----
+  /**
+   * ---- handshake authentication (section 7) ----
+   *
+   * The account's status is checked here as well as in requireAuth, for the
+   * same reason it is checked there rather than at login: a suspended
+   * customer's cookie is still cryptographically valid, and a socket outlives
+   * the request that opened it. Without this, suspending someone would close
+   * nothing — they would keep receiving a rider's position for as long as the
+   * tab stayed open.
+   *
+   * The check is on connect only, not per event. A live socket held by an
+   * account suspended mid-stream survives until it reconnects, which is a gap
+   * worth naming: closing it would mean either watching the collection or
+   * re-reading the user on every GPS tick, and section 6's whole point is that
+   * ticks do not touch Mongo.
+   */
   io.use((socket, next) => {
     const token = tokenFromHandshake(socket)
     const claims = token ? verifyToken(token) : null
@@ -128,8 +143,23 @@ export const createSocketServer = (httpServer: HttpServer): Server => {
       next(new Error('unauthorised'))
       return
     }
-    actors.set(socket, { actor: { id: claims.sub, role: claims.role } })
-    next()
+    void (async () => {
+      const active = await runAsSystem('socket: account status', async () => {
+        const user = await mongoose
+          .model('User')
+          .findById(claims.sub)
+          .select('status')
+          .lean<{ status: string } | null>()
+          .exec()
+        return user?.status === 'active'
+      })
+      if (!active) {
+        next(new Error('unauthorised'))
+        return
+      }
+      actors.set(socket, { actor: { id: claims.sub, role: claims.role } })
+      next()
+    })()
   })
 
   io.on('connection', (socket) => {

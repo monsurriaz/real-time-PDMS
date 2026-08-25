@@ -1,3 +1,5 @@
+import { ACCOUNT_SUSPENDED } from '@pdms/shared'
+
 /**
  * The one place that talks to the server.
  *
@@ -50,6 +52,22 @@ export class ApiError extends Error {
   /** True when the server says we are not logged in. */
   get isUnauthorized(): boolean {
     return this.status === 401
+  }
+
+  /**
+   * True when the server refused because the ACCOUNT is suspended, rather
+   * than because of anything about this particular request.
+   *
+   * Read from the body's machine-readable `reason` rather than by matching the
+   * message, and distinguished from a plain 403 because the two need opposite
+   * responses: a role failure means "you are on the wrong screen", and this
+   * means "nothing you do will work until an admin reinstates you".
+   */
+  get isSuspended(): boolean {
+    return (
+      this.status === 403 &&
+      (this.body as { reason?: string } | undefined)?.reason === ACCOUNT_SUSPENDED
+    )
   }
 }
 
