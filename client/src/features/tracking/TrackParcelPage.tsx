@@ -106,7 +106,7 @@ const ProofPanel = ({ proof }: { proof: ProofOfDelivery }) => (
 
 export const TrackParcelPage = () => {
   const { parcelId } = useParams<{ parcelId: string }>()
-  const { snapshot, mode, point, history, lastTickAt } = useLiveTracking(parcelId)
+  const { snapshot, mode, point, lastTickAt } = useLiveTracking(parcelId)
 
   if (snapshot.isPending) {
     return (
@@ -181,7 +181,6 @@ export const TrackParcelPage = () => {
               route={route}
               pickup={parcel.pickup.point}
               drop={parcel.drop.point}
-              trail={history}
               follow={moving}
               animate
             />

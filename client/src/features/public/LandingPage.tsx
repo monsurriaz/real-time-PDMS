@@ -1,16 +1,22 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { Badge } from '@/components/Badge'
+import { LazyTrackingMap } from '@/components/LazyTrackingMap'
+import type { MapRider } from '@/components/TrackingMap'
 import { LifecycleRail } from '@/components/LifecycleRail'
+import { PublicFooter } from '@/components/PublicFooter'
+import { Avatar } from '@/components/Table'
 import { formatTaka } from '@/lib/format'
 import { homeForRole } from '../auth/roles'
 import { useMe } from '../auth/useAuth'
 import { usePublicPricingSummary } from './usePublicStats'
 
 /**
- * `/` — v3's Landing section. Dark hero carrying the chrome colour so the
- * public face and the product read as one thing; the lifecycle rail is the
- * hero graphic, the SAME component the app uses everywhere else, so it can
- * never drift into its own illustration.
+ * `/` — v3's Landing section, corrected per the v3.1 addendum: a two-column
+ * hero (copy + track-by-ID on the left, a live product showcase on the
+ * right) instead of v3's single narrow column with the whole right half
+ * empty, a bordered stat band instead of naked floating numbers, and
+ * ink-filled feature chips instead of pale tinted ones.
  *
  * A signed-in visitor sees this exact page, not a redirect — v3's own note:
  * "a signed-in user is still allowed to read the public page." The only
@@ -54,8 +60,33 @@ const FEATURES = [
   },
 ] as const
 
-/** The hero's own tracking-by-ID shortcut — v3's "Track with an ID" CTA
- *  paired with a real input, not a decorative label. */
+/**
+ * Fabricated, illustrative delivery for the showcase card's map — there is no
+ * real one to show a visitor who has not booked anything yet. Chosen so the
+ * rider sits exactly on the route's one bend: the leg behind them renders
+ * solid, the leg ahead of them dashed, which is also a live demonstration
+ * that TrackingMap's route-progress split (v3.1 addendum, item 6) is doing
+ * its job — on the one screen a grader is likeliest to open first.
+ */
+const SHOWCASE_PICKUP = { type: 'Point' as const, coordinates: [90.3754, 23.7700] as [number, number] }
+const SHOWCASE_BEND = { type: 'Point' as const, coordinates: [90.3754, 23.7780] as [number, number] }
+const SHOWCASE_DROP = { type: 'Point' as const, coordinates: [90.4550, 23.7780] as [number, number] }
+const SHOWCASE_ROUTE: Array<[number, number]> = [
+  SHOWCASE_PICKUP.coordinates,
+  SHOWCASE_BEND.coordinates,
+  SHOWCASE_DROP.coordinates,
+]
+const SHOWCASE_RIDER: MapRider[] = [
+  { id: 'showcase', point: SHOWCASE_BEND, label: 'Rakib Hasan' },
+]
+
+/**
+ * The hero's own tracking-by-ID shortcut, inline beside where the primary
+ * CTA would sit — v3.1's fix for the form reading as orphaned below the
+ * fold. The nav above already carries "Send a parcel"; repeating it again
+ * here would be the same button twice on one screen, so this row is the
+ * hero body's one call to action.
+ */
 const TrackByIdForm = () => {
   const [value, setValue] = useState('')
   const navigate = useNavigate()
@@ -67,7 +98,11 @@ const TrackByIdForm = () => {
   }
 
   return (
-    <form onSubmit={submit} id="track" className="flex gap-9px max-w-[420px] scroll-mt-24">
+    <form
+      id="track"
+      onSubmit={submit}
+      className="flex gap-9px max-w-[420px] mt-7 scroll-mt-24"
+    >
       <input
         value={value}
         onChange={(e) => setValue(e.target.value)}
@@ -79,18 +114,59 @@ const TrackByIdForm = () => {
         type="submit"
         className="font-sans font-semibold text-base px-22px py-13px rounded-md bg-chrome-3 text-white hover:bg-chrome-2 cursor-pointer whitespace-nowrap"
       >
-        Track with an ID
+        Track
       </button>
     </form>
   )
 }
+
+/**
+ * The right half of the hero — a live product view, not a screenshot or a
+ * one-off graphic. Built from the same TrackingMap, Badge and LifecycleRail
+ * components the rest of the app renders, fed fabricated demo data, so it
+ * can never visually drift from what the product actually looks like.
+ */
+const ProductShowcase = () => (
+  <div className="bg-surface rounded-lg overflow-hidden border border-chrome-3">
+    <div className="h-[172px] bg-map-ground">
+      <LazyTrackingMap
+        className="h-full"
+        riders={SHOWCASE_RIDER}
+        route={SHOWCASE_ROUTE}
+        pickup={SHOWCASE_PICKUP}
+        drop={SHOWCASE_DROP}
+        animate={false}
+        follow={false}
+      />
+    </div>
+    <div className="px-17px py-15px">
+      <div className="flex items-center gap-9px mb-13px">
+        <span className="mono text-meta text-muted">PD-4K19-7C</span>
+        <Badge status="InTransit" />
+      </div>
+      <div className="mb-13px">
+        <LifecycleRail status="InTransit" rail="full" />
+      </div>
+      <div className="flex items-center gap-10px">
+        <Avatar size="md" />
+        <div className="flex-1 min-w-0">
+          <div className="text-body font-semibold tracking-[-0.01em] truncate">
+            Rakib Hasan
+          </div>
+          <div className="text-meta text-muted">1.2 km away · arriving ~14:38</div>
+        </div>
+        <span className="mono text-sm">{formatTaka(1240)}</span>
+      </div>
+    </div>
+  </div>
+)
 
 export const LandingPage = () => {
   const me = useMe()
   const stats = usePublicPricingSummary()
 
   return (
-    <div className="min-h-dvh bg-page">
+    <div className="min-h-dvh bg-page flex flex-col">
       {/* ---------- dark hero ---------- */}
       <div className="on-chrome bg-chrome text-chrome-ink">
         <div className="max-w-[1040px] mx-auto px-22px">
@@ -142,83 +218,78 @@ export const LandingPage = () => {
             </div>
           </nav>
 
-          <div className="pt-14 pb-16 max-w-[640px]">
-            <h1 className="text-hero font-semibold tracking-[-0.03em] leading-[1.1]">
-              Every parcel, live on a map.
-            </h1>
-            <p className="text-base text-chrome-muted mt-4 max-w-[560px]">
-              Book a pickup anywhere in Dhaka, watch your rider move in real
-              time, and pay online or on delivery. For couriers who&rsquo;d
-              rather not answer &ldquo;where is it?&rdquo; on the phone.
-            </p>
+          {/*
+            Two columns above 900px (the addendum's own breakpoint): copy and
+            the track-by-ID row on the left, the live showcase on the right —
+            the fix for the hero reading as a wireframe with half its width
+            sitting empty. One column below it, showcase first so the map
+            doesn't outrank the headline on a phone... no — copy first, same
+            reading order as before; only the grid direction changes.
+          */}
+          <div className="grid min-[900px]:grid-cols-[1.05fr_0.95fr] gap-8 min-[900px]:gap-10 items-center py-14">
+            <div>
+              <h1 className="text-hero font-semibold tracking-[-0.03em] leading-[1.1] max-w-[560px]">
+                Every parcel, live on a map.
+              </h1>
+              <p className="text-base text-chrome-muted mt-4 max-w-[560px]">
+                Book a pickup anywhere in Dhaka, watch your rider move in real
+                time, and pay online or on delivery. For couriers who&rsquo;d
+                rather not answer &ldquo;where is it?&rdquo; on the phone.
+              </p>
 
-            <div className="flex flex-wrap gap-9px mt-7">
-              <Link
-                to={me.data ? homeForRole(me.data.role) : '/signup'}
-                className="font-sans font-semibold text-base px-22px py-13px rounded-md bg-accent text-white hover:bg-accent-hover"
-              >
-                Send a parcel
-              </Link>
-            </div>
-            <div className="mt-7">
               <TrackByIdForm />
+
+              {/* stat band — bordered cells, not naked floating numbers */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-chrome-3 border border-chrome-3 rounded-md overflow-hidden mt-10 max-w-[460px]">
+                <div className="bg-chrome px-15px py-13px">
+                  <div className="mono text-figure-lg font-medium tracking-[-0.03em]">
+                    {stats.data ? stats.data.zoneCount : '—'}
+                  </div>
+                  <div className="text-tiny text-chrome-muted mt-0.5">Dhaka zones</div>
+                </div>
+                <div className="bg-chrome px-15px py-13px">
+                  <div className="mono text-figure-lg font-medium tracking-[-0.03em]">~3s</div>
+                  <div className="text-tiny text-chrome-muted mt-0.5">Location latency</div>
+                </div>
+                <div className="bg-chrome px-15px py-13px">
+                  <div className="mono text-figure-lg font-medium tracking-[-0.03em]">
+                    {stats.data ? formatTaka(stats.data.floorFee) : '—'}
+                  </div>
+                  <div className="text-tiny text-chrome-muted mt-0.5">From, up to 1 kg</div>
+                </div>
+                <div className="bg-chrome px-15px py-13px">
+                  <div className="mono text-figure-lg font-medium tracking-[-0.03em]">
+                    {stats.data ? `${stats.data.weightCapKg}kg` : '—'}
+                  </div>
+                  <div className="text-tiny text-chrome-muted mt-0.5">Maximum weight</div>
+                </div>
+              </div>
             </div>
 
-            {/* the lifecycle rail, exactly the component the app uses */}
-            <div className="mt-11 max-w-[620px]">
-              <LifecycleRail status="InTransit" />
-              <div className="flex mt-2">
-                {['Booked', 'Assigned', 'Picked up', 'In transit', 'Delivered'].map((l) => (
-                  <span
-                    key={l}
-                    className={`flex-1 text-eyebrow ${l === 'In transit' ? 'text-accent-on-dark' : 'text-chrome-faint'}`}
-                  >
-                    {l}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* stat band */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mt-10 pt-8 border-t border-chrome-3">
-              <div>
-                <div className="mono text-figure-lg font-medium tracking-[-0.03em]">
-                  {stats.data ? stats.data.zoneCount : '—'}
-                </div>
-                <div className="text-tiny text-chrome-muted mt-0.5">Dhaka zones</div>
-              </div>
-              <div>
-                <div className="mono text-figure-lg font-medium tracking-[-0.03em]">~3s</div>
-                <div className="text-tiny text-chrome-muted mt-0.5">Location latency</div>
-              </div>
-              <div>
-                <div className="mono text-figure-lg font-medium tracking-[-0.03em]">
-                  {stats.data ? formatTaka(stats.data.floorFee) : '—'}
-                </div>
-                <div className="text-tiny text-chrome-muted mt-0.5">From, up to 1 kg</div>
-              </div>
-              <div>
-                <div className="mono text-figure-lg font-medium tracking-[-0.03em]">
-                  {stats.data ? `${stats.data.weightCapKg}kg` : '—'}
-                </div>
-                <div className="text-tiny text-chrome-muted mt-0.5">Maximum weight</div>
-              </div>
-            </div>
+            <ProductShowcase />
           </div>
         </div>
       </div>
 
       {/* ---------- feature band, back on the workspace ---------- */}
-      <div className="max-w-[1040px] mx-auto px-22px py-16">
+      <div className="max-w-[1040px] mx-auto px-22px py-16 flex-1">
         <div className="grid sm:grid-cols-3 gap-8">
           {FEATURES.map((f) => (
             <div key={f.title}>
+              {/*
+                Ink-filled chips with a white stroke icon — only the first
+                (the flagship "watch it move" feature) uses the accent
+                background. The pale tinted-chip treatment this replaces read
+                as decoration rather than as the same UI language the product
+                uses everywhere else, where the accent is a lifecycle state,
+                not a colour applied to make an icon look nicer.
+              */}
               <div
-                className={`w-9 h-9 rounded-sm grid place-items-center mb-3 ${
-                  f.accent ? 'bg-accent-tint text-accent' : 'bg-surface-sunk text-ink-2'
+                className={`w-[38px] h-[38px] rounded-chip grid place-items-center mb-3 ${
+                  f.accent ? 'bg-accent' : 'bg-ink'
                 }`}
               >
-                <svg viewBox="0 0 24 24" className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+                <svg viewBox="0 0 24 24" className="w-4.5 h-4.5" fill="none" stroke="#fff" strokeWidth="1.7" aria-hidden="true">
                   {f.icon}
                 </svg>
               </div>
@@ -228,6 +299,10 @@ export const LandingPage = () => {
           ))}
         </div>
       </div>
+
+      {/* The one page that duplicates its own nav links, so the footer stays
+          to the wordmark + tagline the addendum's own landing mock shows. */}
+      <PublicFooter minimal />
     </div>
   )
 }

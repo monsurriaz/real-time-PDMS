@@ -22,6 +22,7 @@ import {
   Who,
   paginate,
 } from '@/components/Table'
+import { useSearchable } from '@/features/shell/useHeaderSearch'
 import { ApiError } from '@/lib/api'
 import { formatKm, formatTaka } from '@/lib/format'
 import {
@@ -173,6 +174,9 @@ export const DeliveryBoard = () => {
   const [page, setPage] = useState(1)
   const [openFor, setOpenFor] = useState<string | null>(null)
   const deliveries = useDeliveries(filter)
+  // Claims the header's search box for this screen — v3.1 addendum. Filters
+  // the rows useDeliveries already fetched; no new request.
+  const search = useSearchable('Search tracking ID, recipient or rider…')
 
   /** Rider names come from the rows themselves — no extra request to fill a filter. */
   const riderOptions = useMemo(() => {
@@ -181,15 +185,18 @@ export const DeliveryBoard = () => {
     return [...names].sort().map((n) => ({ value: n, label: n }))
   }, [deliveries.data])
 
-  const rows = useMemo(
-    () =>
-      (deliveries.data ?? []).filter(
-        (d) =>
-          (zone === '' || d.pickupZone === zone || d.dropZone === zone) &&
-          (rider === '' || d.agentName === rider),
-      ),
-    [deliveries.data, zone, rider],
-  )
+  const rows = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return (deliveries.data ?? []).filter(
+      (d) =>
+        (zone === '' || d.pickupZone === zone || d.dropZone === zone) &&
+        (rider === '' || d.agentName === rider) &&
+        (q === '' ||
+          d.trackingId.toLowerCase().includes(q) ||
+          d.recipientName.toLowerCase().includes(q) ||
+          (d.agentName?.toLowerCase().includes(q) ?? false)),
+    )
+  }, [deliveries.data, zone, rider, search])
 
   const view = paginate(rows, page, PER_PAGE)
   const resetPage = <T,>(set: (v: T) => void) => (v: T) => {
@@ -285,8 +292,12 @@ export const DeliveryBoard = () => {
                   <Who name={d.recipientName} sub={`${d.pickupArea} → ${d.dropArea}`} />
                 </Td>
                 <Td>
+                  {/*
+                    Compact: at this 86px width, five discrete segments read
+                    as an ellipsis rather than progress (v3.1 addendum).
+                  */}
                   <div className="w-[86px]">
-                    <LifecycleRail status={d.status} />
+                    <LifecycleRail status={d.status} rail="compact" />
                   </div>
                 </Td>
                 <Td>

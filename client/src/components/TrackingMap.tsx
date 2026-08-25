@@ -49,10 +49,69 @@ interface Props {
   route?: Array<[number, number]>
   pickup?: GeoPoint | null
   drop?: GeoPoint | null
-  trail?: GeoPoint[]
   follow?: boolean
   className?: string
   animate?: boolean
+}
+
+type LngLat = [number, number]
+
+/** Squared distance — comparing it is enough, and it skips a sqrt per call. */
+const distance2 = (a: LngLat, b: LngLat): number => {
+  const dx = a[0] - b[0]
+  const dy = a[1] - b[1]
+  return dx * dx + dy * dy
+}
+
+/** The nearest point ON THE SEGMENT a→b to `p`. */
+const projectOntoSegment = (p: LngLat, a: LngLat, b: LngLat): LngLat => {
+  const abx = b[0] - a[0]
+  const aby = b[1] - a[1]
+  const lenSq = abx * abx + aby * aby
+  if (lenSq === 0) return a
+  const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * abx + (p[1] - a[1]) * aby) / lenSq))
+  return [a[0] + abx * t, a[1] + aby * t]
+}
+
+/**
+ * Splits a planned route into what's behind the rider and what's ahead of
+ * them, by finding the point ON THE ROUTE closest to the rider's current
+ * position and cutting there.
+ *
+ * This is the actual fix for the v3.1 addendum's map bug — see the file
+ * header comment above the layer setup for what was wrong before. Distances
+ * are compared in raw lng/lat degrees rather than metres: Dhaka's whole
+ * service area is a few hundredths of a degree wide, so the distortion from
+ * skipping a proper projection is well under what a route line's width can
+ * even show, and it keeps this synchronous and dependency-free for something
+ * that reruns on every location tick.
+ */
+const splitRouteByProgress = (
+  route: readonly LngLat[],
+  at: LngLat | null,
+): { completed: LngLat[]; remaining: LngLat[] } => {
+  if (!at || route.length < 2) return { completed: [], remaining: [...route] }
+
+  let bestDist = Infinity
+  let bestIndex = 0
+  let bestPoint: LngLat = route[0] ?? [0, 0]
+  for (let i = 0; i < route.length - 1; i += 1) {
+    const a = route[i]
+    const b = route[i + 1]
+    if (!a || !b) continue
+    const point = projectOntoSegment(at, a, b)
+    const d = distance2(at, point)
+    if (d < bestDist) {
+      bestDist = d
+      bestIndex = i
+      bestPoint = point
+    }
+  }
+
+  return {
+    completed: [...route.slice(0, bestIndex + 1), bestPoint],
+    remaining: [bestPoint, ...route.slice(bestIndex + 1)],
+  }
 }
 
 /** ms to glide between two received positions — just under the 3s cadence. */
@@ -79,9 +138,28 @@ const riderElement = (label: string): HTMLElement => {
   return el
 }
 
+/**
+ * Drop-off is a real pin shape (a rounded teardrop), not a circle — see the
+ * v3.1 addendum's bug report: the old `.pdms-pin--drop` was a white-filled
+ * circle with an ink ring, which reads as a hollow, disabled-looking marker
+ * rather than a placed location. The fill is solid ink with a small white
+ * dot at its head, same idea as the pickup dot's white centre.
+ */
+const DROP_PIN_SVG = `
+  <svg viewBox="0 0 22 28" width="22" height="28" xmlns="http://www.w3.org/2000/svg">
+    <path class="pdms-pin-body" d="M11 1a9 9 0 0 1 9 9c0 6.4-9 17-9 17S2 16.4 2 10a9 9 0 0 1 9-9z" />
+    <circle class="pdms-pin-hole" cx="11" cy="10" r="3.2" />
+  </svg>
+`
+
 const endpointElement = (kind: 'pickup' | 'drop'): HTMLElement => {
   const el = document.createElement('div')
-  el.className = `pdms-pin pdms-pin--${kind}`
+  if (kind === 'drop') {
+    el.className = 'pdms-pin pdms-pin--drop'
+    el.innerHTML = DROP_PIN_SVG
+    return el
+  }
+  el.className = 'pdms-pin pdms-pin--pickup'
   return el
 }
 
@@ -90,7 +168,6 @@ export const TrackingMap = ({
   route,
   pickup,
   drop,
-  trail,
   follow = false,
   className = '',
   animate = true,
@@ -119,27 +196,45 @@ export const TrackingMap = ({
   useEffect(() => {
     if (!holder.current || map.current) return
 
-    const m = new maplibregl.Map({
-      container: holder.current,
-      style: STYLE_URL,
-      center: DHAKA,
-      zoom: 11.5,
-      /**
-       * OpenFreeMap's licence requires credit, and it renders: the style's
-       * TileJSON supplies "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
-       * confirmed in a real browser rather than assumed. An earlier version
-       * added the same credits via customAttribution as insurance, which
-       * printed them twice — so the control is left to the style.
-       */
-      attributionControl: { compact: true },
-    })
+    /**
+     * A WebGL-less environment doesn't fail asynchronously through the map's
+     * own event system below — MapLibre THROWS synchronously, straight out of
+     * the constructor, before there is a map to attach an 'error' listener
+     * to. That exception was escaping this effect uncaught, which in React 18
+     * unmounts the entire tree on the next commit — not just this component,
+     * every screen the map happened to sit on. So this is where "a WebGL-less
+     * browser fails silently otherwise" (the comment below, describing the
+     * one thing this component exists to prevent) turned out not to be
+     * covered: the try/catch is what actually delivers on it.
+     */
+    let m: maplibregl.Map
+    try {
+      m = new maplibregl.Map({
+        container: holder.current,
+        style: STYLE_URL,
+        center: DHAKA,
+        zoom: 11.5,
+        /**
+         * OpenFreeMap's licence requires credit, and it renders: the style's
+         * TileJSON supplies "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
+         * confirmed in a real browser rather than assumed. An earlier version
+         * added the same credits via customAttribution as insurance, which
+         * printed them twice — so the control is left to the style.
+         */
+        attributionControl: { compact: true },
+      })
+    } catch (err) {
+      console.error('[map]', err)
+      setFailed(err instanceof Error ? err.message : 'the map failed to load')
+      return
+    }
 
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
 
     /**
-     * Surface failures instead of leaving a blank rectangle. A bad style URL, a
-     * blocked tile host or a WebGL-less browser all fail silently otherwise,
-     * which is exactly the state this component was found in.
+     * Surface failures instead of leaving a blank rectangle. A bad style URL
+     * or a blocked tile host fail silently otherwise — a WebGL-less browser
+     * is caught above, before there is a map to listen on.
      */
     m.on('error', (e) => {
       const message = e.error?.message ?? 'the map failed to load'
@@ -157,33 +252,44 @@ export const TrackingMap = ({
        * lib/mapStyle.ts for why the style is recoloured rather than swapped.
        */
       coolMapStyle(m)
-      m.addSource('pdms-route', {
+      /**
+       * ONE route, split into two layers by how far the rider has actually
+       * got — not two independently-sourced lines. See splitRouteByProgress
+       * above for why, and the effect below for how the split is computed.
+       *
+       * Layer order matters: 'remaining' is added first so 'completed' paints
+       * on top of it at the cut point, the same way the mock draws one path
+       * that changes from solid to dashed partway along.
+       */
+      m.addSource('pdms-route-remaining', {
         type: 'geojson',
         data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } },
       })
-      m.addSource('pdms-trail', {
+      m.addSource('pdms-route-completed', {
         type: 'geojson',
         data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } },
       })
       m.addLayer({
-        id: 'pdms-route-line',
+        id: 'pdms-route-remaining-line',
         type: 'line',
-        source: 'pdms-route',
+        source: 'pdms-route-remaining',
         paint: {
-          // The planned road line: the accent, dashed and held back, so the
-          // travelled trail below reads as the solid one.
+          // What's still ahead of the rider: the accent, dashed and held
+          // back, so the completed line below reads as the solid one.
           'line-color': ROUTE_COLOUR,
           'line-width': 3,
-          'line-opacity': 0.5,
+          'line-opacity': 0.45,
           'line-dasharray': [2, 8],
         },
         layout: { 'line-cap': 'round', 'line-join': 'round' },
       })
       m.addLayer({
-        id: 'pdms-trail-line',
+        id: 'pdms-route-completed-line',
         type: 'line',
-        source: 'pdms-trail',
-        paint: { 'line-color': ROUTE_COLOUR, 'line-width': 3.5 },
+        source: 'pdms-route-completed',
+        // What the rider has already covered: solid, full opacity, no dash —
+        // this is the layer the v3.1 addendum's bug report was about.
+        paint: { 'line-color': ROUTE_COLOUR, 'line-width': 4 },
         layout: { 'line-cap': 'round', 'line-join': 'round' },
       })
       // Re-run the data effects now that sources exist.
@@ -218,19 +324,15 @@ export const TrackingMap = ({
     }
   }, [])
 
-  // ---- route + endpoints ----
+  // ---- endpoints + camera ----
+  // Deliberately NOT keyed on `riders`: this is the effect that calls
+  // fitBounds, and re-framing the camera every ~3s as a location tick arrives
+  // would fight the separate follow/easeTo behaviour below and read as the
+  // map yanking itself around. Endpoints and the frame only move when the
+  // journey itself changes.
   useEffect(() => {
     const m = map.current
     if (!m || !ready.current) return
-
-    const src = m.getSource('pdms-route') as maplibregl.GeoJSONSource | undefined
-    if (src) {
-      src.setData({
-        type: 'Feature',
-        properties: {},
-        geometry: { type: 'LineString', coordinates: route ?? [] },
-      })
-    }
 
     for (const marker of endpoints.current) marker.remove()
     endpoints.current = []
@@ -243,7 +345,9 @@ export const TrackingMap = ({
     }
     if (drop) {
       endpoints.current.push(
-        new maplibregl.Marker({ element: endpointElement('drop'), anchor: 'center' })
+        // 'bottom': a pin's TIP marks the location, not its centre — unlike
+        // the plain pickup dot, which stays anchor:'center'.
+        new maplibregl.Marker({ element: endpointElement('drop'), anchor: 'bottom' })
           .setLngLat(drop.coordinates)
           .addTo(m),
       )
@@ -265,17 +369,42 @@ export const TrackingMap = ({
     }
   }, [route, pickup, drop, mapVersion])
 
-  // ---- the travelled trail ----
+  // ---- the route, split into what's behind the rider and what's ahead ----
+  // Kept separate from the effect above so a location tick (which changes
+  // `riders`) only ever rewrites two GeoJSON sources — cheap, no camera
+  // movement — rather than re-running marker teardown and fitBounds too.
   useEffect(() => {
     const m = map.current
-    if (!m || !ready.current || !trail || trail.length < 2) return
-    const src = m.getSource('pdms-trail') as maplibregl.GeoJSONSource | undefined
-    src?.setData({
+    if (!m || !ready.current) return
+
+    /**
+     * The split point is the rider's own position — the same point that
+     * places their marker, kept in step automatically as it moves. Only
+     * defined for the single-delivery screens (exactly one rider): the fleet
+     * board passes many riders and no route at all, so there is nothing to
+     * split there.
+     */
+    const riderPoint: LngLat | null =
+      riders.length === 1 && riders[0] ? riders[0].point.coordinates : null
+    const { completed, remaining } = splitRouteByProgress(route ?? [], riderPoint)
+
+    const completedSrc = m.getSource('pdms-route-completed') as
+      | maplibregl.GeoJSONSource
+      | undefined
+    completedSrc?.setData({
       type: 'Feature',
       properties: {},
-      geometry: { type: 'LineString', coordinates: trail.map((p) => p.coordinates) },
+      geometry: { type: 'LineString', coordinates: completed },
     })
-  }, [trail, mapVersion])
+    const remainingSrc = m.getSource('pdms-route-remaining') as
+      | maplibregl.GeoJSONSource
+      | undefined
+    remainingSrc?.setData({
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'LineString', coordinates: remaining },
+    })
+  }, [route, riders, mapVersion])
 
   // ---- riders, eased between positions ----
   useEffect(() => {

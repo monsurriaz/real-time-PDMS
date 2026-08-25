@@ -15,6 +15,7 @@ import {
   Who,
   paginate,
 } from '@/components/Table'
+import { useSearchable } from '@/features/shell/useHeaderSearch'
 import { ApiError } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import {
@@ -113,15 +114,27 @@ const StatusAction = ({ customer }: { customer: CustomerRow }) => {
 
 const PER_PAGE = 10
 
-export const AdminCustomersPage = () => {
+/**
+ * The roster table itself, rendered AS A CHILD of `<AppShell>` — not inline
+ * in the component that constructs `<AppShell>` — so `useSearchable` runs
+ * inside AppShell's rendered tree, where the header's search context
+ * actually exists. See AdminAgentsPage's `RidersContent` for the same fix,
+ * done first.
+ */
+const CustomersContent = () => {
   const roster = useCustomerRoster()
   const [status, setStatus] = useState<UserStatus | ''>('')
   const [page, setPage] = useState(1)
+  const search = useSearchable('Search customer name or email…')
 
-  const rows = useMemo(
-    () => (roster.data ?? []).filter((c) => status === '' || c.status === status),
-    [roster.data, status],
-  )
+  const rows = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return (roster.data ?? []).filter(
+      (c) =>
+        (status === '' || c.status === status) &&
+        (q === '' || c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)),
+    )
+  }, [roster.data, status, search])
 
   const suspendedCount = (roster.data ?? []).filter(
     (c) => c.status === 'suspended',
@@ -129,46 +142,36 @@ export const AdminCustomersPage = () => {
 
   if (roster.isPending) {
     return (
-      <AppShell title="Customers">
-        <PageHead title="Customers" />
-        <Card>
-          <p className="text-body text-muted">Loading customers…</p>
-        </Card>
-      </AppShell>
+      <Card>
+        <p className="text-body text-muted">Loading customers…</p>
+      </Card>
     )
   }
 
   if (roster.isError) {
     return (
-      <AppShell title="Customers">
-        <PageHead title="Customers" />
-        <Card>
-          <p
-            role="alert"
-            className="text-sm text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2"
-          >
-            {roster.error instanceof ApiError
-              ? roster.error.message
-              : 'Customers could not be loaded.'}
-          </p>
-        </Card>
-      </AppShell>
+      <Card>
+        <p
+          role="alert"
+          className="text-sm text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2"
+        >
+          {roster.error instanceof ApiError
+            ? roster.error.message
+            : 'Customers could not be loaded.'}
+        </p>
+      </Card>
     )
   }
 
   const view = paginate(rows, page, PER_PAGE)
 
   return (
-    <AppShell title="Customers">
-      <PageHead
-        title="Customers"
-        sub="Everyone who can book a parcel, and whether their account is still allowed to."
-        action={
-          suspendedCount > 0 ? (
-            <Pill tone="failed">{suspendedCount} suspended</Pill>
-          ) : undefined
-        }
-      />
+    <>
+      {suspendedCount > 0 ? (
+        <div className="flex justify-end mb-3">
+          <Pill tone="failed">{suspendedCount} suspended</Pill>
+        </div>
+      ) : null}
 
       <Card pad={false}>
         <FilterBar>
@@ -259,6 +262,16 @@ export const AdminCustomersPage = () => {
           onPage={setPage}
         />
       </Card>
-    </AppShell>
+    </>
   )
 }
+
+export const AdminCustomersPage = () => (
+  <AppShell title="Customers">
+    <PageHead
+      title="Customers"
+      sub="Everyone who can book a parcel, and whether their account is still allowed to."
+    />
+    <CustomersContent />
+  </AppShell>
+)

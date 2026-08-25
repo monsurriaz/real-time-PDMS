@@ -132,7 +132,7 @@ export const CodReconciliation = () => {
           ].map((cell, i) => (
             <div
               key={cell.k}
-              className={i < 2 ? 'sm:border-r sm:border-border sm:pr-5' : 'sm:pl-5'}
+              className={i < 1 ? 'sm:border-r sm:border-border sm:pr-5' : i < 2 ? 'sm:border-r sm:border-border sm:pl-5' : 'sm:pl-5'}
             >
               <Eyebrow>{cell.k}</Eyebrow>
               <div className="mono text-figure-lg font-medium tracking-[-0.04em]">

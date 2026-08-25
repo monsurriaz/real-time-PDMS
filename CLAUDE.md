@@ -77,6 +77,7 @@ Course project, CSC 470. Seven-day build. Demo-ready beats feature-complete.
   simulate.ts    fake rider GPS along a Dhaka route  ← needed to demo tracking
 /docs
   design-system-v3-meridian.html   THE visual reference — read before building any UI
+  design-system-v3.1-addendum.html M6.96 corrections to v3 — read alongside it, wins on conflict
   design-system.html               v1, superseded. Kept for history only.
 CLAUDE.md
 .gitignore
@@ -91,6 +92,20 @@ CLAUDE.md
 building any screen and match it. It shows the palette, type scale, components, the
 route table and the app shell. `tokens.css` is generated from it — if the two ever
 disagree, the HTML wins.
+
+**`/docs/design-system-v3.1-addendum.html` corrects v3 in six places** (M6.96): the
+footer rule, the landing hero composition, a login/signup split-screen layout, three
+header controls, a compact `LifecycleRail` variant, and the map's route/marker
+rendering. It is read together with the v3 file, not instead of it — where the two
+disagree, the addendum wins, and it is now part of the frozen visual reference rule 2
+protects. It is a small standalone doc with its own simplified stylesheet, not
+generated from `tokens.css`, so a few of its raw pixel values (padding, mostly) don't
+land exactly on an existing step — those are implemented at the CLOSEST existing
+token rather than by minting a new one. Container widths, heights and breakpoints are
+not spacing values and were never drawn from the scale in the first place (the
+codebase's own long-standing convention — `max-w-[400px]`, `min-h-[340px]`, and
+similar one-off layout facts already appear throughout); only interior
+padding/margin/gap is a rule-1 spacing decision.
 
 The v1 system (warm paper, orange accent, header-only layout) is **retired**. Its
 tokens no longer exist under any name, so a component still asking for `--paper` or
@@ -250,6 +265,7 @@ but the override is still bound by the same approval check. A self-registered ri
 | M6 | Analytics + polish | Stat cards, one chart, delayed alerts, loading/empty/error states, agent mobile pass |
 | M6.5 | Visual system replacement (Meridian v3), three sessions: **a** shell + routes + re-skin existing screens, **b** rider workspace rebuild, **c** landing + signup + approval flow + profiles | Every screen matches docs/design-system-v3-meridian.html; no v1 token survives in the codebase |
 | M6.9 | Pre-deploy fixes: booking/payment redirect, customer suspension, one-time welcome, COD amount integrity, search copy | Six unrelated defects closed; suspension enforced in `requireAuth` on every request, not at login |
+| M6.96 | UI corrections against the v3.1 addendum: footer rule, landing hero, auth split-screen, header search/notifications/avatar, compact rail variant, map rendering | Every item in the addendum matches; branched off main, not merged |
 | M7 | Deploy + rehearse | Live on Vercel + Render + Atlas, demo data seeded, run-through twice |
 
 See DEFERRED.md for work parked out of each milestone.
