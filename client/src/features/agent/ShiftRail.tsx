@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
+import { Modal } from '@/components/Modal'
+import { Eyebrow } from '@/components/Card'
 import { ShiftEditor } from './ShiftEditor'
 import { useAgentSelf } from './useAgentSelf'
 
@@ -9,12 +11,17 @@ import { useAgentSelf } from './useAgentSelf'
  * the rail is the point of the rebuild — it must not cost the workspace any
  * vertical space, on a 1400px desktop OR a 375px phone.
  *
- * The popover is `fixed`, not `absolute`. Below 768px the rail collapses to
- * a 64px icon strip (an existing, pre-M6.5b convention — see AppShell), and
- * a form with a zone select and two coordinate fields cannot fit anchored to
- * a 64px box without being clipped off-screen. Fixed positioning lets the
- * same trigger and the same editor work at every width, instead of this
- * screen needing a second, phone-only copy of the control.
+ * The editor opens in the shared `Modal` (M6.98) rather than a rail-anchored
+ * popover. It used to be a `fixed left-[220px]` panel floating past the
+ * 216px rail — the offset only ever cleared the rail by a few px, so on a
+ * wide desktop viewport it sat directly ON TOP of the run detail card
+ * (map, status badge, LifecycleRail) instead of beside it, hiding exactly
+ * the delivery status a rider would open it while still wanting to see. A
+ * real modal with a backdrop makes "this is temporarily covering the page"
+ * the honest, visible state instead of an accidental one, and it needs no
+ * width-specific positioning: `Modal` already centres itself and scrolls
+ * internally at every viewport, including the 64px-collapsed rail below
+ * 768px this used to special-case.
  */
 
 const STATUS_LABEL: Record<string, string> = {
@@ -34,23 +41,6 @@ const STATUS_DOT: Record<string, string> = {
 export const ShiftRail = () => {
   const me = useAgentSelf()
   const [open, setOpen] = useState(false)
-  const box = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const onPointer = (e: MouseEvent): void => {
-      if (!box.current?.contains(e.target as Node)) setOpen(false)
-    }
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('mousedown', onPointer)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onPointer)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [open])
 
   const heading = (
     <div className="text-rail font-semibold uppercase tracking-[0.12em] text-chrome-muted px-2.5 pt-3.5 pb-6px max-md:hidden">
@@ -90,36 +80,39 @@ export const ShiftRail = () => {
   return (
     <div>
       {heading}
-      <div ref={box} className="relative">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          aria-haspopup="dialog"
-          title="Your shift"
-          className="w-full min-h-12 flex items-center gap-9px rounded-sm bg-chrome-2 hover:bg-chrome-3 px-2.5 py-9px max-md:justify-center max-md:px-0"
-        >
-          <span
-            className={`w-7px h-7px rounded-full flex-none ${STATUS_DOT[agent.status] ?? 'bg-chrome-faint'}`}
-          />
-          <span className="min-w-0 text-left max-md:hidden">
-            <span className="block text-chrome-ink text-small font-semibold truncate">
-              {STATUS_LABEL[agent.status] ?? agent.status}
-            </span>
-            <span className="block text-chrome-faint text-eyebrow truncate">{sub}</span>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        title="Your shift"
+        className="w-full min-h-12 flex items-center gap-9px rounded-sm bg-chrome-2 hover:bg-chrome-3 px-2.5 py-9px max-md:justify-center max-md:px-0"
+      >
+        <span
+          className={`w-7px h-7px rounded-full flex-none ${STATUS_DOT[agent.status] ?? 'bg-chrome-faint'}`}
+        />
+        <span className="min-w-0 text-left max-md:hidden">
+          <span className="block text-chrome-ink text-small font-semibold truncate">
+            {STATUS_LABEL[agent.status] ?? agent.status}
           </span>
-        </button>
+          <span className="block text-chrome-faint text-eyebrow truncate">{sub}</span>
+        </span>
+      </button>
 
-        {open ? (
-          <div
-            role="dialog"
-            aria-label="Your shift"
-            className="fixed z-30 left-3 right-3 bottom-3 md:left-[220px] md:right-auto md:bottom-20 md:w-[350px] bg-surface border border-border rounded-md p-4 max-h-[75vh] overflow-y-auto"
-          >
-            <ShiftEditor onLocationSaved={() => setOpen(false)} />
-          </div>
-        ) : null}
-      </div>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={
+          <>
+            <Eyebrow>Shift</Eyebrow>
+            <p className="text-base font-semibold tracking-[-0.015em]">
+              {STATUS_LABEL[agent.status] ?? agent.status}
+            </p>
+          </>
+        }
+      >
+        <ShiftEditor onLocationSaved={() => setOpen(false)} />
+      </Modal>
     </div>
   )
 }

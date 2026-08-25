@@ -59,6 +59,18 @@ debt are all in Resolved. What is left is what M6 stopped short of, and why.
 
 ---
 
+## M6.98 — live board fixes
+
+Nothing outstanding from the two scoped items (fleet map sourced from Agent, assign/reassign
+as a modal). One extra fix landed in the same session, outside the original scope, at the
+user's request after reviewing a screenshot:
+
+| Item | Notes |
+|---|---|
+| **Shift rail popover covered the run detail card on wide viewports** | Was recorded above as deliberate (`fixed left-[220px]`, meant to clear the 216px rail) — but the offset only ever cleared the rail by ~4px, so on a desktop-width viewport the popover landed on top of `DeliveryDetail`'s map/status badge/`LifecycleRail` instead of beside them, hiding exactly the delivery status a rider opens Shift while still wanting to see. Rebuilt on the shared `Modal` (the same component the assign/reassign panel above uses) instead of a hand-positioned `fixed` box. That surfaced a second, sharper bug the same fix had to absorb: `AppShell`'s rail is `position: sticky`, which creates its own CSS stacking context regardless of z-index — a `fixed` element rendered from *inside* it (as `ShiftRail`'s popover was) paints as part of THAT context, under `<main>`'s content, no matter how high its z-index reads. Confirmed with `elementFromPoint`, not just visually: the map canvas was genuinely hit-testing above a `z-40` backdrop. `Modal` now renders via `createPortal` onto `document.body`, which fixes it for every current and future caller, not just this one. |
+
+---
+
 ## Post-M6.5 — open backlog, no milestone attached
 
 M6.5a, b and c between them did every screen v3's route table names. These
@@ -123,7 +135,6 @@ building for its own sake.
 | Analytics keys zone performance off the DROP zone | Deliberate, and the opposite of pricing, which keys off PICKUP. Different questions: pricing asks what it costs to get a rider to the parcel; performance asks where parcels are being taken. |
 | A COD parcel is booked without any checkout step | Deliberate. There is nothing to pay online; `POST /payments/.../checkout` refuses a COD parcel outright rather than creating a session nobody should complete. |
 | Rider disabled controls at 2.36:1 (Call/Navigate) | Decided during the M6.5b rebuild, per the note that raised it: WCAG 1.4.3 exempts text in an inactive component, and these two literally do nothing yet (CLAUDE.md section 7 keeps the recipient's number and drop coordinates off this payload) — no information is lost by them being hard to read outdoors, unlike the Eyebrow case where `--ink-2` replaced `--faint` for text a rider needs at all times. Left on the shared `Button` disabled style rather than given a rider-only override. |
-| The Shift rail popover is `fixed`, not anchored to the 216px rail | Deliberate. Below 768px the rail collapses to a 64px icon strip (a pre-existing, all-roles convention — see AppShell), and the location form's zone select and two coordinate fields cannot fit anchored to that box without being clipped. `fixed` positioning lets one trigger and one editor (`ShiftEditor`) work at every width instead of the phone needing a second copy of the control. |
 | The run queue includes the CURRENT delivery, not just the ones behind it | Deliberate, and the reason it isn't called "Up next" the way the static reference labels it: when it is also how a rider switches which parcel is on the left, the selected one has to be in the list, highlighted, or there is nothing to click back to. |
 | `/agent/runs/:id` for an id that isn't (or is no longer) one of the rider's active runs | Falls back to the first active run rather than 404ing. A rider is never looking at nothing just because a bookmark outlived the delivery it named; there is no dedicated detail view a finished run's id could point to instead. |
 | `/track/:id` serves the pre-v3 `/track/:parcelId` redirect AND v3's new public `/track/:trackingId` at the same route | They are the identical path shape — react-router has no way to prefer one over the other by param name — so one component decides by shape: a 24-char hex id (a Mongo ObjectId) redirects to `/customer/track/:id` the way it always did; anything else is treated as a real tracking ID and hits the new public lookup. `PD-XXXX-XX` can never collide with 24 hex characters. |
