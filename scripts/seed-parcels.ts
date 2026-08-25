@@ -27,6 +27,7 @@ import {
   DeliveryModel,
   ParcelModel,
   PaymentModel,
+  SettlementModel,
   UserModel,
 } from '../server/src/models'
 
@@ -208,6 +209,21 @@ export const seedParcels = async (): Promise<void> => {
     const ids = stale.map((p) => p._id)
     await DeliveryModel.deleteMany({ parcel: { $in: ids } })
     await PaymentModel.deleteMany({ parcel: { $in: ids } })
+    /**
+     * Settlement doesn't carry a `parcel` field — it names the Payment
+     * documents a hand-in closed — so deleting only the Payments above left
+     * every Settlement record pointing at ids that no longer resolve to
+     * anything. That's the bug this was: a rider who had settled showed up
+     * with a Settlement in the audit trail but "—" in the Settled column,
+     * because the reconciliation total is counted from live Payment records
+     * and the ones a stale Settlement pointed to were already gone.
+     *
+     * Every Settlement in this demo belongs to one of the three seeded
+     * agents (rakib/sabbir/imran, looked up above), so a reseed clearing all
+     * of them is the same "restore the demo to a known state" contract the
+     * rest of this file already keeps for parcels.
+     */
+    await SettlementModel.deleteMany({})
     await ParcelModel.deleteMany({ _id: { $in: ids } })
     console.log(`  cleared ${stale.length} previously seeded parcels`)
   }
