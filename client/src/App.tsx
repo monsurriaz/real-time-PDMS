@@ -3,12 +3,13 @@ import { AdminAnalyticsPage } from '@/features/admin/AdminAnalyticsPage'
 import { AdminCodPage } from '@/features/admin/AdminCodPage'
 import { AdminHome } from '@/features/admin/AdminHome'
 import { AdminPricingPage } from '@/features/admin/AdminPricingPage'
-import { AgentHome } from '@/features/agent/AgentHome'
+import { AgentFinishedPage } from '@/features/agent/AgentFinishedPage'
 import { BookParcelPage } from '@/features/booking/BookParcelPage'
 import { CustomerHome } from '@/features/customer/CustomerHome'
 import { LandingPlaceholder } from '@/features/public/LandingPlaceholder'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { RequireRole } from '@/features/auth/RequireRole'
+import { RiderWorkspace } from '@/features/agent/RiderWorkspace'
 import { TrackParcelPage } from '@/features/tracking/TrackParcelPage'
 
 /**
@@ -68,7 +69,24 @@ export const App = () => (
       path="/agent/runs"
       element={
         <RequireRole roles={['agent']}>
-          <AgentHome />
+          <RiderWorkspace />
+        </RequireRole>
+      }
+    />
+    {/* Same workspace: :id picks which active run shows on the left. */}
+    <Route
+      path="/agent/runs/:id"
+      element={
+        <RequireRole roles={['agent']}>
+          <RiderWorkspace />
+        </RequireRole>
+      }
+    />
+    <Route
+      path="/agent/finished"
+      element={
+        <RequireRole roles={['agent']}>
+          <AgentFinishedPage />
         </RequireRole>
       }
     />

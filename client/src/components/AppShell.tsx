@@ -4,6 +4,7 @@ import type { Role } from '@pdms/shared'
 import { useLogout, useMe } from '@/features/auth/useAuth'
 import { useRailCounts, type RailCounts } from '@/features/shell/useRailCounts'
 import { homeForRole } from '@/features/auth/roles'
+import { ShiftRail } from '@/features/agent/ShiftRail'
 import { Avatar } from './Table'
 
 /**
@@ -133,13 +134,7 @@ const NAV: Record<Role, readonly NavGroup[]> = {
     {
       items: [
         { to: '/agent/runs', label: "Today's runs", icon: 'runs', count: 'active' },
-        {
-          to: '/agent/finished',
-          label: 'Finished',
-          icon: 'check',
-          count: 'finished',
-          soon: 'M6.5b',
-        },
+        { to: '/agent/finished', label: 'Finished', icon: 'check', count: 'finished' },
       ],
     },
   ],
@@ -406,6 +401,8 @@ export const AppShell = ({ title, titleAside, children }: Props) => {
               </nav>
             </div>
           ))}
+
+          {role === 'agent' ? <ShiftRail /> : null}
         </div>
 
         <div className="mt-auto border-t border-chrome-3 pt-3">

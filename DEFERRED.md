@@ -48,17 +48,13 @@ These are the pieces it deliberately stopped before.
 
 | Item | Target | Notes |
 |---|---|---|
-| **Rider workspace rebuild** | M6.5b | `/agent/runs` is still the old single column of stacked cards — moved onto the new shell and tokens so it is not broken, and nothing more. v3 replaces it with a route map beside the active delivery, and adds `/agent/runs/:id`. |
-| `/agent/finished` | M6.5b | In the rail, dimmed, carrying its real count. The screen does not exist. |
 | **Landing page at `/`** | M6.5c | `/` currently forwards a signed-in visitor to their role default. v3 says it should show the public page with a link to the dashboard instead — a signed-in person is still allowed to read the marketing copy. That needs copy to exist, so `LandingPlaceholder` is replaced rather than edited. |
 | Sign-up and the approval flow | M6.5c | `/signup`, `/agent/pending`, `/admin/agents`. The rail's Riders item is dimmed and its pending count is already wired — it reads 0 because no rider carries an approval field yet, which is the honest answer until the flow exists. |
-| Profiles | M6.5c | `/customer/profile`, `/agent/profile`, `/admin/profile`. The account menu's Profile item is present and disabled. |
+| Profiles | M6.5c | `/customer/profile`, `/agent/profile`, `/admin/profile`. The account menu's Profile item is present and disabled, and now says when it's arriving (M6.5b) rather than just refusing. |
 | **Public tracking by tracking ID** | M6.5c | v3's route table has `/track/:trackingId` as PUBLIC — track without logging in. Today `/track/:parcelId` redirects to the customer screen, which needs a session. The public version needs an unauthenticated lookup endpoint, which is server work this session was scoped out of. |
 | Search field | M6.5c | Presentational. A real input, disabled, labelled "coming in M6.5c" rather than a decorative box that swallows keystrokes. Wiring it means a server search across tracking IDs, customers and riders. |
 | Notification bell | M6.5c | Presentational and disabled. There is no notification store; v3 draws an unread dot, and showing one over nothing would be a lie. |
 | Zones nav item | M6.5c | v3's admin rail has Operations / Analytics / COD, then Riders / Pricing / **Zones**. Zones has no screen and no count, so it is omitted rather than dimmed — an empty row for a screen nobody has asked for is noise. |
-| Seed leaves settlement records behind | M6.5c | `npm run seed` clears seeded parcels and their payments but not `Settlement` documents, so the COD screen's audit trail can reference payments that no longer exist — visible now as a rider with a settlement in the trail but "—" in the Settled column. One `deleteMany` in `seed-parcels.ts`. |
-| Rider disabled controls at 2.36:1 | M6.5b | v3's disabled state is `--faint` on `--surface-sunk`, which is correct for a desktop console and close to invisible on a phone in daylight. WCAG exempts disabled controls, so this is a judgement call, not a violation — decide it during the rider rebuild rather than by restyling v3's disabled spec globally. |
 
 ---
 
@@ -95,6 +91,10 @@ These are the pieces it deliberately stopped before.
 | `PROMISED_WINDOW_HOURS = 24` lives in one constant, not in config | Deliberate for now. CLAUDE.md states no service level; one named constant in `lifecycle.ts` is the honest version of "not decided yet". If the promise ever varies by zone or weight it belongs in `PricingConfig` beside the rates. |
 | Analytics keys zone performance off the DROP zone | Deliberate, and the opposite of pricing, which keys off PICKUP. Different questions: pricing asks what it costs to get a rider to the parcel; performance asks where parcels are being taken. |
 | A COD parcel is booked without any checkout step | Deliberate. There is nothing to pay online; `POST /payments/.../checkout` refuses a COD parcel outright rather than creating a session nobody should complete. |
+| Rider disabled controls at 2.36:1 (Call/Navigate) | Decided during the M6.5b rebuild, per the note that raised it: WCAG 1.4.3 exempts text in an inactive component, and these two literally do nothing yet (CLAUDE.md section 7 keeps the recipient's number and drop coordinates off this payload) — no information is lost by them being hard to read outdoors, unlike the Eyebrow case where `--ink-2` replaced `--faint` for text a rider needs at all times. Left on the shared `Button` disabled style rather than given a rider-only override. |
+| The Shift rail popover is `fixed`, not anchored to the 216px rail | Deliberate. Below 768px the rail collapses to a 64px icon strip (a pre-existing, all-roles convention — see AppShell), and the location form's zone select and two coordinate fields cannot fit anchored to that box without being clipped. `fixed` positioning lets one trigger and one editor (`ShiftEditor`) work at every width instead of the phone needing a second copy of the control. |
+| The run queue includes the CURRENT delivery, not just the ones behind it | Deliberate, and the reason it isn't called "Up next" the way the static reference labels it: when it is also how a rider switches which parcel is on the left, the selected one has to be in the list, highlighted, or there is nothing to click back to. |
+| `/agent/runs/:id` for an id that isn't (or is no longer) one of the rider's active runs | Falls back to the first active run rather than 404ing. A rider is never looking at nothing just because a bookmark outlived the delivery it named; there is no dedicated detail view a finished run's id could point to instead. |
 
 ---
 
@@ -102,6 +102,11 @@ These are the pieces it deliberately stopped before.
 
 | Item | Milestone | Commit |
 |---|---|---|
+| **Rider workspace rebuild** — route map beside the active delivery, `/agent/runs/:id`, shift folded into the rail | M6.5b | `PENDING` |
+| `/agent/finished` | M6.5b | `PENDING` |
+| Seed leaves settlement records behind | M6.5b | `09ba383` |
+| Sidebar account block scrolled away with the page instead of staying pinned | M6.5b | `a82f3c3` |
+| Account menu's Profile item disabled with no explanation | M6.5b | `b86f049` |
 | Disabled buttons were a washed-out accent ("Mark delivered") | M6.5a | `b16ad74` |
 | Primary button contrast — v3's accent is 5.89:1 on white, against v1's 3.75:1 | M6.5a | `b16ad74` |
 | Topbar wordmark as a 26px target — the header shell is gone; the rail's is 37-46px | M6.5a | `b16ad74` |

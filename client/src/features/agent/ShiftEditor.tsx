@@ -2,18 +2,24 @@ import { useState } from 'react'
 import { setAgentLocationInputSchema, type ZoneName } from '@pdms/shared'
 import { Button } from '@/components/Button'
 import { Field, SelectField } from '@/components/Field'
-import { Card, Eyebrow } from '@/components/Card'
+import { Eyebrow } from '@/components/Card'
 import { ApiError } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import { useZones } from '../pricing/usePricing'
 import { useAgentSelf, useSetAgentStatus, useSetLocation } from './useAgentSelf'
 
 /**
- * The rider's shift controls: where they are, and whether they are on duty.
+ * The rider's shift controls: where they are, and whether they are on duty —
+ * the same form the old build gave a whole Card at the top of the run list.
  *
- * This stands in for the GPS stream until M4 (CLAUDE.md section 6). Both
- * fields feed the $near assignment query in section 5 — without a way to move
- * a rider by hand, proximity assignment cannot be exercised at all.
+ * v3's Shell section folds "shift" into the rail, so this is now the CONTENT
+ * of that rail's popover (see ShiftRail) rather than a page in its own right.
+ * It has no Card wrapper of its own for that reason — the caller supplies the
+ * surface, sizing and dismissal.
+ *
+ * Both fields feed the $near assignment query in CLAUDE.md section 5 —
+ * without a way to move a rider by hand, proximity assignment cannot be
+ * exercised at all.
  */
 
 const STATUS_LABEL: Record<string, string> = {
@@ -22,7 +28,7 @@ const STATUS_LABEL: Record<string, string> = {
   offline: 'Off shift',
 }
 
-export const ShiftControls = () => {
+export const ShiftEditor = ({ onLocationSaved }: { onLocationSaved?: () => void }) => {
   const me = useAgentSelf()
   const zones = useZones()
   const setLocation = useSetLocation()
@@ -35,21 +41,13 @@ export const ShiftControls = () => {
   const [invalid, setInvalid] = useState<string | null>(null)
 
   if (me.isPending) {
-    return (
-      <Card title="Your shift" className="mb-5">
-        <p className="text-sm text-muted">Loading…</p>
-      </Card>
-    )
+    return <p className="text-sm text-muted">Loading…</p>
   }
   if (me.isError || !me.data) {
     return (
-      <Card title="Your shift" className="mb-5">
-        <p role="alert" className="text-sm text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2">
-          {me.error instanceof ApiError
-            ? me.error.message
-            : 'Could not load your rider record.'}
-        </p>
-      </Card>
+      <p role="alert" className="text-sm text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2">
+        {me.error instanceof ApiError ? me.error.message : 'Could not load your rider record.'}
+      </p>
     )
   }
 
@@ -72,11 +70,11 @@ export const ShiftControls = () => {
       setInvalid(parsed.error.issues[0]?.message ?? 'check the location')
       return
     }
-    setLocation.mutate(parsed.data)
+    setLocation.mutate(parsed.data, { onSuccess: () => onLocationSaved?.() })
   }
 
   return (
-    <Card title="Your shift" className="mb-5">
+    <div>
       <div className="flex items-start justify-between gap-4 mb-5">
         <div>
           <Eyebrow tone="strong">Status</Eyebrow>
@@ -179,7 +177,7 @@ export const ShiftControls = () => {
           ) : (
             <div className="grid grid-cols-2 gap-x-3">
               <Field
-              touch
+                touch
                 label="Latitude"
                 inputMode="decimal"
                 placeholder="23.7461"
@@ -187,7 +185,7 @@ export const ShiftControls = () => {
                 onChange={(e) => setLat(e.target.value)}
               />
               <Field
-              touch
+                touch
                 label="Longitude"
                 inputMode="decimal"
                 placeholder="90.3742"
@@ -213,6 +211,6 @@ export const ShiftControls = () => {
           </Button>
         </form>
       </div>
-    </Card>
+    </div>
   )
 }
