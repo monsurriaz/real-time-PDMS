@@ -55,12 +55,12 @@ export const LoginPage = () => {
      * the marker has to be able to get in.
      */
     <main className="min-h-dvh flex justify-center bg-page px-22px py-10">
-      <div className="w-full max-w-[400px]">
+      <div className="w-full max-w-[400px] flex flex-col justify-center">
         <div className="bg-surface border border-border rounded-lg p-6">
-          <div className="flex items-center justify-center gap-9px mb-22px font-bold text-mark tracking-[-0.03em]">
+          <Link to="/" className="flex items-center justify-center gap-9px mb-22px font-bold text-mark tracking-[-0.03em]">
             <span className="w-[15px] h-[15px] rounded-mark bg-accent rotate-45" />
             ParcelDelivery
-          </div>
+          </Link>
 
           <h1 className="text-h2 font-semibold tracking-[-0.03em] text-center">
             Sign in

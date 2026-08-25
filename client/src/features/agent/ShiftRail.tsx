@@ -114,7 +114,7 @@ export const ShiftRail = () => {
           <div
             role="dialog"
             aria-label="Your shift"
-            className="fixed z-30 left-3 right-3 bottom-3 md:left-[220px] md:right-auto md:bottom-16 md:w-[300px] bg-surface border border-border rounded-md p-4 max-h-[75vh] overflow-y-auto"
+            className="fixed z-30 left-3 right-3 bottom-3 md:left-[220px] md:right-auto md:bottom-20 md:w-[350px] bg-surface border border-border rounded-md p-4 max-h-[75vh] overflow-y-auto"
           >
             <ShiftEditor onLocationSaved={() => setOpen(false)} />
           </div>
