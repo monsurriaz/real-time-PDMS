@@ -32,7 +32,8 @@ interface CustomerLean {
    * middleware/auth.ts — absent means active, there and here.
    */
   status?: UserStatus
-  accountHistory: Array<{ status: UserStatus; at: Date; by: mongoose.Types.ObjectId }>
+  /** Optional for the same reason `status` is — a lean read applies no default. */
+  accountHistory?: Array<{ status: UserStatus; at: Date; by: mongoose.Types.ObjectId }>
   createdAt: Date
 }
 
@@ -71,7 +72,7 @@ customersRouter.get('/', requireAuth, requireRole('admin'), async (_req, res, ne
 
     const customers: CustomerRow[] = rows.map((r) => {
       // Append-only, so the last entry is the current decision.
-      const last = r.accountHistory.at(-1)
+      const last = r.accountHistory?.at(-1)
       return {
         _id: r._id.toString(),
         name: r.name,
