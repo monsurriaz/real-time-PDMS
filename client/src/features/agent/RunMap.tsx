@@ -21,7 +21,7 @@ export const RunMap = ({ parcelId }: { parcelId: string }) => {
     : []
 
   return (
-    <div className="relative h-[170px] bg-map-ground">
+    <div className="relative h-[350px] bg-map-ground">
       <LazyTrackingMap
         className="absolute inset-0"
         riders={riders}
