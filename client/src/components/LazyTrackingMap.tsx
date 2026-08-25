@@ -29,9 +29,9 @@ export const LazyTrackingMap = (props: Props) => (
   <Suspense
     fallback={
       <div
-        className={`grid place-items-center bg-surface-sunk ${props.className ?? ''}`}
+        className={`grid place-items-center bg-map-ground ${props.className ?? ''}`}
       >
-        <p className="text-[12.5px] text-muted">Loading the map…</p>
+        <p className="text-small text-muted">Loading the map…</p>
       </div>
     }
   >

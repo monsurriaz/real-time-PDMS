@@ -1,8 +1,9 @@
 import type { DeliveryStatus } from '@pdms/shared'
 
 /**
- * The `.rail` from docs/design-system.html — five 5px pill segments with a 4px
- * gap, one per step of the happy path, optionally with labels underneath.
+ * The `.rail` from docs/design-system-v3-meridian.html — five 4px pill
+ * segments with a 3px gap, one per step of the happy path, optionally with
+ * labels underneath.
  *
  * The travelling highlight on the live segment is a LIVENESS INDICATOR, not
  * decoration. It runs only while `live` is true, which the tracking screen
@@ -57,7 +58,7 @@ export const LifecycleRail = ({ status, live = false, labels = false }: Props) =
   return (
     <div>
       <div
-        className="flex gap-1"
+        className="flex gap-3px"
         role="img"
         aria-label={`Progress: ${status}${live ? ', live' : ''}`}
       >
@@ -78,7 +79,7 @@ export const LifecycleRail = ({ status, live = false, labels = false }: Props) =
           return (
             <span
               key={step.status}
-              className={`h-[5px] flex-1 rounded-pill ${colour}${isLiveSegment ? ' rail-live' : ''}`}
+              className={`h-1 flex-1 rounded-pill ${colour}${isLiveSegment ? ' rail-live' : ''}`}
               {...(isLiveSegment ? { 'data-live': String(live) } : {})}
             />
           )
@@ -91,7 +92,9 @@ export const LifecycleRail = ({ status, live = false, labels = false }: Props) =
             <span
               key={step.status}
               className={[
-                'flex-1 text-[10.5px] font-medium',
+                // 10px in v3, the smallest text in the system, and only ever
+                // under a rail where the segment above carries the meaning.
+                'flex-1 text-rail font-medium',
                 i === reached && !finished
                   ? 'text-transit'
                   : i <= reached

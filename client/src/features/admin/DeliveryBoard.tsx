@@ -1,12 +1,27 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   assignInputSchema,
   deliveryStatusSchema,
+  zoneName,
+  type DeliveryListItem,
   type DeliveryStatus,
 } from '@pdms/shared'
 import { Badge } from '@/components/Badge'
 import { Button } from '@/components/Button'
-import { Eyebrow, Panel } from '@/components/Panel'
+import { Card, Eyebrow } from '@/components/Card'
+import { LifecycleRail } from '@/components/LifecycleRail'
+import {
+  FilterBar,
+  Pager,
+  SelectFilter,
+  TableScroll,
+  Td,
+  Thead,
+  Tr,
+  Who,
+  paginate,
+} from '@/components/Table'
 import { ApiError } from '@/lib/api'
 import { formatKm, formatTaka } from '@/lib/format'
 import {
@@ -23,11 +38,6 @@ import {
  * which strategy produced the list, because "nearest within 5 km" and "anyone
  * in this zone" are materially different recommendations.
  */
-
-const FILTERS: ReadonlyArray<DeliveryStatus | 'all'> = [
-  'all',
-  ...deliveryStatusSchema.options,
-]
 
 const STRATEGY_NOTE: Record<string, string> = {
   near: 'Nearest available riders within 5 km of the pick-up.',
@@ -50,35 +60,35 @@ const AssignPanel = ({
   const err = assign.error instanceof ApiError ? assign.error.message : null
 
   return (
-    <div className="bg-surface-sunk border border-hairline rounded-md p-4 mt-3">
+    <div className="bg-surface-sunk border border-border rounded-md p-4 mt-3">
       <div className="flex items-baseline justify-between mb-3">
         <Eyebrow>{currentAgentId ? 'Reassign' : 'Assign'}</Eyebrow>
         <button
           type="button"
           onClick={onClose}
-          className="text-[12px] text-muted hover:text-ink"
+          className="text-meta text-muted hover:text-ink"
         >
           Close
         </button>
       </div>
 
       {err ? (
-        <p role="alert" className="text-[12.5px] text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2 mb-3">
+        <p role="alert" className="text-small text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2 mb-3">
           {err}
         </p>
       ) : null}
 
       {candidates.isPending ? (
-        <p className="text-[13px] text-muted">Finding riders…</p>
+        <p className="text-sm text-muted">Finding riders…</p>
       ) : candidates.isError ? (
-        <p className="text-[12.5px] text-failed-ink">
+        <p className="text-small text-failed-ink">
           {candidates.error instanceof ApiError
             ? candidates.error.message
             : 'Could not look up riders.'}
         </p>
       ) : candidates.data ? (
         <>
-          <p className="text-[12px] text-muted mb-3">
+          <p className="text-meta text-muted mb-3">
             {STRATEGY_NOTE[candidates.data.strategy] ?? ''}
             {!candidates.data.hasPickupPoint
               ? ' This parcel has no geocoded pick-up point, so distance is unknown.'
@@ -86,7 +96,7 @@ const AssignPanel = ({
           </p>
 
           {candidates.data.candidates.length === 0 ? (
-            <p className="text-[13px] text-muted">
+            <p className="text-sm text-muted">
               No available rider covers {candidates.data.zone}. Bring an agent
               online first.
             </p>
@@ -107,16 +117,16 @@ const AssignPanel = ({
                 {candidates.data.candidates.map((c) => (
                   <div
                     key={c.agentId}
-                    className="flex items-center justify-between gap-3 bg-surface border border-hairline rounded-sm px-3 py-2"
+                    className="flex items-center justify-between gap-3 bg-surface border border-border rounded-sm px-3 py-2"
                   >
                     <div className="min-w-0">
-                      <span className="text-[13px] font-medium block truncate">
+                      <span className="text-sm font-medium block truncate">
                         {c.name}
                         {c.agentId === currentAgentId ? (
                           <span className="text-muted font-normal"> · current</span>
                         ) : null}
                       </span>
-                      <span className="text-[11.5px] text-muted">
+                      <span className="text-tiny text-muted">
                         {c.vehicle}
                         {c.distanceMetres !== null
                           ? ` · ${formatKm(c.distanceMetres / 1000)}`
@@ -154,151 +164,251 @@ const AssignPanel = ({
   )
 }
 
+const PER_PAGE = 10
+
 export const DeliveryBoard = () => {
   const [filter, setFilter] = useState<DeliveryStatus | 'all'>('all')
+  const [zone, setZone] = useState<string>('')
+  const [rider, setRider] = useState<string>('')
+  const [page, setPage] = useState(1)
   const [openFor, setOpenFor] = useState<string | null>(null)
   const deliveries = useDeliveries(filter)
 
-  return (
-    <div>
-      {/* Status filter — quiet buttons, no new component pattern. */}
-      <div className="flex flex-wrap gap-2 mb-5">
-        {FILTERS.map((f) => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => setFilter(f)}
-            className={[
-              'text-[12.5px] font-medium px-3 py-1.5 rounded-pill border',
-              filter === f
-                ? 'bg-ink text-white border-transparent'
-                : 'bg-surface text-ink-2 border-hairline-strong hover:bg-surface-sunk',
-            ].join(' ')}
-          >
-            {f === 'all' ? 'All' : f}
-          </button>
-        ))}
-      </div>
+  /** Rider names come from the rows themselves — no extra request to fill a filter. */
+  const riderOptions = useMemo(() => {
+    const names = new Set<string>()
+    for (const d of deliveries.data ?? []) if (d.agentName) names.add(d.agentName)
+    return [...names].sort().map((n) => ({ value: n, label: n }))
+  }, [deliveries.data])
 
-      {deliveries.isPending ? (
-        <Panel>
-          <p className="text-body text-muted">Loading deliveries…</p>
-        </Panel>
-      ) : deliveries.isError ? (
-        <Panel>
-          <p role="alert" className="text-[13px] text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2">
-            {deliveries.error instanceof ApiError
-              ? deliveries.error.message
-              : 'Deliveries could not be loaded.'}
-          </p>
-        </Panel>
-      ) : deliveries.data.length === 0 ? (
-        <Panel>
-          <p className="text-body text-muted">
-            {filter === 'all'
-              ? 'No deliveries yet. Run the seed script or book a parcel.'
-              : `Nothing is ${filter}.`}
-          </p>
-        </Panel>
-      ) : (
-        <Panel title={`${deliveries.data.length} deliveries`}>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse min-w-[720px]">
-              <thead>
-                <tr>
-                  {['Tracking', 'Route', 'Status', 'Rider', 'Value', ''].map((h) => (
-                    <th
-                      key={h}
-                      className="text-left text-[11px] font-semibold uppercase tracking-[0.13em] text-faint pb-3 border-b border-hairline"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {deliveries.data.map((d) => (
-                  <tr key={d._id} className="border-b border-hairline last:border-b-0 align-top">
-                    <td className="py-3 pr-4">
-                      <span className="mono text-[12.5px] font-medium">{d.trackingId}</span>
-                      {d.isOverdue ? (
-                        <span className="block text-[11px] text-failed-ink font-medium">
-                          overdue
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="py-3 pr-4 text-[13px] text-ink-2">
-                      {d.pickupArea} → {d.dropArea}
-                      <span className="block text-[11.5px] text-faint">
-                        {d.pickupZone} → {d.dropZone}
-                      </span>
-                    </td>
-                    <td className="py-3 pr-4">
-                      <Badge status={d.status} />
-                    </td>
-                    <td className="py-3 pr-4 text-[13px]">
-                      {d.agentName ?? <span className="text-faint">unassigned</span>}
-                    </td>
-                    <td className="py-3 pr-4">
-                      <span className="mono text-[13px]">{formatTaka(d.total)}</span>
-                      {d.isCod ? (
-                        <span
-                          className={[
-                            'block text-[11px] mono',
-                            // Cash a rider is still carrying is the figure an
-                            // admin is scanning for; settled cash is history.
-                            d.codStatus === 'collected'
-                              ? 'text-transit-ink'
-                              : d.codStatus === 'failed'
-                                ? 'text-failed-ink'
-                                : 'text-faint',
-                          ].join(' ')}
-                        >
-                          COD {formatTaka(d.codAmount)}
-                          {d.codStatus === 'collected'
-                            ? ' · held'
-                            : d.codStatus === 'settled'
-                              ? ' · settled'
-                              : d.codStatus === 'failed'
-                                ? ' · not collected'
-                                : ''}
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="py-3">
-                      {/*
-                        Assignment is only offered while it is legal — before
-                        pickup (section 5). The server refuses regardless.
-                      */}
-                      {d.status === 'Booked' || d.status === 'Assigned' ? (
-                        <Button
-                          onClick={() =>
-                            setOpenFor(openFor === d._id ? null : d._id)
-                          }
-                        >
-                          {d.agentId ? 'Reassign' : 'Assign'}
-                        </Button>
-                      ) : (
-                        <span className="text-[11.5px] text-faint">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {openFor ? (
-            <AssignPanel
-              deliveryId={openFor}
-              currentAgentId={
-                deliveries.data.find((d) => d._id === openFor)?.agentId ?? null
-              }
-              onClose={() => setOpenFor(null)}
-            />
-          ) : null}
-        </Panel>
-      )}
-    </div>
+  const rows = useMemo(
+    () =>
+      (deliveries.data ?? []).filter(
+        (d) =>
+          (zone === '' || d.pickupZone === zone || d.dropZone === zone) &&
+          (rider === '' || d.agentName === rider),
+      ),
+    [deliveries.data, zone, rider],
   )
+
+  const view = paginate(rows, page, PER_PAGE)
+  const resetPage = <T,>(set: (v: T) => void) => (v: T) => {
+    set(v)
+    setPage(1)
+  }
+
+  if (deliveries.isPending) {
+    return (
+      <Card>
+        <p className="text-body text-muted">Loading deliveries…</p>
+      </Card>
+    )
+  }
+
+  if (deliveries.isError) {
+    return (
+      <Card>
+        <p
+          role="alert"
+          className="text-sm text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2"
+        >
+          {deliveries.error instanceof ApiError
+            ? deliveries.error.message
+            : 'Deliveries could not be loaded.'}
+        </p>
+      </Card>
+    )
+  }
+
+  return (
+    <Card pad={false}>
+      <FilterBar>
+        <SelectFilter
+          label="All statuses"
+          value={filter === 'all' ? '' : filter}
+          onChange={resetPage((v: DeliveryStatus | '') => setFilter(v === '' ? 'all' : v))}
+          options={deliveryStatusSchema.options.map((o) => ({ value: o, label: o }))}
+        />
+        <SelectFilter
+          label="All zones"
+          value={zone}
+          onChange={resetPage(setZone)}
+          options={zoneName.options.map((z) => ({ value: z, label: z }))}
+        />
+        <SelectFilter
+          label="All riders"
+          value={rider}
+          onChange={resetPage(setRider)}
+          options={riderOptions}
+        />
+        <Button
+          size="sm"
+          variant="ink"
+          className="ml-auto"
+          onClick={() => exportCsv(rows)}
+          disabled={rows.length === 0}
+        >
+          Export
+        </Button>
+      </FilterBar>
+
+      {rows.length === 0 ? (
+        <div className="px-18px py-8 text-center">
+          <p className="text-body text-muted">
+            {(deliveries.data ?? []).length === 0
+              ? 'No deliveries yet. Run the seed script or book a parcel.'
+              : 'Nothing matches those filters.'}
+          </p>
+        </div>
+      ) : (
+        <TableScroll min={940}>
+          <Thead
+            cols={['Tracking', 'Recipient', 'Progress', 'Rider', 'Zone', 'COD', 'Status', '']}
+          />
+          <tbody>
+            {view.slice.map((d) => (
+              <Tr key={d._id}>
+                <Td>
+                  <Link
+                    to={`/customer/track/${d.parcelId}`}
+                    className="mono text-small font-medium hover:text-accent whitespace-nowrap inline-flex items-center min-h-6"
+                  >
+                    {d.trackingId}
+                  </Link>
+                  {d.isOverdue ? (
+                    <span className="block text-eyebrow text-failed-ink font-medium">
+                      overdue
+                    </span>
+                  ) : null}
+                </Td>
+                <Td>
+                  <Who name={d.recipientName} sub={`${d.pickupArea} → ${d.dropArea}`} />
+                </Td>
+                <Td>
+                  <div className="w-[86px]">
+                    <LifecycleRail status={d.status} />
+                  </div>
+                </Td>
+                <Td>
+                  {d.agentName ?? <span className="text-muted">Unassigned</span>}
+                </Td>
+                <Td className="text-ink-2">{d.dropZone}</Td>
+                <Td>
+                  {d.isCod ? (
+                    <>
+                      <span className="mono text-small">{formatTaka(d.codAmount)}</span>
+                      <span
+                        className={[
+                          'block text-eyebrow',
+                          // Cash a rider is still carrying is the figure an
+                          // admin is scanning for; settled cash is history.
+                          d.codStatus === 'collected'
+                            ? 'text-transit-ink'
+                            : d.codStatus === 'failed'
+                              ? 'text-failed-ink'
+                              : 'text-faint',
+                        ].join(' ')}
+                      >
+                        {d.codStatus === 'collected'
+                          ? 'held'
+                          : d.codStatus === 'settled'
+                            ? 'settled'
+                            : d.codStatus === 'failed'
+                              ? 'not collected'
+                              : 'on delivery'}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-muted">—</span>
+                  )}
+                </Td>
+                <Td>
+                  <Badge status={d.status} />
+                </Td>
+                <Td align="right">
+                  {/*
+                    Assignment is only offered while it is legal — before
+                    pickup (section 5). The server refuses regardless.
+                  */}
+                  {d.status === 'Booked' || d.status === 'Assigned' ? (
+                    <Button
+                      size="sm"
+                      variant={d.agentId ? 'quiet' : 'primary'}
+                      onClick={() => setOpenFor(openFor === d._id ? null : d._id)}
+                    >
+                      {d.agentId ? 'Reassign' : 'Assign'}
+                    </Button>
+                  ) : (
+                    <Link to={`/customer/track/${d.parcelId}`} className="inline-flex">
+                      <Button size="sm">View</Button>
+                    </Link>
+                  )}
+                </Td>
+              </Tr>
+            ))}
+          </tbody>
+        </TableScroll>
+      )}
+
+      {openFor ? (
+        <div className="px-18px pb-4">
+          <AssignPanel
+            deliveryId={openFor}
+            currentAgentId={rows.find((d) => d._id === openFor)?.agentId ?? null}
+            onClose={() => setOpenFor(null)}
+          />
+        </div>
+      ) : null}
+
+      <Pager
+        page={view.page}
+        pageCount={view.pageCount}
+        total={rows.length}
+        from={view.from}
+        to={view.to}
+        onPage={setPage}
+      />
+    </Card>
+  )
+}
+
+/**
+ * Export what is on screen, filters included.
+ *
+ * A Blob and an <a download>, so no dependency and no server round trip — the
+ * rows are already in the browser. Exporting the FILTERED set rather than
+ * everything is the point: an admin who narrowed to one rider's failed COD
+ * parcels wants those, not all 412.
+ */
+const exportCsv = (rows: readonly DeliveryListItem[]): void => {
+  const head = ['Tracking', 'Recipient', 'Status', 'Rider', 'Pickup zone', 'Drop zone', 'Total', 'COD', 'COD status']
+  const cell = (v: string | number | null): string => {
+    const s = v === null ? '' : String(v)
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const csv = [
+    head.join(','),
+    ...rows.map((d) =>
+      [
+        d.trackingId,
+        d.recipientName,
+        d.status,
+        d.agentName,
+        d.pickupZone,
+        d.dropZone,
+        d.total,
+        d.isCod ? d.codAmount : '',
+        d.isCod ? (d.codStatus ?? '') : '',
+      ]
+        .map(cell)
+        .join(','),
+    ),
+  ].join('\n')
+
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `deliveries-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
 }

@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
 import type { DelayedParcel } from '@pdms/shared'
-import { Badge } from '@/components/Badge'
-import { Eyebrow, Note, Panel } from '@/components/Panel'
+import { Badge, Pill } from '@/components/Badge'
+import { Button } from '@/components/Button'
+import { Card, Eyebrow, Note } from '@/components/Card'
 import { StatCard, StatIcons } from '@/components/StatCard'
 import { ApiError } from '@/lib/api'
 import { formatDateTime, formatTaka } from '@/lib/format'
@@ -26,25 +27,25 @@ const lateness = (minutes: number): string => {
 }
 
 const DelayedRow = ({ p }: { p: DelayedParcel }) => (
-  <div className="flex items-start justify-between gap-4 py-3 border-b border-hairline last:border-b-0">
+  <div className="flex items-start justify-between gap-4 py-3 border-b border-border last:border-b-0">
     <div className="min-w-0">
       <Link
         to={`/track/${p.parcelId}`}
-        className="mono text-[12.5px] font-medium underline decoration-hairline-strong hover:decoration-ink"
+        className="mono text-small font-medium underline decoration-border-strong hover:decoration-ink"
       >
         {p.trackingId}
       </Link>
-      <div className="text-[12px] text-muted mt-0.5">
+      <div className="text-meta text-muted mt-0.5">
         {p.dropZone} · {p.agentName ?? 'unassigned'}
         {p.isCod ? ` · COD ${formatTaka(p.codAmount)}` : ''}
       </div>
     </div>
     <div className="text-right flex-none">
       <Badge status={p.status} />
-      <div className="mono text-[11.5px] text-failed-ink mt-1">
+      <div className="mono text-tiny text-failed-ink mt-1">
         {lateness(p.minutesLate)}
       </div>
-      <div className="mono text-[11px] text-faint">
+      <div className="mono text-eyebrow text-faint">
         due {formatDateTime(p.expectedBy)}
       </div>
     </div>
@@ -57,31 +58,31 @@ export const AnalyticsDashboard = () => {
   if (analytics.isPending) {
     return (
       <div className="grid gap-5">
-        <Panel>
+        <Card>
           <p className="text-body text-muted">Counting deliveries…</p>
-        </Panel>
-        <Panel>
+        </Card>
+        <Card>
           <p className="text-body text-muted">Measuring the zones…</p>
-        </Panel>
+        </Card>
       </div>
     )
   }
 
   if (analytics.isError) {
     return (
-      <Panel title="Analytics">
+      <Card title="Analytics">
         <p
           role="alert"
-          className="text-[13px] text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2"
+          className="text-sm text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2"
         >
           {analytics.error instanceof ApiError
             ? analytics.error.message
             : 'The dashboard could not be loaded.'}
         </p>
-        <p className="text-[12.5px] text-muted mt-3">
+        <p className="text-small text-muted mt-3">
           The board and the map are unaffected — this screen only reads figures.
         </p>
-      </Panel>
+      </Card>
     )
   }
 
@@ -91,9 +92,9 @@ export const AnalyticsDashboard = () => {
 
   return (
     <div className="grid gap-5">
-      {/* ---- the stat strip ---- */}
-      <Panel>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      {/* ---- the stat strip: one card per figure, per v3's .g4 ---- */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
           <StatCard
             label="Total deliveries"
             value={d.totalDeliveries.value}
@@ -101,50 +102,66 @@ export const AnalyticsDashboard = () => {
             stat={d.totalDeliveries}
             deltaLabel={deltaLabel}
           />
+        </Card>
+        <Card>
+          {/* The accent chip: parcels in flight is what this screen is about. */}
           <StatCard
-            label="Active right now"
+            accent
+            label="Active now"
             value={d.activeDeliveries.value}
             icon={StatIcons.clock}
             stat={d.activeDeliveries}
             deltaLabel={deltaLabel}
           />
+        </Card>
+        <Card>
           <StatCard
             label="Riders on shift"
             value={d.activeAgents.value}
             icon={StatIcons.rider}
             stat={d.activeAgents}
           />
+        </Card>
+        <Card>
           <StatCard
-            label={`Revenue · last ${d.comparisonWindowHours} h`}
+            label={`Revenue · ${d.comparisonWindowHours} h`}
             value={formatTaka(d.revenue.value)}
             icon={StatIcons.taka}
             stat={d.revenue}
             deltaLabel={deltaLabel}
           />
-        </div>
-      </Panel>
+        </Card>
+      </div>
 
       {nothingYet ? (
-        <Panel title="Nothing to measure yet">
+        <Card title="Nothing to measure yet">
           <p className="text-body text-muted mb-2">
             No parcels have been booked, so there is nothing to chart. Run{' '}
-            <span className="mono text-[12.5px]">npm run seed</span> for the demo
+            <span className="mono text-small">npm run seed</span> for the demo
             data, or book a parcel as a customer.
           </p>
-        </Panel>
+        </Card>
       ) : (
-        <div className="grid gap-5 lg:grid-cols-[1fr_360px] items-start">
-          <Panel title="Zone performance">
+        <div className="grid gap-4 lg:grid-cols-[1fr_290px] items-start">
+          <Card
+            title="Zone performance"
+            action={
+              <span className="text-tiny text-faint">Delivered · still moving</span>
+            }
+          >
             <ZonePerformanceChart zones={d.zones} />
-          </Panel>
+          </Card>
 
-          <div className="grid gap-5">
+          <div className="grid gap-4">
             {/* ---- delayed alerts ---- */}
-            <Panel
-              title={
-                d.delayed.count === 0
-                  ? 'Delayed parcels'
-                  : `Delayed · ${d.delayed.count}`
+            <Card
+              title="Delayed"
+              action={
+                d.delayed.count > 0 ? (
+                  <Pill tone="failed">{d.delayed.count}</Pill>
+                ) : (
+                  <span className="text-tiny text-faint">none</span>
+                )
               }
             >
               {d.delayed.count === 0 ? (
@@ -158,27 +175,24 @@ export const AnalyticsDashboard = () => {
                     <DelayedRow key={p.deliveryId} p={p} />
                   ))}
                   {d.delayed.count > d.delayed.parcels.length ? (
-                    <p className="text-[11.5px] text-faint mt-3">
+                    <p className="text-tiny text-faint mt-3">
                       Showing the {d.delayed.parcels.length} latest of{' '}
                       {d.delayed.count}.
                     </p>
                   ) : null}
                 </>
               )}
-            </Panel>
+            </Card>
 
-            <Panel title="Cash on delivery">
+            <Card title="Cash on delivery">
               <Eyebrow>Held by riders</Eyebrow>
-              <div className="mono text-[22px] font-medium tracking-[-0.03em]">
+              <div className="mono text-figure-lg font-medium tracking-[-0.04em] mt-1">
                 {formatTaka(d.codOutstanding)}
               </div>
-              <Link
-                to="/admin/cod"
-                className="inline-block text-[12.5px] font-medium text-ink underline decoration-hairline-strong hover:decoration-ink mt-3"
-              >
-                Reconcile
+              <Link to="/admin/cod" className="inline-flex mt-11px">
+                <Button size="sm">Reconcile</Button>
               </Link>
-            </Panel>
+            </Card>
           </div>
         </div>
       )}

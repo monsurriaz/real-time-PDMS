@@ -1,108 +1,152 @@
 /**
- * THE DESIGN SYSTEM. Generated from docs/design-system.html — if the
- * two ever disagree, the HTML wins (CLAUDE.md section 4).
+ * THE DESIGN SYSTEM — v3 Meridian.
  *
- * Do not add a value here to satisfy one screen. Every colour, radius and
- * font in the app resolves to something in this file.
+ * Generated from docs/design-system-v3-meridian.html. If the two ever
+ * disagree, the HTML wins (CLAUDE.md rule 2).
+ *
+ * v3 fully supersedes the original system. The warm paper palette, the orange
+ * accent and the header-only layout are retired — `--paper`, `--hairline` and
+ * `--accent: #EA4E1B` no longer exist under any name, so a component still
+ * asking for them fails to build rather than quietly rendering the old look.
  *
  * Radii live in @theme rather than :root because Tailwind's --radius-*
  * namespace and the design system's radius names are the same names — one
  * declaration serves both `rounded-sm` and `var(--radius-sm)`, instead of two
- * that can drift apart.
+ * that can drift apart. The type scale is here for the same reason.
  */
 @theme {
-  /**
-   * `--radius-chip` (the 38px stat-card icon tile) and `--radius-xs` (the
-   * wordmark dot) are values design-system.html already uses. They are named
-   * here for the same reason the optical spacing steps are: the reference wins
-   * on disagreement, so its values belong in the scale rather than appearing as
-   * arbitrary brackets in a component.
-   */
-  --radius-xs: 2px;
   --radius-sm: 8px;
-  --radius-chip: 11px;
   --radius-md: 12px;
   --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-chip: 11px;
+  --radius-mark: 3px;
   --radius-pill: 999px;
 
   /**
-   * Two type sizes design-system.html uses constantly and tokens.css never
-   * named, so every screen wrote them as `text-body` / `text-control`.
-   * Rule 1 covers fonts as much as it covers spacing: an arbitrary-value
-   * bracket in a diff should be a signal, and it stops being one when 34 of
-   * them are load-bearing.
-   *
-   * Named by the job rather than the number, because that is what a component
-   * is choosing — reading text, or a form control.
+   * The type scale, named by the job a component is choosing rather than by
+   * its pixel value. v3 uses fourteen sizes, and rule 1 covers fonts as much
+   * as spacing: an arbitrary-value bracket in a diff should be a signal, and
+   * it stops being one when every screen writes `text-[12.5px]`.
    */
+  /** Only ever under a lifecycle rail, where the segment carries the meaning. */
+  --text-rail: 10px;
+  --text-micro: 10.5px;
+  --text-eyebrow: 11px;
+  --text-tiny: 11.5px;
+  --text-meta: 12px;
+  --text-small: 12.5px;
+  --text-sm: 13px;
   --text-body: 13.5px;
-  --text-control: 14.5px;
+  --text-control: 14px;
+  --text-base: 14.5px;
+  --text-md: 15px;
+  --text-lg: 16px;
+  /** v3's `.authmark` — the wordmark on the sign-in card. */
+  --text-mark: 17px;
+  --text-title: 21px;
+  --text-h2: 26px;
+  --text-hero: 30px;
+
+  /** Mono display sizes — money and counts that carry a screen. */
+  --text-figure: 19px;
+  --text-figure-lg: 24px;
+  --text-figure-xl: 27px;
 }
 
 :root {
-  /* surfaces */
-  --paper: #faf9f7;
+  /**
+   * CHROME — the navigation frame. Always dark, in both the public pages and
+   * the app. The workspace is never dark; nothing in this block belongs on a
+   * content surface.
+   */
+  --chrome: #1b1f27;
+  --chrome-2: #232936;
+  --chrome-3: #2e3542;
+  --chrome-ink: #f2f3f5;
+  --chrome-muted: #8a91a0;
+  --chrome-faint: #636a79;
+
+  /* workspace */
+  --page: #f7f8fa;
   --surface: #ffffff;
-  --surface-sunk: #f4f2ee;
-  --hairline: #e9e6e0;
-  --hairline-strong: #d8d4cc;
+  --surface-sunk: #f1f3f6;
+  --border: #e7e9ee;
+  --border-strong: #d6d9e0;
 
-  /* ink */
-  --ink: #14140f;
-  --ink-2: #4a4740;
-  --muted: #6b6862;
-  --faint: #9c988f;
+  --ink: #111420;
+  --ink-2: #3c4254;
+  --muted: #6c7280;
+  --faint: #9aa0ad;
 
-  /* accent — flat, never a gradient */
-  --accent: #ea4e1b;
-  --accent-press: #c63e11;
-  --accent-tint: #fff1eb;
+  --accent: #3b4ef0;
+  --accent-hover: #2e3ecc;
+  --accent-tint: #eef0fe;
+  /** The accent, lightened enough to read on chrome. Never used on --surface. */
+  --accent-on-dark: #8fa0ff;
 
-  /* lifecycle ramp */
-  --s-booked: #8a8f98;
-  --s-booked-bg: #eff0f2;
-  --s-booked-ink: #454a52;
-  --s-assigned: #4c6ef5;
-  --s-assigned-bg: #e9edfd;
-  --s-assigned-ink: #26307a;
-  --s-picked: #0e9891;
-  --s-picked-bg: #e0f3f1;
-  --s-picked-ink: #0a4f4b;
-  --s-transit: #ea4e1b;
-  --s-transit-bg: #fff1eb;
-  --s-transit-ink: #8f2c0c;
-  --s-delivered: #17864f;
-  --s-delivered-bg: #e3f3e9;
-  --s-delivered-ink: #0d4a2c;
-  --s-failed: #c9342c;
-  --s-failed-bg: #fcebea;
-  --s-failed-ink: #7a1c17;
+  /**
+   * LIFECYCLE RAMP — cool rotation, energy rising, ending green.
+   *
+   * In transit IS the accent: the brand colour is a lifecycle state, not
+   * decoration, so ultramarine is on screen exactly when a parcel is moving.
+   * Violet and ultramarine never sit adjacent on the rail, which is what keeps
+   * them distinguishable under protanopia.
+   */
+  --s-booked: #7c8394;
+  --s-booked-bg: #eef0f3;
+  --s-booked-ink: #3f4552;
+  --s-assigned: #8b5cf6;
+  --s-assigned-bg: #f1ebfe;
+  --s-assigned-ink: #4a2596;
+  --s-picked: #06a6c2;
+  --s-picked-bg: #e0f5f9;
+  --s-picked-ink: #075a6b;
+  --s-transit: #3b4ef0;
+  --s-transit-bg: #eef0fe;
+  --s-transit-ink: #1e2aa0;
+  --s-delivered: #12996b;
+  --s-delivered-bg: #e1f4ec;
+  --s-delivered-ink: #0a5b3f;
+  --s-failed: #dc3a34;
+  --s-failed-bg: #fcedec;
+  --s-failed-ink: #8c1f1b;
+
+  /**
+   * Pending — new in v3, for a rider awaiting approval. The only amber in the
+   * system, which is what makes it read as "waiting on a person" rather than
+   * as another lifecycle step.
+   */
+  --s-pending: #c4820a;
+  --s-pending-bg: #fdf3df;
+  --s-pending-ink: #79500a;
 
   /**
    * Cancelled, by name.
    *
-   * design-system.html defines six badge variants for seven lifecycle states,
-   * and Cancelled has always borrowed Booked's neutral grey — the right
-   * appearance (a cancelled parcel is inert, not failed; red would misreport
-   * it), reached by aliasing rather than by choice. These are var() references
-   * on purpose: identical to Booked today, and a single place to change if the
-   * two ever need to differ.
+   * The lifecycle has seven states and v3 draws seven badges, but Cancelled is
+   * not among them — it shares Booked's neutral grey, deliberately: a
+   * cancelled parcel is inert, not failed, and borrowing the red would
+   * misreport it. These are var() references, so the two are identical today
+   * and separable in one place if they ever need to differ.
    */
   --s-cancelled: var(--s-booked);
   --s-cancelled-bg: var(--s-booked-bg);
   --s-cancelled-ink: var(--s-booked-ink);
 
-  /* The design system calls the 12px radius --radius; Tailwind's scale calls
-     it --radius-md. Same value, both names resolve. */
-  --radius: var(--radius-md);
-  --pill: var(--radius-pill);
+  /**
+   * Map ground — v3's `.maparea` colour. Used behind the canvas so a tile that
+   * has not painted yet is the right grey rather than white, and as the base
+   * the positron tile style is recoloured towards (see lib/mapStyle.ts).
+   */
+  --map-ground: #e9ecf1;
 
   /**
-   * Spacing scale (CLAUDE.md section 4), in two families.
+   * Spacing, in two families.
    *
-   * GRID STEPS — --space-N is N x 4px. The numbering deliberately matches
-   * Tailwind's default spacing scale, so `p-4` and var(--space-4) are both
-   * 16px and cannot drift. Use these when CHOOSING spacing.
+   * GRID STEPS — --space-N is N x 4px. The numbering matches Tailwind's
+   * default spacing scale, so `p-4` and var(--space-4) are both 16px and
+   * cannot drift. Use these when CHOOSING spacing.
    */
   --space-1: 4px;
   --space-2: 8px;
@@ -117,18 +161,20 @@
   --space-16: 64px;
 
   /**
-   * OPTICAL STEPS — the off-grid values design-system.html actually uses.
+   * OPTICAL STEPS — the off-grid values the reference actually uses.
    *
-   * Named in literal pixels rather than as fractions of the grid: seven of
-   * the twelve are odd numbers, and --space-3-75 reads worse than the 15px it
-   * stands for. The `px` suffix always means literal pixels, which is what
-   * keeps --space-14 (56px) and --space-14px (14px) from being confusable.
+   * Named in literal pixels rather than as fractions of the grid: most are odd
+   * numbers, and --space-3-75 reads worse than the 15px it stands for. The
+   * `px` suffix always means literal pixels, which keeps --space-14 (56px) and
+   * --space-14px (14px) from being confusable.
    *
-   * These exist so the reference's values are tokens instead of raw pixels.
+   * They exist so the reference's values are tokens instead of raw pixels.
    * They are not an invitation to widen the palette — reach for one only to
    * match a specific value in the locked HTML.
    */
+  --space-3px: 3px;
   --space-5px: 5px;
+  --space-6px: 6px;
   --space-7px: 7px;
   --space-9px: 9px;
   --space-10px: 10px;
@@ -138,31 +184,46 @@
   --space-15px: 15px;
   --space-17px: 17px;
   --space-18px: 18px;
+  --space-19px: 19px;
+  --space-21px: 21px;
   --space-22px: 22px;
+  --space-26px: 26px;
   --space-30px: 30px;
+  --space-34px: 34px;
 
-  --font: "Manrope", system-ui, -apple-system, sans-serif;
+  /**
+   * Inter Tight, not Inter: the tighter tracking is what keeps large headings
+   * from feeling generic, and it is the single change that most separates v3
+   * from the old build. JetBrains Mono carries every number without exception.
+   */
+  --font: "Inter Tight", system-ui, -apple-system, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, monospace;
-  --display: "Montserrat", var(--font);
 }
 
 /**
  * Tailwind reads the design system rather than shipping its own palette.
  * `--color-*: initial` removes every default colour, so `bg-blue-500` simply
- * does not exist — which is what stops rule 1 of CLAUDE.md from being broken
- * by muscle memory.
+ * does not exist — which is what stops rule 1 from being broken by muscle
+ * memory.
  *
- * `inline` makes the generated utilities reference var(--paper) directly
+ * `inline` makes the generated utilities reference var(--page) directly
  * instead of adding a second indirection.
  */
 @theme inline {
   --color-*: initial;
 
-  --color-paper: var(--paper);
+  --color-chrome: var(--chrome);
+  --color-chrome-2: var(--chrome-2);
+  --color-chrome-3: var(--chrome-3);
+  --color-chrome-ink: var(--chrome-ink);
+  --color-chrome-muted: var(--chrome-muted);
+  --color-chrome-faint: var(--chrome-faint);
+
+  --color-page: var(--page);
   --color-surface: var(--surface);
   --color-surface-sunk: var(--surface-sunk);
-  --color-hairline: var(--hairline);
-  --color-hairline-strong: var(--hairline-strong);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
 
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
@@ -170,10 +231,12 @@
   --color-faint: var(--faint);
 
   --color-accent: var(--accent);
-  --color-accent-press: var(--accent-press);
+  --color-accent-hover: var(--accent-hover);
   --color-accent-tint: var(--accent-tint);
+  --color-accent-on-dark: var(--accent-on-dark);
 
   --color-white: #ffffff;
+  --color-map-ground: var(--map-ground);
 
   --color-booked: var(--s-booked);
   --color-booked-bg: var(--s-booked-bg);
@@ -193,13 +256,15 @@
   --color-failed: var(--s-failed);
   --color-failed-bg: var(--s-failed-bg);
   --color-failed-ink: var(--s-failed-ink);
+  --color-pending: var(--s-pending);
+  --color-pending-bg: var(--s-pending-bg);
+  --color-pending-ink: var(--s-pending-ink);
   --color-cancelled: var(--s-cancelled);
   --color-cancelled-bg: var(--s-cancelled-bg);
   --color-cancelled-ink: var(--s-cancelled-ink);
 
   --font-sans: var(--font);
   --font-mono: var(--mono);
-  --font-display: var(--display);
 
   /**
    * Optical steps as utilities, so a component can write `py-11px` instead of
@@ -209,7 +274,9 @@
    * The grid steps need no entry here: Tailwind's own --spacing multiplier
    * (.25rem) already makes p-1 .. p-16 land exactly on them.
    */
+  --spacing-3px: var(--space-3px);
   --spacing-5px: var(--space-5px);
+  --spacing-6px: var(--space-6px);
   --spacing-7px: var(--space-7px);
   --spacing-9px: var(--space-9px);
   --spacing-10px: var(--space-10px);
@@ -219,6 +286,10 @@
   --spacing-15px: var(--space-15px);
   --spacing-17px: var(--space-17px);
   --spacing-18px: var(--space-18px);
+  --spacing-19px: var(--space-19px);
+  --spacing-21px: var(--space-21px);
   --spacing-22px: var(--space-22px);
+  --spacing-26px: var(--space-26px);
   --spacing-30px: var(--space-30px);
+  --spacing-34px: var(--space-34px);
 }

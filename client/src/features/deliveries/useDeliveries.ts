@@ -12,8 +12,12 @@ import { api } from '@/lib/api'
 
 export const deliveriesKey = ['deliveries'] as const
 
-export const useDeliveries = (status?: DeliveryStatus | 'all') =>
+export const useDeliveries = (
+  status?: DeliveryStatus | 'all',
+  opts?: { enabled?: boolean },
+) =>
   useQuery({
+    ...(opts?.enabled === undefined ? {} : { enabled: opts.enabled }),
     queryKey: [...deliveriesKey, status ?? 'all'],
     queryFn: () =>
       api.get<{ deliveries: DeliveryListItem[] }>(

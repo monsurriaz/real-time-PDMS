@@ -70,6 +70,37 @@ const toSelf = async (agent: AgentLean): Promise<AgentSelf> => {
   }
 }
 
+/**
+ * GET /agents/counts — what the admin rail shows beside "Riders".
+ *
+ * `pendingApproval` counts riders waiting to be let in. The approval flow is
+ * M6.5c and no rider carries an approval field yet, so the honest answer today
+ * is 0 — but it is REPORTED as a query rather than assumed, because the first
+ * attempt here was `countDocuments({ approvalStatus: 'pending' })` and Mongoose
+ * silently dropped the unknown path under strictQuery and counted every rider
+ * instead. A filter on a field that does not exist does not mean "none"; it
+ * means "no filter". Hence the explicit `strictQuery: false`, which makes Mongo
+ * evaluate the condition it was given and answer 0 until the field is real.
+ */
+agentsRouter.get('/counts', requireAuth, requireRole('admin'), async (_req, res, next) => {
+  try {
+    const [total, onShift, pendingApproval] = await runAsSystem(
+      'agents: rail counts',
+      async () =>
+        Promise.all([
+          AgentModel.countDocuments({}).exec(),
+          AgentModel.countDocuments({ status: { $ne: 'offline' } }).exec(),
+          AgentModel.countDocuments({ approvalStatus: 'pending' })
+            .setOptions({ strictQuery: false })
+            .exec(),
+        ]),
+    )
+    res.json({ total, onShift, pendingApproval })
+  } catch (err) {
+    next(err)
+  }
+})
+
 agentsRouter.get('/me', requireAuth, requireRole('agent'), async (req, res, next) => {
   try {
     const actor = req.actor

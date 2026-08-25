@@ -2,13 +2,13 @@ import type { ReactNode } from 'react'
 import type { StatCard as StatCardData } from '@pdms/shared'
 
 /**
- * The `.stat` pattern from docs/design-system.html: a 38px ink chip holding a
- * 20px icon, beside a 12.5px muted label and a 22px mono value with an optional
- * delta.
+ * The `.stat` pattern from docs/design-system-v3-meridian.html: a 38px chip at
+ * radius-11 holding an 18px icon, beside a 12px muted label and a 21px mono
+ * value with an optional delta.
  *
- * CLAUDE.md section 3 lists StatCard among the shared components; this is that
- * component, built from the reference rather than invented for one screen — so
- * the analytics dashboard introduces no new pattern.
+ * v3 gives one chip per screen the accent fill (`.chip.acc`) — the figure the
+ * screen is actually about. Everything else is ink, so the accent still means
+ * "this is the thing that moves".
  */
 
 interface Props {
@@ -25,6 +25,8 @@ interface Props {
    * up is good — so direction alone cannot pick the colour.
    */
   riseIsGood?: boolean
+  /** The one figure this screen is about. At most one per view. */
+  accent?: boolean
 }
 
 export const StatCard = ({
@@ -34,24 +36,30 @@ export const StatCard = ({
   stat,
   deltaLabel,
   riseIsGood = true,
+  accent = false,
 }: Props) => {
   const delta = stat?.deltaPct ?? null
   const rising = delta !== null && delta > 0
   const good = delta === null || delta === 0 ? null : rising === riseIsGood
 
   return (
-    <div className="flex items-center gap-13px">
-      <span className="w-[38px] h-[38px] rounded-chip bg-ink text-white flex items-center justify-center flex-none">
+    <div className="flex items-center gap-3">
+      <span
+        className={[
+          'w-[38px] h-[38px] rounded-chip text-white flex items-center justify-center flex-none',
+          accent ? 'bg-accent' : 'bg-ink',
+        ].join(' ')}
+      >
         {icon}
       </span>
       <div className="min-w-0">
-        <div className="text-[12.5px] text-muted font-medium">{label}</div>
-        <div className="mono text-[22px] font-medium tracking-[-0.03em] leading-[1.15]">
+        <div className="text-meta text-muted font-medium">{label}</div>
+        <div className="mono text-title font-medium tracking-[-0.04em] leading-[1.2]">
           {value}
           {delta !== null && delta !== 0 ? (
             <span
               className={[
-                'text-[11.5px] font-semibold ml-1.5 font-sans',
+                'text-eyebrow font-semibold ml-1.5 font-sans',
                 good ? 'text-delivered' : 'text-failed',
               ].join(' ')}
             >
@@ -61,7 +69,7 @@ export const StatCard = ({
           ) : null}
         </div>
         {deltaLabel && delta !== null ? (
-          <div className="text-[11px] text-faint">{deltaLabel}</div>
+          <div className="text-eyebrow text-faint">{deltaLabel}</div>
         ) : null}
       </div>
     </div>
@@ -71,8 +79,8 @@ export const StatCard = ({
 /** The four icons the dashboard uses, kept beside the component that draws them. */
 const stroke = {
   viewBox: '0 0 24 24',
-  width: 20,
-  height: 20,
+  width: 18,
+  height: 18,
   fill: 'none',
   stroke: 'currentColor',
   strokeWidth: 1.7,

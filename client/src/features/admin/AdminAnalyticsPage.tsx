@@ -1,13 +1,12 @@
-import { RoleShell } from '@/components/RoleShell'
-import { ADMIN_NAV } from './AdminHome'
+import { AppShell, PageHead } from '@/components/AppShell'
 import { AnalyticsDashboard } from './AnalyticsDashboard'
 
 export const AdminAnalyticsPage = () => (
-  <RoleShell
-    title="Analytics"
-    subtitle="How the fleet is performing by zone, and what is running late."
-    nav={ADMIN_NAV}
-  >
+  <AppShell title="Analytics">
+    <PageHead
+      title="Analytics"
+      sub="How the fleet is performing by zone, and what is running late."
+    />
     <AnalyticsDashboard />
-  </RoleShell>
+  </AppShell>
 )

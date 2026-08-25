@@ -1,13 +1,14 @@
 import { Link, useParams } from 'react-router-dom'
 import type { GeoPoint, ProofOfDelivery } from '@pdms/shared'
 import { Badge } from '@/components/Badge'
+import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
 import { LifecycleRail } from '@/components/LifecycleRail'
 import { LazyTrackingMap } from '@/components/LazyTrackingMap'
 import type { MapRider } from '@/components/TrackingMap'
 import { ApiError } from '@/lib/api'
 import { formatDateTime, formatKg, formatTaka } from '@/lib/format'
-import { RoleShell } from '@/components/RoleShell'
+import { AppShell } from '@/components/AppShell'
 import { ConnectionPill } from './ConnectionPill'
 import { EventTimeline } from './EventTimeline'
 import { useLiveTracking } from './useLiveTracking'
@@ -18,18 +19,13 @@ import { useLiveTracking } from './useLiveTracking'
  * lifecycle rail, rider card, key-value block, event timeline.
  *
  * The map is the largest object on the page and the only place saturated
- * colour appears; everything else is paper, ink and hairlines.
+ * colour appears; everything else is page, ink and borders.
  */
 
-const NAV = [
-  { to: '/', label: 'My parcels' },
-  { to: '/book', label: 'Book' },
-] as const
-
 const KeyRow = ({ k, children }: { k: string; children: React.ReactNode }) => (
-  <div className="flex justify-between items-baseline py-10px border-b border-hairline last:border-b-0">
-    <span className="text-[12.5px] text-muted">{k}</span>
-    <span className="text-[13px]">{children}</span>
+  <div className="flex justify-between items-baseline py-10px border-b border-border last:border-b-0">
+    <span className="text-small text-muted">{k}</span>
+    <span className="text-sm">{children}</span>
   </div>
 )
 
@@ -57,11 +53,11 @@ const kmBetween = (a: GeoPoint, b: GeoPoint): number => {
  */
 const DeliveryCode = ({ code, expiresAt }: { code: string; expiresAt: string }) => (
   <div className="mt-4 p-4 border-l-2 border-accent bg-accent-tint rounded-r-sm">
-    <p className="text-[11px] font-semibold uppercase tracking-[0.13em] text-accent-press">
+    <p className="text-eyebrow font-semibold uppercase tracking-[0.13em] text-accent-hover">
       Delivery code
     </p>
-    <p className="mono text-[27px] font-medium tracking-[0.22em] mt-1">{code}</p>
-    <p className="text-[12px] text-ink-2 mt-1.5">
+    <p className="mono text-figure-xl font-medium tracking-[0.22em] mt-1">{code}</p>
+    <p className="text-meta text-ink-2 mt-1.5">
       Read this to the rider. Expires{' '}
       <span className="mono">
         {new Date(expiresAt).toLocaleTimeString('en-BD', {
@@ -83,10 +79,10 @@ const PROOF_LABEL: Record<string, string> = {
 
 const ProofPanel = ({ proof }: { proof: ProofOfDelivery }) => (
   <div className="mt-4 p-13px bg-delivered-bg rounded-md">
-    <p className="text-[11px] font-semibold uppercase tracking-[0.13em] text-delivered-ink">
+    <p className="text-eyebrow font-semibold uppercase tracking-[0.13em] text-delivered-ink">
       Proof of delivery
     </p>
-    <p className="text-[13px] text-delivered-ink mt-1">
+    <p className="text-sm text-delivered-ink mt-1">
       {PROOF_LABEL[proof.method] ?? proof.method}
       {proof.receivedBy ? ` · ${proof.receivedBy}` : ''}
     </p>
@@ -97,12 +93,12 @@ const ProofPanel = ({ proof }: { proof: ProofOfDelivery }) => (
         href={proof.photoUrl}
         target="_blank"
         rel="noreferrer"
-        className="inline-block mt-2 text-[12.5px] font-medium text-delivered-ink underline decoration-current/40 hover:decoration-current"
+        className="inline-block mt-2 text-small font-medium text-delivered-ink underline decoration-current/40 hover:decoration-current"
       >
         View the photo
       </a>
     ) : null}
-    <p className="mono text-[11.5px] text-delivered-ink/80 mt-1.5">
+    <p className="mono text-tiny text-delivered-ink/80 mt-1.5">
       {formatDateTime(proof.capturedAt)}
     </p>
   </div>
@@ -114,24 +110,31 @@ export const TrackParcelPage = () => {
 
   if (snapshot.isPending) {
     return (
-      <RoleShell title="Tracking" nav={NAV}>
-        <p className="text-body text-muted">Loading…</p>
-      </RoleShell>
+      <AppShell title="Tracking">
+        <Card>
+          <p className="text-body text-muted">Loading the parcel…</p>
+        </Card>
+      </AppShell>
     )
   }
 
   if (snapshot.isError || !snapshot.data) {
     return (
-      <RoleShell title="Tracking" nav={NAV}>
-        <p role="alert" className="text-[13px] text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2 max-w-[520px]">
-          {snapshot.error instanceof ApiError
-            ? snapshot.error.message
-            : 'This parcel could not be loaded.'}
-        </p>
-        <Link to="/" className="inline-block mt-4">
-          <Button>Back to my parcels</Button>
-        </Link>
-      </RoleShell>
+      <AppShell title="Tracking">
+        <Card>
+          <p
+            role="alert"
+            className="text-sm text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2 max-w-[520px]"
+          >
+            {snapshot.error instanceof ApiError
+              ? snapshot.error.message
+              : 'This parcel could not be loaded.'}
+          </p>
+          <Link to="/customer/parcels" className="inline-block mt-4">
+            <Button>Back to my parcels</Button>
+          </Link>
+        </Card>
+      </AppShell>
     )
   }
 
@@ -154,26 +157,52 @@ export const TrackParcelPage = () => {
     point && parcel.drop.point ? kmBetween(point, parcel.drop.point) : null
 
   return (
-    <RoleShell title="Tracking" nav={NAV}>
-      {/* The `.screen` frame from the reference: one surface, hairline, radius-lg. */}
-      <div className="bg-surface border border-hairline rounded-lg overflow-hidden">
-        <div className="flex items-center gap-3 px-5 py-[14px] border-b border-hairline">
-          <Link to="/" className="text-[12.5px] text-muted hover:text-ink">
-            My parcels
-          </Link>
-          <span className="text-faint">/</span>
-          <span className="mono text-[12.5px] font-medium">{parcel.trackingId}</span>
-          <div className="ml-auto">
-            <ConnectionPill mode={mode} />
+    <AppShell
+      title={parcel.trackingId}
+      titleAside={
+        <span className="flex items-center gap-2">
+          <Badge status={delivery.status} />
+          <ConnectionPill mode={mode} compact />
+        </span>
+      }
+    >
+      {/*
+        v3 puts the map FIRST and the detail column at 310px on the right —
+        the reverse of the old build. The map is the largest object on the page
+        and the only place saturated colour appears, so it leads.
+      */}
+      <div className="bg-surface border border-border rounded-lg overflow-hidden">
+        <div className="grid lg:grid-cols-[1fr_310px]">
+          {/* The map: largest object on the page. */}
+          <div className="relative min-h-[340px] lg:min-h-[560px] bg-map-ground">
+            <LazyTrackingMap
+              className="absolute inset-0"
+              riders={riders}
+              route={route}
+              pickup={parcel.pickup.point}
+              drop={parcel.drop.point}
+              trail={history}
+              follow={moving}
+              animate
+            />
+            {riders.length === 0 ? (
+              // Floated clear of the bottom edge: the tile attribution lives
+              // there, and a full-width bar sat on top of the credit the
+              // licence requires us to show.
+              <div className="absolute inset-x-3 bottom-8 flex justify-center pointer-events-none">
+                <p className="text-small text-muted bg-surface/[0.94] border border-border rounded-pill px-3 py-1.5">
+                  {moving
+                    ? 'Waiting for the first position from the rider.'
+                    : 'Not moving — no live position to show.'}
+                </p>
+              </div>
+            ) : null}
           </div>
-        </div>
 
-        {/* 340px detail column beside the map, per the reference. */}
-        <div className="grid lg:grid-cols-[340px_1fr]">
-          <div className="lg:border-r border-hairline p-22px">
+          <div className="lg:border-l border-border p-18px overflow-auto">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[19px] font-semibold tracking-[-0.02em]">
+                <div className="text-figure font-semibold tracking-[-0.02em]">
                   {delivery.status === 'InTransit'
                     ? 'On the way'
                     : delivery.status === 'Delivered'
@@ -184,11 +213,15 @@ export const TrackParcelPage = () => {
                           ? 'Cancelled'
                           : 'Preparing'}
                 </div>
-                <div className="text-[13px] text-muted mt-0.5">
+                <div className="text-sm text-muted mt-0.5">
                   {parcel.pickup.area} → {parcel.drop.area}
                 </div>
               </div>
-              <Badge status={delivery.status} />
+              {/*
+                No badge here: the shell header carries the status now, and two
+                copies of the same pill on one screen makes neither the
+                authority.
+              */}
             </div>
 
             <div className="my-5">
@@ -206,12 +239,12 @@ export const TrackParcelPage = () => {
 
             {rider ? (
               <div className="flex items-center gap-11px p-[13px] bg-surface-sunk rounded-md my-4">
-                <div className="w-9 h-9 rounded-full bg-hairline-strong flex-none" />
+                <div className="w-9 h-9 rounded-full bg-border-strong flex-none" />
                 <div className="flex-1 min-w-0">
                   <div className="text-body font-semibold truncate">
                     {rider.name}
                   </div>
-                  <div className="text-[12px] text-muted">
+                  <div className="text-meta text-muted">
                     {distanceKm !== null
                       ? `${distanceKm.toFixed(1)} km away · ${rider.vehicle}`
                       : rider.vehicle}
@@ -220,7 +253,7 @@ export const TrackParcelPage = () => {
               </div>
             ) : (
               <div className="p-[13px] bg-surface-sunk rounded-md my-4">
-                <p className="text-[12.5px] text-muted">
+                <p className="text-small text-muted">
                   No rider assigned yet.
                 </p>
               </div>
@@ -252,7 +285,7 @@ export const TrackParcelPage = () => {
               </KeyRow>
               {delivery.lastLocationAt && mode !== 'live' ? (
                 <KeyRow k="Position from">
-                  <span className="mono text-[12px]">
+                  <span className="mono text-meta">
                     {new Date(delivery.lastLocationAt).toLocaleTimeString('en-BD', {
                       hour: '2-digit',
                       minute: '2-digit',
@@ -271,30 +304,8 @@ export const TrackParcelPage = () => {
             />
           </div>
 
-          {/* The map: largest object on the page. */}
-          <div className="relative min-h-[430px] lg:min-h-[560px] bg-surface-sunk">
-            <LazyTrackingMap
-              className="absolute inset-0"
-              riders={riders}
-              route={route}
-              pickup={parcel.pickup.point}
-              drop={parcel.drop.point}
-              trail={history}
-              follow={moving}
-              animate
-            />
-            {riders.length === 0 ? (
-              <div className="absolute inset-x-0 bottom-0 p-3 bg-paper/[0.92] border-t border-hairline">
-                <p className="text-[12.5px] text-muted text-center">
-                  {moving
-                    ? 'Waiting for the first position from the rider.'
-                    : 'This parcel is not moving — no live position to show.'}
-                </p>
-              </div>
-            ) : null}
-          </div>
         </div>
       </div>
-    </RoleShell>
+    </AppShell>
   )
 }

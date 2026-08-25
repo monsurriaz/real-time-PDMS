@@ -14,10 +14,11 @@ import { formatTaka } from '@/lib/format'
  * The design system is frozen (CLAUDE.md rule 2), so the palette cannot be
  * fixed — the form has to change instead.
  *
- * So this is the emphasis form: the measure that matters (completed) in ink,
- * everything still open as a recessive track, and every other number printed
- * beside the bar as a mono figure. Nobody has to distinguish two hues to read
- * it, which also means it survives a rider's phone in daylight and a printout.
+ * So this is the emphasis form: the measure that matters (completed) as an ink
+ * fill in a sunk track, and every other number printed beside the bar as a mono
+ * figure. Nobody has to distinguish two hues to read it, which also means it
+ * survives a printout — and it is why v3 kept the form when the palette
+ * changed underneath it.
  *
  * Horizontal because the categories are long-named Dhaka zones, and no reader
  * should have to tilt their head to find Mohammadpur.
@@ -27,40 +28,23 @@ interface Props {
   zones: readonly ZonePerformance[]
 }
 
-/** The bar itself. A 2px surface gap keeps the two segments from touching. */
-const Bar = ({
-  completed,
-  open,
-  max,
-}: {
-  completed: number
-  open: number
-  max: number
-}) => {
-  const pct = (n: number): string => `${max > 0 ? (n / max) * 100 : 0}%`
-  return (
-    <div className="flex items-center gap-[2px] h-[10px]" aria-hidden="true">
-      {completed > 0 ? (
-        <span
-          className="h-full bg-ink rounded-pill"
-          style={{ width: pct(completed) }}
-        />
-      ) : null}
-      {open > 0 ? (
-        <span
-          className="h-full bg-hairline-strong rounded-pill"
-          style={{ width: pct(open) }}
-        />
-      ) : null}
-    </div>
-  )
-}
-
-const Swatch = ({ className, label }: { className: string; label: string }) => (
-  <span className="inline-flex items-center gap-1.5 text-[11.5px] text-muted">
-    <span className={`w-[10px] h-[10px] rounded-pill ${className}`} />
-    {label}
-  </span>
+/**
+ * v3's zone bar: a 7px sunk track with an ink fill for the delivered share.
+ *
+ * The old build drew two abutting segments and needed a 2px gap between them
+ * to stay readable. A filled track says the same thing with one shape, and it
+ * stays legible at 7px where two segments did not.
+ */
+const Bar = ({ completed, total }: { completed: number; total: number }) => (
+  <div
+    className="flex h-[7px] rounded-pill overflow-hidden bg-surface-sunk"
+    aria-hidden="true"
+  >
+    <span
+      className="bg-ink"
+      style={{ width: `${total > 0 ? (completed / total) * 100 : 0}%` }}
+    />
+  </div>
 )
 
 export const ZonePerformanceChart = ({ zones }: Props) => {
@@ -78,14 +62,10 @@ export const ZonePerformanceChart = ({ zones }: Props) => {
 
   return (
     <div>
-      {/* Two segments, so a legend is present — identity is never colour-alone. */}
-      <div className="flex flex-wrap gap-4 mb-5">
-        <Swatch className="bg-ink" label="Delivered" />
-        <Swatch className="bg-hairline-strong" label="Still moving" />
-        <span className="text-[11.5px] text-faint">
-          Failed and cancelled parcels are counted in the numbers, not the bar.
-        </span>
-      </div>
+      <p className="text-tiny text-faint mb-4">
+        The bar is the delivered share of each zone. Failed and cancelled
+        parcels are counted in the numbers beside it, not in the bar.
+      </p>
 
       <div className="grid gap-4">
         {zones.map((z) => (
@@ -99,11 +79,11 @@ export const ZonePerformanceChart = ({ zones }: Props) => {
             className="rounded-sm focus-visible:outline-none"
           >
             <div className="flex items-baseline justify-between gap-4 mb-1.5">
-              <span className="text-[13px] font-medium">{z.zone}</span>
+              <span className="text-sm font-medium">{z.zone}</span>
               {/* Direct-labelled, so the recessive track never has to carry
                   meaning on contrast alone. */}
               {z.total > 0 ? (
-                <span className="mono text-[12.5px] text-muted">
+                <span className="mono text-small text-muted">
                   <span className="text-ink font-medium">{z.completed}</span>
                   {' / '}
                   {z.total}
@@ -115,16 +95,16 @@ export const ZonePerformanceChart = ({ zones }: Props) => {
             {z.total === 0 ? (
               // A serviceable zone with no parcels. An empty bar reads as a
               // rendering fault; saying so reads as a fact about the business.
-              <p className="text-[11.5px] text-faint">
+              <p className="text-tiny text-faint">
                 No parcels booked into this zone yet.
               </p>
             ) : (
-              <Bar completed={z.completed} open={z.open} max={max} />
+              <Bar completed={z.completed} total={z.total} />
             )}
 
             <div
               className={[
-                'flex flex-wrap items-baseline gap-x-4 gap-y-0.5 mt-1.5 text-[11.5px]',
+                'flex flex-wrap items-baseline gap-x-4 gap-y-0.5 mt-1.5 text-tiny',
                 z.total === 0 ? 'hidden' : '',
               ].join(' ')}
             >

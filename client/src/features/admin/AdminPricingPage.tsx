@@ -1,13 +1,12 @@
-import { RoleShell } from '@/components/RoleShell'
-import { ADMIN_NAV } from './AdminHome'
+import { AppShell, PageHead } from '@/components/AppShell'
 import { PricingEditor } from './PricingEditor'
 
 export const AdminPricingPage = () => (
-  <RoleShell
-    title="Pricing"
-    subtitle="Changes apply to the next booking. Already-booked parcels keep their price."
-    nav={ADMIN_NAV}
-  >
+  <AppShell title="Pricing">
+    <PageHead
+      title="Pricing"
+      sub="Changes apply to the next booking. Already-booked parcels keep their price."
+    />
     <PricingEditor />
-  </RoleShell>
+  </AppShell>
 )

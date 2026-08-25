@@ -32,19 +32,39 @@ const COPY: Record<ConnectionMode, { label: string; detail: string; tone: string
   },
 }
 
-export const ConnectionPill = ({ mode }: { mode: ConnectionMode }) => {
+/**
+ * `compact` drops the explanatory line to a tooltip. In v3 this sits in the
+ * app header beside the tracking ID, where a second line would push the whole
+ * header taller on every screen — the detail is still there on hover and for
+ * a screen reader, which is where it was doing its work anyway.
+ */
+export const ConnectionPill = ({
+  mode,
+  compact = false,
+}: {
+  mode: ConnectionMode
+  compact?: boolean
+}) => {
   const c = COPY[mode]
+  const pill = (
+    <span
+      className={`inline-flex items-center gap-6px rounded-pill py-1 pr-11px pl-9px text-meta font-medium ${c.tone}`}
+      role="status"
+      aria-live="polite"
+      title={compact ? c.detail : undefined}
+    >
+      <i className="w-[5.5px] h-[5.5px] rounded-full bg-current flex-none" />
+      {c.label}
+      {compact ? <span className="sr-only"> — {c.detail}</span> : null}
+    </span>
+  )
+
+  if (compact) return pill
+
   return (
     <div>
-      <span
-        className={`inline-flex items-center gap-7px rounded-pill py-5px pr-3 pl-10px text-[12.5px] font-medium ${c.tone}`}
-        role="status"
-        aria-live="polite"
-      >
-        <i className="w-1.5 h-1.5 rounded-full bg-current flex-none" />
-        {c.label}
-      </span>
-      <p className="text-[11.5px] text-faint mt-1.5">{c.detail}</p>
+      {pill}
+      <p className="text-tiny text-muted mt-1.5">{c.detail}</p>
     </div>
   )
 }

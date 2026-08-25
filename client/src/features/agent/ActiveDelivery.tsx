@@ -34,7 +34,7 @@ const ADVANCE_LABEL: Record<string, string> = {
   Delivered: 'Mark delivered',
 }
 
-const CAPS = 'text-[11px] font-semibold uppercase tracking-[0.13em] text-muted'
+const CAPS = 'text-eyebrow font-semibold uppercase tracking-[0.13em] text-ink-2'
 
 export const ActiveDelivery = ({ d }: { d: DeliveryListItem }) => {
   const advance = useAdvanceStatus()
@@ -68,11 +68,11 @@ export const ActiveDelivery = ({ d }: { d: DeliveryListItem }) => {
   }
 
   return (
-    <div className="w-[372px] max-w-full mx-auto border border-hairline rounded-[26px] bg-surface overflow-hidden mb-5">
+    <div className="w-[372px] max-w-full mx-auto border border-border rounded-[26px] bg-surface overflow-hidden mb-5">
       {/* ---- head ---- */}
-      <div className="px-[18px] pt-4 pb-3 border-b border-hairline">
+      <div className="px-[18px] pt-4 pb-3 border-b border-border">
         <div className="flex items-center justify-between gap-3">
-          <span className="mono text-[12.5px] font-medium">{d.trackingId}</span>
+          <span className="mono text-small font-medium">{d.trackingId}</span>
           <Badge status={d.status} />
         </div>
         <div className="mt-14px">
@@ -83,7 +83,7 @@ export const ActiveDelivery = ({ d }: { d: DeliveryListItem }) => {
       {/* ---- body ---- */}
       <div className="p-[18px]">
         <div className={CAPS}>Deliver to</div>
-        <div className="text-[17px] font-semibold mt-5px tracking-[-0.015em]">
+        <div className="text-mark font-semibold mt-5px tracking-[-0.015em]">
           {d.recipientName}
         </div>
         <div className="text-body text-muted mt-0.5">
@@ -124,7 +124,7 @@ export const ActiveDelivery = ({ d }: { d: DeliveryListItem }) => {
             </div>
             {/* The largest thing on the screen, per the reference's rationale:
                 this is the number that gets a rider in trouble. */}
-            <div className="mono text-[29px] font-medium tracking-[-0.035em] mt-1">
+            <div className="mono text-figure-xl font-medium tracking-[-0.035em] mt-1">
               {formatTaka(d.codAmount)}
             </div>
           </div>
@@ -134,7 +134,7 @@ export const ActiveDelivery = ({ d }: { d: DeliveryListItem }) => {
         {nextStep === 'Delivered' || d.hasProofOfDelivery ? <PodCapture d={d} /> : null}
 
         {err ? (
-          <p role="alert" className="text-[12.5px] text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2 mt-4">
+          <p role="alert" className="text-small text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2 mt-4">
             {err}
           </p>
         ) : null}
@@ -154,13 +154,13 @@ export const ActiveDelivery = ({ d }: { d: DeliveryListItem }) => {
             {needsProof ? (
               // The reference says "Needs a photo or OTP first". All three
               // methods are live now, so the line names all three.
-              <p className="text-[11.5px] text-muted text-center mt-11px">
+              <p className="text-tiny text-muted text-center mt-11px">
                 Needs a photo, code, or signature first
               </p>
             ) : null}
           </>
         ) : (
-          <p className="text-[13px] text-muted text-center mt-5">
+          <p className="text-sm text-muted text-center mt-5">
             Nothing left to do on this one.
           </p>
         )}
@@ -168,8 +168,8 @@ export const ActiveDelivery = ({ d }: { d: DeliveryListItem }) => {
         {/* ---- the quiet exception path ---- */}
         {canFail ? (
           showFail ? (
-            <div className="mt-5 pt-4 border-t border-hairline">
-              <label htmlFor={`fn-${d._id}`} className="block text-[12.5px] font-medium text-ink-2 mb-1.5">
+            <div className="mt-5 pt-4 border-t border-border">
+              <label htmlFor={`fn-${d._id}`} className="block text-small font-medium text-ink-2 mb-1.5">
                 What went wrong?
               </label>
               <input
@@ -178,7 +178,7 @@ export const ActiveDelivery = ({ d }: { d: DeliveryListItem }) => {
                 placeholder="Recipient not reachable"
                 onChange={(e) => setFailureNote(e.target.value)}
                 className="w-full min-h-12 font-sans text-control text-ink px-13px py-11px mb-3
-                           border border-hairline-strong rounded-sm bg-surface outline-none
+                           border border-border-strong rounded-sm bg-surface outline-none
                            focus:border-accent focus:ring-[3px] focus:ring-accent-tint"
               />
               <Button
@@ -191,7 +191,7 @@ export const ActiveDelivery = ({ d }: { d: DeliveryListItem }) => {
               <button
                 type="button"
                 onClick={() => setShowFail(false)}
-                className="w-full min-h-12 text-[12px] text-muted hover:text-ink mt-3"
+                className="w-full min-h-12 text-meta text-muted hover:text-ink mt-3"
               >
                 Back
               </button>
@@ -200,7 +200,7 @@ export const ActiveDelivery = ({ d }: { d: DeliveryListItem }) => {
             <button
               type="button"
               onClick={() => setShowFail(true)}
-              className="w-full min-h-12 text-[12.5px] font-medium text-muted hover:text-ink mt-4 py-2"
+              className="w-full min-h-12 text-small font-medium text-muted hover:text-ink mt-4 py-2"
             >
               Can&apos;t deliver
             </button>

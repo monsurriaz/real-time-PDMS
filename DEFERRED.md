@@ -37,9 +37,28 @@ debt are all in Resolved. What is left is what M6 stopped short of, and why.
 | Webhook is acknowledged before the ledger write | M5 | Untouched, and still the right trade: the provider never waits on our database, and a dropped event is recoverable by resending from the dashboard. |
 | Proof photos are never deleted from Cloudinary | M5 | Untouched. The preset is unsigned and no API secret is in `.env`, so the server cannot delete. |
 | HEIC photos may not compress | M5 | Untouched. Falls back to an honest error and the rider uses OTP or signature. Worth one test on a real iPhone before the demo. |
-| **Primary button contrast: 3.75:1** | M6 | **Found, not fixed — needs your decision.** White on `--accent` at 15.5px measures 3.75:1, below WCAG AA's 4.5:1 for text that size. It is the design system's signature component and CLAUDE.md rule 2 freezes it, so M6 reported rather than restyled. Two ways out, both design-system changes: darken `--accent` for text-bearing surfaces, or take the `lg` button to ≥18.66px, where the large-text threshold is 3:1 and the current pair passes. |
-| Topbar wordmark link is a 26px target | M6 | Found during the rider mobile pass. Shared chrome across all three roles, so raising it to 48px is a visual change on every screen — left alone for the same reason as the row above. Riders tap the log-out button, which is now 48px for them. |
 | No admin unassign | M3 | Untouched, and explicitly out of scope for M6: it would add a lifecycle transition, which is a decision to take deliberately rather than as part of a polish pass. |
+
+---
+
+## M6.5b / M6.5c — the rest of the v3 rebuild
+
+M6.5a did foundations, routes, the shell and the screens that already existed.
+These are the pieces it deliberately stopped before.
+
+| Item | Target | Notes |
+|---|---|---|
+| **Rider workspace rebuild** | M6.5b | `/agent/runs` is still the old single column of stacked cards — moved onto the new shell and tokens so it is not broken, and nothing more. v3 replaces it with a route map beside the active delivery, and adds `/agent/runs/:id`. |
+| `/agent/finished` | M6.5b | In the rail, dimmed, carrying its real count. The screen does not exist. |
+| **Landing page at `/`** | M6.5c | `/` currently forwards a signed-in visitor to their role default. v3 says it should show the public page with a link to the dashboard instead — a signed-in person is still allowed to read the marketing copy. That needs copy to exist, so `LandingPlaceholder` is replaced rather than edited. |
+| Sign-up and the approval flow | M6.5c | `/signup`, `/agent/pending`, `/admin/agents`. The rail's Riders item is dimmed and its pending count is already wired — it reads 0 because no rider carries an approval field yet, which is the honest answer until the flow exists. |
+| Profiles | M6.5c | `/customer/profile`, `/agent/profile`, `/admin/profile`. The account menu's Profile item is present and disabled. |
+| **Public tracking by tracking ID** | M6.5c | v3's route table has `/track/:trackingId` as PUBLIC — track without logging in. Today `/track/:parcelId` redirects to the customer screen, which needs a session. The public version needs an unauthenticated lookup endpoint, which is server work this session was scoped out of. |
+| Search field | M6.5c | Presentational. A real input, disabled, labelled "coming in M6.5c" rather than a decorative box that swallows keystrokes. Wiring it means a server search across tracking IDs, customers and riders. |
+| Notification bell | M6.5c | Presentational and disabled. There is no notification store; v3 draws an unread dot, and showing one over nothing would be a lie. |
+| Zones nav item | M6.5c | v3's admin rail has Operations / Analytics / COD, then Riders / Pricing / **Zones**. Zones has no screen and no count, so it is omitted rather than dimmed — an empty row for a screen nobody has asked for is noise. |
+| Seed leaves settlement records behind | M6.5c | `npm run seed` clears seeded parcels and their payments but not `Settlement` documents, so the COD screen's audit trail can reference payments that no longer exist — visible now as a rider with a settlement in the trail but "—" in the Settled column. One `deleteMany` in `seed-parcels.ts`. |
+| Rider disabled controls at 2.36:1 | M6.5b | v3's disabled state is `--faint` on `--surface-sunk`, which is correct for a desktop console and close to invisible on a phone in daylight. WCAG exempts disabled controls, so this is a judgement call, not a violation — decide it during the rider rebuild rather than by restyling v3's disabled spec globally. |
 
 ---
 
@@ -67,6 +86,10 @@ debt are all in Resolved. What is left is what M6 stopped short of, and why.
 | The delivery code goes to the parcel's OWNER, never the rider | Deliberate. The rider is the party OTP proof exists to check; a code visible on the rider's screen makes the proof worth no more than their word. The server decides this by role, not by scoping. |
 | POD photo uploads go browser → Cloudinary, not through our server | Deliberate, and what the unsigned preset in CLAUDE.md §2 implies. The server holds no API secret and verifies that a submitted URL names our own cloud — a 175 KB image left the phone and a 184-byte record reached Mongo. |
 | `Payment.amount` means two different sums | Deliberate. COD tracks the cash at the door (`codAmount`), card tracks the delivery fee (`price.total`). Two payers, two amounts, one field — resolved once in `amountFor()` rather than at each call site. |
+| positron stays as the tile style, recoloured in code | Deliberate, and measured. v3's map ground is cool (#E9ECF1); OpenFreeMap's positron is rgb(242,243,240) and bright/liberty are #F8F4F0, all warm, and fiord is a dark style which v3 rules out. positron is the closest to neutral and the one CLAUDE.md names, so `lib/mapStyle.ts` shifts its greys onto the cool axis after load. Same tiles, same URL, same free tier. |
+| The rail's counts mean "needs attention", not "how many exist" | Deliberate, and it is v3's stated reason for the rail carrying counts at all. My parcels counts parcels still moving, not everything ever sent; COD counts riders holding cash, not the amount. |
+| Table headers and `.who` sub-lines use `--muted`, where v3 specifies `--faint` | Deliberate. Measured: `--faint` on `--surface` is 2.62:1. A column header is content — it is what tells a reader what the column means. `--muted` is 4.83:1 and comes from the same palette, so this narrows which token is used rather than inventing one. Decorative `--faint` (placeholders, "flat" hints) is untouched. |
+| The rail's group headings and counts use `--chrome-muted`, where v3 specifies `--chrome-faint` | Same reasoning: 3.04:1 against 5.24:1, and v3's own note says the counts are the reason the rail exists. |
 | The zone chart is single-hue, not a status-coloured stacked bar | Deliberate. The lifecycle ramp fails as an adjacent categorical set — transit orange against failed red is ΔE 8.7 for normal vision, and orange against delivered green is 5.9 under protanopia. The palette is frozen, so the form changed instead: ink for completed, a recessive track for open, every number direct-labelled. |
 | Analytics reads through `find()` rather than an aggregation | Deliberate. `$lookup`/`$match` bypass the roleScope query middleware entirely. The figures are counted in JavaScript inside `runAsSystem`, where "unscoped" is stated rather than accidental. Revisit only if the collection outgrows a course demo. |
 | `PROMISED_WINDOW_HOURS = 24` lives in one constant, not in config | Deliberate for now. CLAUDE.md states no service level; one named constant in `lifecycle.ts` is the honest version of "not decided yet". If the promise ever varies by zone or weight it belongs in `PricingConfig` beside the rates. |
@@ -79,6 +102,9 @@ debt are all in Resolved. What is left is what M6 stopped short of, and why.
 
 | Item | Milestone | Commit |
 |---|---|---|
+| Disabled buttons were a washed-out accent ("Mark delivered") | M6.5a | `PENDING3` |
+| Primary button contrast — v3's accent is 5.89:1 on white, against v1's 3.75:1 | M6.5a | `PENDING3` |
+| Topbar wordmark as a 26px target — the header shell is gone; the rail's is 37-46px | M6.5a | `PENDING3` |
 | **Socket room authorisation bypass** (agents could join any parcel room) | M6 | `cd8904f` |
 | `roleScope` merged with `Query.where`, so same-key filters overwrote | M6 | `cd8904f` |
 | Admin analytics: stat cards, zone chart, delayed alerts, revenue | M6 | `cd8904f` |

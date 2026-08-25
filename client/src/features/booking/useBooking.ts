@@ -44,8 +44,9 @@ export const useBookParcel = () => {
   })
 }
 
-export const useParcels = () =>
+export const useParcels = (opts?: { enabled?: boolean }) =>
   useQuery({
+    ...(opts?.enabled === undefined ? {} : { enabled: opts.enabled }),
     queryKey: parcelsKey,
     queryFn: () => api.get<{ parcels: ParcelListItem[] }>('/parcels'),
     select: (d) => d.parcels,

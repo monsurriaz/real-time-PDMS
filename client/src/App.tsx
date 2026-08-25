@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { AdminAnalyticsPage } from '@/features/admin/AdminAnalyticsPage'
 import { AdminCodPage } from '@/features/admin/AdminCodPage'
 import { AdminHome } from '@/features/admin/AdminHome'
@@ -6,20 +6,39 @@ import { AdminPricingPage } from '@/features/admin/AdminPricingPage'
 import { AgentHome } from '@/features/agent/AgentHome'
 import { BookParcelPage } from '@/features/booking/BookParcelPage'
 import { CustomerHome } from '@/features/customer/CustomerHome'
+import { LandingPlaceholder } from '@/features/public/LandingPlaceholder'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { RequireRole } from '@/features/auth/RequireRole'
 import { TrackParcelPage } from '@/features/tracking/TrackParcelPage'
 
 /**
- * Three role-gated routes plus login. The gate is convenience only — the
- * server enforces the same rules independently.
+ * Routes, per the table in docs/design-system-v3-meridian.html.
+ *
+ * Public routes are unprefixed; every authenticated route sits under its role,
+ * so the URL always states who you are. The gate is a convenience for the
+ * person using the app, NOT a security boundary — the server enforces the same
+ * rules independently on every request behind these screens.
+ *
+ * Nothing 404s. The pre-v3 paths are still live as redirects, because a
+ * bookmarked /book landing on a blank page is the kind of breakage a
+ * restructure is supposed to avoid rather than cause.
  */
+
+/** `/track/:parcelId` kept its parameter; only its prefix moved. */
+const TrackRedirect = () => {
+  const { parcelId } = useParams<{ parcelId: string }>()
+  return <Navigate to={`/customer/track/${parcelId ?? ''}`} replace />
+}
+
 export const App = () => (
   <Routes>
+    {/* ---------- public ---------- */}
+    <Route path="/" element={<LandingPlaceholder />} />
     <Route path="/login" element={<LoginPage />} />
 
+    {/* ---------- customer ---------- */}
     <Route
-      path="/"
+      path="/customer/parcels"
       element={
         <RequireRole roles={['customer']}>
           <CustomerHome />
@@ -27,30 +46,42 @@ export const App = () => (
       }
     />
     <Route
-      path="/book"
+      path="/customer/book"
       element={
         <RequireRole roles={['customer']}>
           <BookParcelPage />
         </RequireRole>
       }
     />
+    {/* Customers and admins both track; the server scopes what they can see. */}
     <Route
-      path="/agent"
+      path="/customer/track/:parcelId"
+      element={
+        <RequireRole roles={['customer', 'admin']}>
+          <TrackParcelPage />
+        </RequireRole>
+      }
+    />
+
+    {/* ---------- agent ---------- */}
+    <Route
+      path="/agent/runs"
       element={
         <RequireRole roles={['agent']}>
           <AgentHome />
         </RequireRole>
       }
     />
+
+    {/* ---------- admin ---------- */}
     <Route
-      path="/admin"
+      path="/admin/board"
       element={
         <RequireRole roles={['admin']}>
           <AdminHome />
         </RequireRole>
       }
     />
-
     <Route
       path="/admin/analytics"
       element={
@@ -59,7 +90,6 @@ export const App = () => (
         </RequireRole>
       }
     />
-
     <Route
       path="/admin/cod"
       element={
@@ -68,7 +98,6 @@ export const App = () => (
         </RequireRole>
       }
     />
-
     <Route
       path="/admin/pricing"
       element={
@@ -78,16 +107,21 @@ export const App = () => (
       }
     />
 
-    {/* Customers and admins both track; the server scopes what they can see. */}
-    <Route
-      path="/track/:parcelId"
-      element={
-        <RequireRole roles={['customer', 'admin']}>
-          <TrackParcelPage />
-        </RequireRole>
-      }
-    />
+    {/*
+      ---------- pre-v3 paths ----------
+      Redirects, not re-mounted screens: the address bar has to end up on the
+      new URL, or the next reload starts from the old one again.
+    */}
+    <Route path="/book" element={<Navigate to="/customer/book" replace />} />
+    <Route path="/agent" element={<Navigate to="/agent/runs" replace />} />
+    <Route path="/admin" element={<Navigate to="/admin/board" replace />} />
+    <Route path="/track/:parcelId" element={<TrackRedirect />} />
 
+    {/*
+      Anything else goes to the landing placeholder, which forwards a signed-in
+      visitor to their own default. Sending an unknown URL straight to a role
+      home would be wrong for a signed-out visitor, who has no role yet.
+    */}
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>
 )

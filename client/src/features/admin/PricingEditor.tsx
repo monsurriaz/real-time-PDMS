@@ -9,7 +9,7 @@ import {
 } from '@pdms/shared'
 import { Button } from '@/components/Button'
 import { Field, SelectField } from '@/components/Field'
-import { Eyebrow, KeyValue, Note, Panel } from '@/components/Panel'
+import { Card, Eyebrow, KeyValue, Note } from '@/components/Card'
 import { ApiError } from '@/lib/api'
 import { formatKm, formatTaka } from '@/lib/format'
 import {
@@ -187,7 +187,7 @@ export const PricingEditor = () => {
     <form onSubmit={submit} noValidate>
       <div className="grid gap-5 lg:grid-cols-[1fr_320px] items-start">
         <div className="grid gap-5">
-          <Panel title="Distance rate">
+          <Card title="Distance rate">
             <Field
               label="Per kilometre"
               type="number"
@@ -202,9 +202,9 @@ export const PricingEditor = () => {
                 edit({ ...current, perKmRate: Number(e.target.value) })
               }
             />
-          </Panel>
+          </Card>
 
-          <Panel
+          <Card
             title="Weight tiers"
             action={
               <Button type="button" onClick={addTier}>
@@ -212,7 +212,7 @@ export const PricingEditor = () => {
               </Button>
             }
           >
-            <p className="text-[12.5px] text-muted mb-4">
+            <p className="text-small text-muted mb-4">
               Bounds are inclusive and must ascend without overlapping. A
               parcel is charged the first tier its weight fits. Leave{' '}
               <b className="font-semibold text-ink">+ ৳/kg</b> blank for a flat
@@ -226,7 +226,7 @@ export const PricingEditor = () => {
               {['Up to (kg)', 'Fee (৳)', '+ ৳/kg over', 'Label', ''].map((h) => (
                 <span
                   key={h}
-                  className="text-[11px] font-semibold uppercase tracking-[0.13em] text-faint"
+                  className="text-eyebrow font-semibold uppercase tracking-[0.13em] text-faint"
                 >
                   {h}
                 </span>
@@ -236,7 +236,7 @@ export const PricingEditor = () => {
             {current.weightTiers.map((tier, i) => (
               <div
                 key={i}
-                className="grid sm:grid-cols-[1fr_1fr_1fr_1.4fr_auto] gap-3 items-start border-b border-hairline last:border-b-0 py-3 first:pt-0"
+                className="grid sm:grid-cols-[1fr_1fr_1fr_1.4fr_auto] gap-3 items-start border-b border-border last:border-b-0 py-3 first:pt-0"
               >
                 <Field
                   label="Up to (kg)"
@@ -296,18 +296,18 @@ export const PricingEditor = () => {
             ))}
 
             {errors.weightTiers ? (
-              <p role="alert" className="text-[12.5px] text-failed-ink mt-3">
+              <p role="alert" className="text-small text-failed-ink mt-3">
                 {errors.weightTiers}
               </p>
             ) : null}
-          </Panel>
+          </Card>
 
-          <Panel title="Per-zone base fare">
-            <p className="text-[12.5px] text-muted mb-4">
+          <Card title="Per-zone base fare">
+            <p className="text-small text-muted mb-4">
               Optional. Leave blank to use the zone&apos;s own base fare.
             </p>
             {zones.isPending ? (
-              <p className="text-[13px] text-muted">Loading zones…</p>
+              <p className="text-sm text-muted">Loading zones…</p>
             ) : zones.data && zones.data.length > 0 ? (
               <div className="grid sm:grid-cols-2 gap-x-5">
                 {zones.data.map((z) => {
@@ -335,16 +335,16 @@ export const PricingEditor = () => {
                 })}
               </div>
             ) : (
-              <p className="text-[13px] text-muted">
+              <p className="text-sm text-muted">
                 No serviceable zones — run the seed script.
               </p>
             )}
-          </Panel>
+          </Card>
         </div>
 
         {/* ---- live worked example ---- */}
         <div className="lg:sticky lg:top-[78px] grid gap-4">
-          <Panel title="Worked example">
+          <Card title="Worked example">
             <Eyebrow>What a booking would cost right now</Eyebrow>
 
             <div className="grid grid-cols-2 gap-x-3">
@@ -384,17 +384,17 @@ export const PricingEditor = () => {
             </SelectField>
 
             {!isValid ? (
-              <p className="text-[12.5px] text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2">
+              <p className="text-small text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2">
                 Fix the errors above to see the price.
               </p>
             ) : !exampleUsable ? (
-              <p className="text-[12.5px] text-muted">
+              <p className="text-small text-muted">
                 Enter a distance and a weight above zero.
               </p>
             ) : preview.isPending ? (
-              <p className="text-[13px] text-muted">Calculating…</p>
+              <p className="text-sm text-muted">Calculating…</p>
             ) : preview.isError ? (
-              <p className="text-[12.5px] text-failed-ink">
+              <p className="text-small text-failed-ink">
                 {preview.error instanceof ApiError
                   ? preview.error.message
                   : 'Could not calculate.'}
@@ -416,27 +416,27 @@ export const PricingEditor = () => {
                     {formatTaka(preview.data.weightSurcharge)}
                   </span>
                 </KeyValue>
-                <div className="flex justify-between items-baseline pt-4 mt-1 border-t border-hairline-strong">
-                  <span className="text-[12.5px] font-semibold">Total</span>
-                  <span className="mono text-[19px] font-medium">
+                <div className="flex justify-between items-baseline pt-4 mt-1 border-t border-border-strong">
+                  <span className="text-small font-semibold">Total</span>
+                  <span className="mono text-figure font-medium">
                     {formatTaka(preview.data.total)}
                   </span>
                 </div>
               </>
             ) : null}
-          </Panel>
+          </Card>
 
-          <Panel>
+          <Card>
             {saveError ? (
               <p
                 role="alert"
-                className="text-[12.5px] text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2 mb-3"
+                className="text-small text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2 mb-3"
               >
                 {saveError}
               </p>
             ) : null}
             {saved && !dirty ? (
-              <p className="text-[12.5px] text-delivered-ink bg-delivered-bg rounded-sm px-3 py-2 mb-3">
+              <p className="text-small text-delivered-ink bg-delivered-bg rounded-sm px-3 py-2 mb-3">
                 Saved. New bookings use these rates immediately.
               </p>
             ) : null}
@@ -464,7 +464,7 @@ export const PricingEditor = () => {
                 Discard changes
               </Button>
             ) : null}
-          </Panel>
+          </Card>
 
           <Note>
             Prices are <b>snapshotted at booking</b>. Changing a rate here

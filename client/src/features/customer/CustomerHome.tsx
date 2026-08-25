@@ -1,13 +1,12 @@
-import { RoleShell } from '@/components/RoleShell'
+import { AppShell, PageHead } from '@/components/AppShell'
 import { ParcelList } from './ParcelList'
 
-const NAV = [
-  { to: '/', label: 'My parcels' },
-  { to: '/book', label: 'Book' },
-] as const
-
 export const CustomerHome = () => (
-  <RoleShell title="Your parcels" nav={NAV}>
+  <AppShell title="My parcels">
+    <PageHead
+      title="My parcels"
+      sub="Everything you have sent, and where it is right now."
+    />
     <ParcelList />
-  </RoleShell>
+  </AppShell>
 )

@@ -26,13 +26,13 @@ import { useIssueOtp, useRecordPod } from '../deliveries/useDeliveries'
  * transition, and nothing here competes with it.
  */
 
-const CAPS = 'text-[11px] font-semibold uppercase tracking-[0.13em] text-muted'
+const CAPS = 'text-eyebrow font-semibold uppercase tracking-[0.13em] text-ink-2'
 
 const FIELD = [
   // min-h-12 for the same reason the tiles are min-h-12: this is a phone in a
   // rider's hand, and section 4 puts the floor at 48px.
   'w-full min-h-12 font-sans text-control text-ink px-13px py-11px',
-  'border border-hairline-strong rounded-sm bg-surface outline-none',
+  'border border-border-strong rounded-sm bg-surface outline-none',
   'focus:border-accent focus:ring-[3px] focus:ring-accent-tint',
 ].join(' ')
 
@@ -62,7 +62,7 @@ const LABEL: Record<PodMethod, string> = {
   signature: 'Signature',
 }
 
-/** The `.pod` tile: dashed hairline, 20px icon above a 12.5px label. */
+/** The `.pod` tile: dashed border, 20px icon above a 12.5px label. */
 const PodTile = ({
   method,
   hint,
@@ -85,17 +85,17 @@ const PodTile = ({
     className={[
       // 48px minimum tap target is a floor, not a target: these are taller.
       'flex-1 min-h-12 border border-dashed rounded-md py-4 px-3 text-center',
-      'text-[12.5px] font-medium transition-colors duration-100',
+      'text-small font-medium transition-colors duration-100',
       disabled
-        ? 'border-hairline text-muted cursor-not-allowed'
+        ? 'border-border text-muted cursor-not-allowed'
         : selected
           ? 'border-accent bg-accent-tint text-ink cursor-pointer'
-          : 'border-hairline-strong text-ink-2 hover:bg-surface-sunk cursor-pointer',
+          : 'border-border-strong text-ink-2 hover:bg-surface-sunk cursor-pointer',
     ].join(' ')}
   >
     <span className="flex justify-center mb-7px">{ICON[method]}</span>
     {LABEL[method]}
-    {hint ? <span className="block text-[10.5px] font-normal mt-0.5">{hint}</span> : null}
+    {hint ? <span className="block text-micro font-normal mt-0.5">{hint}</span> : null}
   </button>
 )
 
@@ -134,7 +134,7 @@ export const PodCapture = ({ d }: Props) => {
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" className="text-delivered-ink flex-none">
             <path d="M4 12.5l5 5L20 6.5" />
           </svg>
-          <span className="text-[12.5px] font-medium text-delivered-ink">
+          <span className="text-small font-medium text-delivered-ink">
             {recorded} recorded
           </span>
         </div>
@@ -265,7 +265,7 @@ export const PodCapture = ({ d }: Props) => {
           </Button>
 
           {progress !== null ? (
-            // A 1px-hairline bar, not a spinner: the rider needs to know it is
+            // A 1px-border bar, not a spinner: the rider needs to know it is
             // moving on a slow connection, and a percentage alone reads as stuck.
             <div className="h-1 bg-surface-sunk rounded-pill mt-2 overflow-hidden">
               <div
@@ -276,7 +276,7 @@ export const PodCapture = ({ d }: Props) => {
           ) : null}
 
           {photo ? (
-            <p className="text-[11.5px] text-muted mt-2">
+            <p className="text-tiny text-muted mt-2">
               Uploaded{' '}
               <span className="mono">
                 {formatBytes(photo.from)} → {formatBytes(photo.bytes)}
@@ -284,7 +284,7 @@ export const PodCapture = ({ d }: Props) => {
               · stored as a link, not an image
             </p>
           ) : (
-            <p className="text-[11.5px] text-muted mt-2">
+            <p className="text-tiny text-muted mt-2">
               Compressed on the phone before it is sent.
             </p>
           )}
@@ -298,7 +298,7 @@ export const PodCapture = ({ d }: Props) => {
             <>
               <label
                 htmlFor={`otp-${d._id}`}
-                className="block text-[12.5px] font-medium text-ink-2 mb-1.5"
+                className="block text-small font-medium text-ink-2 mb-1.5"
               >
                 Code the recipient reads out
               </label>
@@ -311,7 +311,7 @@ export const PodCapture = ({ d }: Props) => {
                   maxLength={POD_OTP_LENGTH}
                   placeholder="000000"
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-                  className={`${FIELD} mono flex-1 min-w-0 tracking-[0.3em] text-[17px]`}
+                  className={`${FIELD} mono flex-1 min-w-0 tracking-[0.3em] text-mark`}
                 />
                 <Button
                   className="min-h-12"
@@ -321,7 +321,7 @@ export const PodCapture = ({ d }: Props) => {
                   {pod.isPending ? 'Checking…' : 'Verify'}
                 </Button>
               </div>
-              <p className="text-[11.5px] text-muted mt-2">
+              <p className="text-tiny text-muted mt-2">
                 Sent to the sender&apos;s tracking screen. Expires{' '}
                 <span className="mono">
                   {new Date(issue.data.otp.expiresAt).toLocaleTimeString('en-BD', {
@@ -342,7 +342,7 @@ export const PodCapture = ({ d }: Props) => {
               >
                 {issue.isPending ? 'Sending…' : 'Send code'}
               </Button>
-              <p className="text-[11.5px] text-muted mt-2">
+              <p className="text-tiny text-muted mt-2">
                 The code goes to the sender, never to this screen.
               </p>
             </>
@@ -355,7 +355,7 @@ export const PodCapture = ({ d }: Props) => {
         <div className="mt-14px">
           <label
             htmlFor={`rb-${d._id}`}
-            className="block text-[12.5px] font-medium text-ink-2 mb-1.5"
+            className="block text-small font-medium text-ink-2 mb-1.5"
           >
             Received by
           </label>
@@ -381,7 +381,7 @@ export const PodCapture = ({ d }: Props) => {
       {error ? (
         <p
           role="alert"
-          className="text-[12.5px] text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2 mt-3"
+          className="text-small text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2 mt-3"
         >
           {error}
         </p>

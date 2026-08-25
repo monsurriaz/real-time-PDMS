@@ -10,7 +10,7 @@ import {
 } from '@pdms/shared'
 import { Button } from '@/components/Button'
 import { Field, SelectField } from '@/components/Field'
-import { Eyebrow, KeyValue, Panel } from '@/components/Panel'
+import { Card, Eyebrow, KeyValue } from '@/components/Card'
 import { ApiError } from '@/lib/api'
 import { formatKm, formatTaka } from '@/lib/format'
 import { usePaymentConfig, useStartCheckout } from '../payments/usePayments'
@@ -192,7 +192,7 @@ export const BookingPage = () => {
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_340px] items-start">
       <form onSubmit={requestQuote} noValidate className="grid gap-5">
-        <Panel title="Pick-up">
+        <Card title="Pick-up">
           <Field
             label="Road / house"
             placeholder="Road 27"
@@ -236,9 +236,9 @@ export const BookingPage = () => {
             error={errors['pickup.contactPhone']}
             onChange={(e) => set('senderPhone', e.target.value)}
           />
-        </Panel>
+        </Card>
 
-        <Panel title="Drop-off">
+        <Card title="Drop-off">
           <Field
             label="Road / house"
             placeholder="Gulshan Avenue"
@@ -282,9 +282,9 @@ export const BookingPage = () => {
             error={errors['drop.contactPhone']}
             onChange={(e) => set('recipientPhone', e.target.value)}
           />
-        </Panel>
+        </Card>
 
-        <Panel title="Parcel">
+        <Card title="Parcel">
           <div className="grid sm:grid-cols-2 gap-x-5">
             <Field
               label="Weight"
@@ -344,7 +344,7 @@ export const BookingPage = () => {
               onChange={(e) => set('codAmount', e.target.value)}
             />
           ) : null}
-        </Panel>
+        </Card>
 
         <div>
           {/* The one orange button on this screen (section 4). */}
@@ -356,7 +356,7 @@ export const BookingPage = () => {
           >
             {quote.isPending ? 'Checking addresses…' : 'Get price'}
           </Button>
-          <p className="text-[11.5px] text-faint mt-2">
+          <p className="text-tiny text-faint mt-2">
             We look up both addresses to measure the route. This takes a moment.
           </p>
         </div>
@@ -365,11 +365,11 @@ export const BookingPage = () => {
       {/* ---- quote panel ---- */}
       <div className="lg:sticky lg:top-[78px] grid gap-4">
         {problem ? (
-          <Panel title="Address problem">
-            <p role="alert" className="text-[13px] text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2">
+          <Card title="Address problem">
+            <p role="alert" className="text-sm text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2">
               {problem.message}
             </p>
-            <p className="text-[12px] text-muted mt-3">
+            <p className="text-meta text-muted mt-3">
               {problem.field === 'pickup'
                 ? 'Check the pick-up address.'
                 : problem.field === 'drop'
@@ -377,19 +377,19 @@ export const BookingPage = () => {
                   : 'Check both addresses.'}
               {problem.retryable ? ' You can try again in a moment.' : ''}
             </p>
-          </Panel>
+          </Card>
         ) : null}
 
         {otherError ? (
-          <Panel title="Could not price this">
-            <p role="alert" className="text-[13px] text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2">
+          <Card title="Could not price this">
+            <p role="alert" className="text-sm text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2">
               {otherError}
             </p>
-          </Panel>
+          </Card>
         ) : null}
 
         {confirmed ? (
-          <Panel title="Price">
+          <Card title="Price">
             <Eyebrow>Estimate</Eyebrow>
             <KeyValue k="Zone base">
               <span className="mono">{formatTaka(confirmed.price.zoneBase)}</span>
@@ -402,23 +402,23 @@ export const BookingPage = () => {
             <KeyValue k={confirmed.price.weightTierLabel}>
               <span className="mono">{formatTaka(confirmed.price.weightSurcharge)}</span>
             </KeyValue>
-            <div className="flex justify-between items-baseline pt-4 mt-1 border-t border-hairline-strong">
-              <span className="text-[12.5px] font-semibold">Total</span>
-              <span className="mono text-[21px] font-medium">
+            <div className="flex justify-between items-baseline pt-4 mt-1 border-t border-border-strong">
+              <span className="text-small font-semibold">Total</span>
+              <span className="mono text-title font-medium">
                 {formatTaka(confirmed.price.total)}
               </span>
             </div>
 
-            <div className="mt-5 pt-4 border-t border-hairline grid gap-3">
+            <div className="mt-5 pt-4 border-t border-border grid gap-3">
               <div>
                 <Eyebrow>Pick-up resolved to</Eyebrow>
-                <p className="text-[12px] text-ink-2 leading-snug">
+                <p className="text-meta text-ink-2 leading-snug">
                   {confirmed.pickup.resolvedLabel}
                 </p>
               </div>
               <div>
                 <Eyebrow>Drop-off resolved to</Eyebrow>
-                <p className="text-[12px] text-ink-2 leading-snug">
+                <p className="text-meta text-ink-2 leading-snug">
                   {confirmed.drop.resolvedLabel}
                 </p>
               </div>
@@ -440,7 +440,7 @@ export const BookingPage = () => {
                     ? 'Confirm booking'
                     : 'Confirm and pay'}
             </Button>
-            <p className="text-[11.5px] text-faint mt-2">
+            <p className="text-tiny text-faint mt-2">
               This price is fixed once booked, even if rates change later.
               {draft.isCod
                 ? ' The rider collects the cash at the door.'
@@ -448,15 +448,15 @@ export const BookingPage = () => {
                   ? ' You will be taken to a secure checkout page.'
                   : ''}
             </p>
-          </Panel>
+          </Card>
         ) : !problem && !otherError ? (
-          <Panel title="Price">
+          <Card title="Price">
             {/* Empty state, not just the happy path. */}
-            <p className="text-[13px] text-muted">
+            <p className="text-sm text-muted">
               Fill in both addresses and the weight, then choose{' '}
               <b className="font-semibold text-ink">Get price</b>.
             </p>
-          </Panel>
+          </Card>
         ) : null}
       </div>
     </div>

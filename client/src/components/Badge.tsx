@@ -1,16 +1,15 @@
 import type { DeliveryStatus } from '@pdms/shared'
 
 /**
- * The status pill from docs/design-system.html — `.badge` plus its `.b-*`
- * variant, including the 6px dot. Padding, gap, size and radius are the
- * reference's own values, expressed through spacing tokens.
+ * The status pill from docs/design-system-v3-meridian.html — `.badge` plus its
+ * `.b-*` variant, including the 5.5px dot.
  *
- * The lifecycle has seven states and design-system.html drew six variants, so
- * Cancelled used to borrow Booked's classes outright. It now has its own name,
- * `cancelled-*`, aliased to Booked's values in tokens.css: the appearance is
- * unchanged and deliberately so — a cancelled parcel is inert, not failed, and
- * borrowing the red would misreport it — but the map below no longer has two
- * states pointing at one variant's name.
+ * v3 draws seven badges and the lifecycle has seven states, but they are not
+ * the same seven: v3's seventh is `pending` (a rider awaiting approval, not a
+ * parcel), and Cancelled shares Booked's neutral grey. That sharing is
+ * deliberate — a cancelled parcel is inert, not failed, so borrowing the red
+ * would misreport it — and `cancelled-*` exists as its own token name so the
+ * two are separable without touching this file.
  */
 const VARIANT: Record<DeliveryStatus, string> = {
   Booked: 'bg-booked-bg text-booked-ink',
@@ -33,19 +32,42 @@ const LABEL: Record<DeliveryStatus, string> = {
   Failed: 'Failed',
 }
 
-interface Props {
-  status: DeliveryStatus
+const SHELL =
+  'inline-flex items-center gap-6px rounded-pill py-1 pr-11px pl-9px text-meta font-medium whitespace-nowrap'
+
+export const Badge = ({ status }: { status: DeliveryStatus }) => (
+  <span className={`${SHELL} ${VARIANT[status]}`}>
+    <i className="w-[5.5px] h-[5.5px] rounded-full bg-current flex-none" />
+    {LABEL[status]}
+  </span>
+)
+
+/**
+ * The same pill for things that are not parcel states — a count in the header,
+ * a rider awaiting approval. Kept beside Badge so both read from one set of
+ * variant classes rather than each screen assembling pill styles by hand.
+ */
+type ToneName = 'booked' | 'transit' | 'delivered' | 'failed' | 'pending'
+
+const TONE: Record<ToneName, string> = {
+  booked: 'bg-booked-bg text-booked-ink',
+  transit: 'bg-transit-bg text-transit-ink',
+  delivered: 'bg-delivered-bg text-delivered-ink',
+  failed: 'bg-failed-bg text-failed-ink',
+  pending: 'bg-pending-bg text-pending-ink',
 }
 
-export const Badge = ({ status }: Props) => (
-  <span
-    className={[
-      'inline-flex items-center gap-7px rounded-pill',
-      'py-5px pr-3 pl-10px text-[12.5px] font-medium',
-      VARIANT[status],
-    ].join(' ')}
-  >
-    <i className="w-1.5 h-1.5 rounded-full bg-current flex-none" />
-    {LABEL[status]}
+export const Pill = ({
+  tone,
+  children,
+  dot = true,
+}: {
+  tone: ToneName
+  children: React.ReactNode
+  dot?: boolean
+}) => (
+  <span className={`${SHELL} ${TONE[tone]}`}>
+    {dot ? <i className="w-[5.5px] h-[5.5px] rounded-full bg-current flex-none" /> : null}
+    {children}
   </span>
 )

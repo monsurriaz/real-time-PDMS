@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import maplibregl, { type LngLatLike, type Map as MapLibreMap } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { GeoPoint } from '@pdms/shared'
+import { coolMapStyle } from '@/lib/mapStyle'
 
 /**
  * The tracking map. MapLibre GL JS over OpenFreeMap's positron style (CLAUDE.md
- * section 2) — no key, no quota.
+ * section 2) — no key, no quota — recoloured onto v3's cool greys at load
+ * (see lib/mapStyle.ts).
  *
  * The design brief for this screen is that the map is the only place saturated
  * colour appears: the base stays muted and the route line and rider marker are
@@ -18,6 +20,21 @@ const STYLE_URL =
   'https://tiles.openfreemap.org/styles/positron'
 
 /** Dhaka, for the initial viewport before anything is known. */
+/**
+ * The route colour, read from the stylesheet rather than repeated here.
+ *
+ * MapLibre paints into a canvas and cannot resolve a CSS variable, so the value
+ * has to be handed over as a literal — but taking it from the computed style
+ * means the map and `--s-transit` cannot drift apart, and v3's rule that "in
+ * transit IS the accent" holds on the map as well as in the badge.
+ */
+const ROUTE_COLOUR =
+  typeof window === 'undefined'
+    ? '#3b4ef0'
+    : getComputedStyle(document.documentElement)
+        .getPropertyValue('--s-transit')
+        .trim() || '#3b4ef0'
+
 const DHAKA: LngLatLike = [90.4074, 23.7808]
 
 export interface MapRider {
@@ -134,6 +151,12 @@ export const TrackingMap = ({
 
     m.on('load', () => {
       ready.current = true
+      /**
+       * Cool the tile style before anything is drawn on top of it. positron
+       * ships a warm-neutral ground and v3's map area is cool — see
+       * lib/mapStyle.ts for why the style is recoloured rather than swapped.
+       */
+      coolMapStyle(m)
       m.addSource('pdms-route', {
         type: 'geojson',
         data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } },
@@ -147,10 +170,12 @@ export const TrackingMap = ({
         type: 'line',
         source: 'pdms-route',
         paint: {
-          'line-color': '#EA4E1B',
+          // The planned road line: the accent, dashed and held back, so the
+          // travelled trail below reads as the solid one.
+          'line-color': ROUTE_COLOUR,
           'line-width': 3,
-          'line-opacity': 0.35,
-          'line-dasharray': [2, 2.5],
+          'line-opacity': 0.5,
+          'line-dasharray': [2, 8],
         },
         layout: { 'line-cap': 'round', 'line-join': 'round' },
       })
@@ -158,7 +183,7 @@ export const TrackingMap = ({
         id: 'pdms-trail-line',
         type: 'line',
         source: 'pdms-trail',
-        paint: { 'line-color': '#EA4E1B', 'line-width': 4 },
+        paint: { 'line-color': ROUTE_COLOUR, 'line-width': 3.5 },
         layout: { 'line-cap': 'round', 'line-join': 'round' },
       })
       // Re-run the data effects now that sources exist.
@@ -357,7 +382,7 @@ export const TrackingMap = ({
         <div className="absolute inset-0 grid place-items-center p-4 bg-surface-sunk">
           <p
             role="alert"
-            className="text-[12.5px] text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2 max-w-[280px] text-center"
+            className="text-small text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2 max-w-[280px] text-center"
           >
             The map could not load. Tracking still works — the details beside it
             are live.

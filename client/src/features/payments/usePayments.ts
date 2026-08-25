@@ -47,8 +47,9 @@ export interface ReconciliationResponse {
   totals: { outstanding: number; settled: number; uncollectable: number }
 }
 
-export const useCodReconciliation = () =>
+export const useCodReconciliation = (opts?: { enabled?: boolean }) =>
   useQuery({
+    ...(opts?.enabled === undefined ? {} : { enabled: opts.enabled }),
     queryKey: [...paymentsKey, 'reconciliation'],
     queryFn: () => api.get<ReconciliationResponse>('/payments/reconciliation'),
   })

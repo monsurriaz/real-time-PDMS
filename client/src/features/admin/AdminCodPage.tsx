@@ -1,13 +1,12 @@
-import { RoleShell } from '@/components/RoleShell'
-import { ADMIN_NAV } from './AdminHome'
+import { AppShell, PageHead } from '@/components/AppShell'
 import { CodReconciliation } from './CodReconciliation'
 
 export const AdminCodPage = () => (
-  <RoleShell
-    title="Cash on delivery"
-    subtitle="What each rider is holding, what has been handed in, and what will never be collected."
-    nav={ADMIN_NAV}
-  >
+  <AppShell title="Cash on delivery">
+    <PageHead
+      title="Cash on delivery"
+      sub="What each rider is holding, what has been handed in, and what will never be collected."
+    />
     <CodReconciliation />
-  </RoleShell>
+  </AppShell>
 )

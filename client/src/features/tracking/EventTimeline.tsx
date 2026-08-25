@@ -40,7 +40,7 @@ export const EventTimeline = ({ events, status, expectedBy, dropArea }: Props) =
           <div key={`${e.status}-${i}`} className="flex gap-3 pb-4 relative">
             {/* Connector, drawn behind the nodes. */}
             {i < events.length - 1 || !finished ? (
-              <span className="absolute left-[6px] top-[16px] bottom-0 w-px bg-hairline" />
+              <span className="absolute left-[6px] top-[16px] bottom-0 w-px bg-border" />
             ) : null}
             <span
               className={[
@@ -57,14 +57,14 @@ export const EventTimeline = ({ events, status, expectedBy, dropArea }: Props) =
                 {LABEL[e.status]}
               </div>
               {e.note ? (
-                <div className="text-[12px] text-muted">{e.note}</div>
+                <div className="text-meta text-muted">{e.note}</div>
               ) : e.actorRole ? (
-                <div className="text-[12px] text-muted">by the {e.actorRole}</div>
+                <div className="text-meta text-muted">by the {e.actorRole}</div>
               ) : (
-                <div className="text-[12px] text-muted">automatic</div>
+                <div className="text-meta text-muted">automatic</div>
               )}
             </div>
-            <span className="mono text-[11.5px] text-faint whitespace-nowrap">
+            <span className="mono text-tiny text-faint whitespace-nowrap">
               {time(e.at)}
             </span>
           </div>
@@ -74,12 +74,12 @@ export const EventTimeline = ({ events, status, expectedBy, dropArea }: Props) =
       {/* The step still to come, so the journey has a visible end. */}
       {!finished ? (
         <div className="flex gap-3 relative">
-          <span className="w-[13px] h-[13px] rounded-full flex-none mt-[3px] border-[2.5px] border-hairline-strong bg-surface" />
+          <span className="w-[13px] h-[13px] rounded-full flex-none mt-[3px] border-[2.5px] border-border-strong bg-surface" />
           <div className="flex-1">
             <div className="text-body font-semibold text-faint">Delivered</div>
-            <div className="text-[12px] text-muted">{dropArea}</div>
+            <div className="text-meta text-muted">{dropArea}</div>
           </div>
-          <span className="mono text-[11.5px] text-faint whitespace-nowrap">
+          <span className="mono text-tiny text-faint whitespace-nowrap">
             {expectedBy ? `~${time(expectedBy)}` : '—'}
           </span>
         </div>

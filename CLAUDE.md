@@ -10,9 +10,14 @@ Course project, CSC 470. Seven-day build. Demo-ready beats feature-complete.
 ## 1. Non-negotiable rules
 
 1. **Never invent a color, font, radius, or spacing value.** Everything comes from
-   `client/src/styles/tokens.css`. If a value you need isn't there, stop and ask.
-2. **The design system is frozen.** Do not restyle a component because it "could look
-   better." Visual changes require an explicit request.
+   `client/src/styles/tokens.css`. If a value you need isn't there, stop and ask.\
+~~2. **The design system is frozen.** Do not restyle a component because it "could look
+   better." Visual changes require an explicit request.~~
+2. **The design system is v3 Meridian, in docs/design-system-v3.html.** It fully
+   supersedes the previous system — the warm paper palette, the orange accent, and
+   the header-only layout are all retired. Every screen rebuilds against v3. Do not
+   invent colors, radii, fonts, or spacing outside it. Once M6.5c ships, the freeze
+   from the original rule 2 applies to v3 instead.
 3. **The delivery state machine is enforced server-side.** The client never decides what
    transition is legal.
 4. **TypeScript strict mode. No `any`.** If a type is hard, model it properly.
@@ -72,7 +77,8 @@ Course project, CSC 470. Seven-day build. Demo-ready beats feature-complete.
   seed.ts        zones, pricing config, demo users, riders
   simulate.ts    fake rider GPS along a Dhaka route  ← needed to demo tracking
 /docs
-  design-system.html   the locked visual reference — read before building any UI
+  design-system-v3-meridian.html   THE visual reference — read before building any UI
+  design-system.html               v1, superseded. Kept for history only.
 CLAUDE.md
 .gitignore
 .env.example     every required key, with empty values
@@ -80,22 +86,45 @@ CLAUDE.md
 
 ---
 
-## 4. Design tokens (locked)
+## 4. Design tokens — v3 Meridian
 
-`/docs/design-system.html` is the visual source of truth. Open it before building any
-screen and match it. It shows the palette, type scale, components, and the three role
-layouts. `tokens.css` is generated from it — if the two ever disagree, the HTML wins.
+`/docs/design-system-v3-meridian.html` is the visual source of truth. Open it before
+building any screen and match it. It shows the palette, type scale, components, the
+route table and the app shell. `tokens.css` is generated from it — if the two ever
+disagree, the HTML wins.
+
+The v1 system (warm paper, orange accent, header-only layout) is **retired**. Its
+tokens no longer exist under any name, so a component still asking for `--paper` or
+`--hairline` fails to build rather than quietly rendering the old look.
 
 ```css
---paper:#FAF9F7;  --surface:#FFFFFF;  --surface-sunk:#F4F2EE;
---hairline:#E9E6E0;  --hairline-strong:#D8D4CC;
---ink:#14140F;  --ink-2:#4A4740;  --muted:#6B6862;  --faint:#9C988F;
---accent:#EA4E1B;  --accent-press:#C63E11;  --accent-tint:#FFF1EB;
+/* chrome — the navigation frame, always dark, in both public and app */
+--chrome:#1B1F27;  --chrome-2:#232936;  --chrome-3:#2E3542;
+--chrome-ink:#F2F3F5;  --chrome-muted:#8A91A0;  --chrome-faint:#636A79;
 
---s-booked:#8A8F98;     --s-assigned:#4C6EF5;   --s-picked:#0E9891;
---s-transit:#EA4E1B;    --s-delivered:#17864F;  --s-failed:#C9342C;
+/* workspace — never dark */
+--page:#F7F8FA;  --surface:#FFFFFF;  --surface-sunk:#F1F3F6;
+--border:#E7E9EE;  --border-strong:#D6D9E0;
+--ink:#111420;  --ink-2:#3C4254;  --muted:#6C7280;  --faint:#9AA0AD;
+--accent:#3B4EF0;  --accent-hover:#2E3ECC;  --accent-tint:#EEF0FE;
+--accent-on-dark:#8FA0FF;   /* the accent, readable on chrome. Never on --surface */
 
---radius-sm:8px;  --radius:12px;  --radius-lg:16px;
+/* lifecycle ramp — cool rotation, energy rising, ending green */
+--s-booked:#7C8394;     --s-assigned:#8B5CF6;   --s-picked:#06A6C2;
+--s-transit:#3B4EF0;    --s-delivered:#12996B;  --s-failed:#DC3A34;
+--s-pending:#C4820A;    /* a rider awaiting approval — the only amber */
+--s-cancelled: var(--s-booked);   /* by name; a cancelled parcel is inert, not failed */
+
+--radius-sm:8px;  --radius-md:12px;  --radius-lg:16px;  --radius-xl:20px;
+--radius-chip:11px;  --radius-mark:3px;  --radius-pill:999px;
+
+/* type scale, named by the job a component is choosing */
+--text-rail:10px;      --text-micro:10.5px;   --text-eyebrow:11px;
+--text-tiny:11.5px;    --text-meta:12px;      --text-small:12.5px;
+--text-sm:13px;        --text-body:13.5px;    --text-control:14px;
+--text-base:14.5px;    --text-md:15px;        --text-lg:16px;
+--text-mark:17px;      --text-title:21px;     --text-h2:26px;   --text-hero:30px;
+--text-figure:19px;    --text-figure-lg:24px; --text-figure-xl:27px;   /* mono */
 
 /* grid steps — --space-N is N x 4px */
 --space-1:4px;    --space-2:8px;    --space-3:12px;
@@ -103,31 +132,36 @@ layouts. `tokens.css` is generated from it — if the two ever disagree, the HTM
 --space-7:28px;   --space-8:32px;   --space-10:40px;
 --space-14:56px;  --space-16:64px;
 
-/* optical steps — the off-grid values design-system.html actually uses.
-   Named in literal pixels because seven of them are odd numbers that no
-   fraction of the 4px grid names readably. */
---space-5px:5px;    --space-7px:7px;    --space-9px:9px;
---space-10px:10px;  --space-11px:11px;  --space-13px:13px;
---space-14px:14px;  --space-15px:15px;  --space-17px:17px;
---space-18px:18px;  --space-22px:22px;  --space-30px:30px;
+/* optical steps — the off-grid values the reference actually uses.
+   Named in literal pixels because most are odd numbers that no fraction
+   of the 4px grid names readably. */
+--space-3px:3px;    --space-5px:5px;    --space-6px:6px;    --space-7px:7px;
+--space-9px:9px;    --space-10px:10px;  --space-11px:11px;  --space-13px:13px;
+--space-14px:14px;  --space-15px:15px;  --space-17px:17px;  --space-18px:18px;
+--space-19px:19px;  --space-21px:21px;  --space-22px:22px;  --space-26px:26px;
+--space-30px:30px;  --space-34px:34px;
 ```
 
 - Two families, one scale. Reach for a **grid step** when you are choosing
-  spacing. Reach for an **optical step** only to match a specific value in
-  `design-system.html` — they exist so those values are tokens rather than raw
-  pixels, not to widen the palette of choices.
+  spacing. Reach for an **optical step** only to match a specific value in the
+  reference — they exist so those values are tokens rather than raw pixels, not
+  to widen the palette of choices.
 - `--space-14` is 56px and `--space-14px` is 14px. The `px` suffix always means
   literal pixels.
 
-- Fonts: **Manrope** (UI), **JetBrains Mono** (all numbers, IDs, money, times),
-  **Montserrat 700** (wordmark only).
-- **No gradients. No drop shadows.** Separation comes from 1px hairlines.
+- Fonts: **Inter Tight** (UI), **JetBrains Mono** (all numbers, IDs, money, times).
+  Montserrat is gone with the old wordmark — v3 sets the wordmark in Inter Tight 700.
+- **No gradients. No drop shadows.** Separation comes from 1px borders.
+- **In transit IS the accent.** The brand colour is a lifecycle state, not decoration:
+  when a parcel is moving, ultramarine is on screen; when nothing moves, the interface
+  goes quiet. One accent button per view, and admin actions use ink.
+- **Disabled is neutral**, never a faded accent — a tinted disabled button reads as
+  broken rather than as unavailable.
 - Every number on screen — price, weight, tracking ID, COD amount, timestamp — uses the
   mono face with `font-variant-numeric: tabular-nums`.
-- Orange means "moving." One orange button per screen, maximum. Admin actions use ink.
-- Agent UI is light, large tap targets (min 48px), one-handed. Riders work in daylight.
-
----
+- Agent UI is light, large tap targets (min 48px), one-handed. Riders work in daylight,
+  which is also why the rider screens reach for `--ink-2` where the reference uses
+  `--faint`: at 10-11px, `--faint` measures 2.6:1 on white.
 
 ## 5. Domain model
 

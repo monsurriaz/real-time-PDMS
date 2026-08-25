@@ -2,20 +2,21 @@ import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react
 import { useId } from 'react'
 
 /**
- * The `.field` pattern from docs/design-system.html: 12.5px label in ink-2,
- * 14.5px input, hairline-strong border, accent focus ring. Shared by the
- * booking form and the admin pricing editor so neither invents its own.
+ * The `.field` pattern from docs/design-system-v3-meridian.html: a 12.5px label
+ * in ink-2 over a 14px control at 10px/12px padding, on a border-strong border
+ * at radius-sm, with the accent focus ring. Shared by the booking form, the
+ * pricing editor and sign-in so none of them invents its own.
  */
 
 const CONTROL = [
-  'w-full font-sans text-control text-ink px-13px py-11px',
+  'w-full font-sans text-control text-ink px-3 py-10px',
   'border rounded-sm bg-surface outline-none',
   'focus:border-accent focus:ring-[3px] focus:ring-accent-tint',
 ].join(' ')
 
 /** Invalid state is a border colour, not a shadow — the system has no shadows. */
 const errorBorder = (invalid: boolean): string =>
-  invalid ? 'border-failed' : 'border-hairline-strong'
+  invalid ? 'border-failed' : 'border-border-strong'
 
 interface BaseProps {
   label: string
@@ -41,8 +42,8 @@ export const Field = ({ label, hint, error, suffix, touch, ...rest }: FieldProps
   const id = useId()
   const errorId = `${id}-error`
   return (
-    <div className="mb-15px">
-      <label htmlFor={id} className="block text-[12.5px] font-medium text-ink-2 mb-1.5">
+    <div className="mb-14px">
+      <label htmlFor={id} className="block text-small font-medium text-ink-2 mb-5px">
         {label}
       </label>
       <div className={suffix ? 'flex items-center gap-2' : undefined}>
@@ -54,15 +55,15 @@ export const Field = ({ label, hint, error, suffix, touch, ...rest }: FieldProps
           {...rest}
         />
         {suffix ? (
-          <span className="text-[13px] text-muted flex-none">{suffix}</span>
+          <span className="text-sm text-muted flex-none">{suffix}</span>
         ) : null}
       </div>
       {error ? (
-        <p id={errorId} role="alert" className="text-[11.5px] text-failed-ink mt-1.5">
+        <p id={errorId} role="alert" className="text-tiny text-failed-ink mt-1">
           {error}
         </p>
       ) : hint ? (
-        <p className={`text-[11.5px] mt-1.5 ${touch ? 'text-muted' : 'text-faint'}`}>
+        <p className={`text-tiny mt-1 ${touch ? 'text-muted' : 'text-muted'}`}>
           {hint}
         </p>
       ) : null}
@@ -87,8 +88,8 @@ export const SelectField = ({
   const id = useId()
   const errorId = `${id}-error`
   return (
-    <div className="mb-15px">
-      <label htmlFor={id} className="block text-[12.5px] font-medium text-ink-2 mb-1.5">
+    <div className="mb-14px">
+      <label htmlFor={id} className="block text-small font-medium text-ink-2 mb-5px">
         {label}
       </label>
       <select
@@ -101,11 +102,11 @@ export const SelectField = ({
         {children}
       </select>
       {error ? (
-        <p id={errorId} role="alert" className="text-[11.5px] text-failed-ink mt-1.5">
+        <p id={errorId} role="alert" className="text-tiny text-failed-ink mt-1">
           {error}
         </p>
       ) : hint ? (
-        <p className={`text-[11.5px] mt-1.5 ${touch ? 'text-muted' : 'text-faint'}`}>
+        <p className={`text-tiny mt-1 ${touch ? 'text-muted' : 'text-muted'}`}>
           {hint}
         </p>
       ) : null}

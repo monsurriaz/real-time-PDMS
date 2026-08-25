@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { CodReconciliationRow } from '@pdms/shared'
 import { Button } from '@/components/Button'
-import { Eyebrow, Note, Panel } from '@/components/Panel'
+import { Card, Eyebrow, Note } from '@/components/Card'
+import { TableScroll, Td, Thead, Tr, Who } from '@/components/Table'
 import { ApiError } from '@/lib/api'
 import { formatDateTime, formatTaka } from '@/lib/format'
 import {
@@ -24,9 +25,6 @@ import {
  * reconciliation table is the fastest way to look untrustworthy."
  */
 
-const TH =
-  'text-left text-[11px] font-semibold uppercase tracking-[0.13em] text-faint pb-3 border-b border-hairline'
-
 /** Right-aligned money cell — the `.amt` column from the reference. */
 const Amount = ({
   value,
@@ -39,7 +37,7 @@ const Amount = ({
 }) => (
   <span
     className={[
-      'mono text-[13px] tabular-nums',
+      'mono text-sm tabular-nums',
       strong ? 'font-medium' : '',
       faint && value === 0 ? 'text-faint' : '',
     ].join(' ')}
@@ -53,12 +51,12 @@ const SettleRow = ({ row }: { row: CodReconciliationRow }) => {
   const [armed, setArmed] = useState(false)
 
   if (row.outstanding === 0) {
-    return <span className="text-[11.5px] text-faint">nothing to settle</span>
+    return <span className="text-tiny text-faint">nothing to settle</span>
   }
 
   if (settle.isError) {
     return (
-      <span role="alert" className="text-[11.5px] text-failed-ink">
+      <span role="alert" className="text-tiny text-failed-ink">
         {settle.error instanceof ApiError ? settle.error.message : 'Could not settle'}
       </span>
     )
@@ -81,7 +79,7 @@ const SettleRow = ({ row }: { row: CodReconciliationRow }) => {
       <button
         type="button"
         onClick={() => setArmed(false)}
-        className="text-[12px] text-muted hover:text-ink"
+        className="text-meta text-muted hover:text-ink"
       >
         Cancel
       </button>
@@ -99,24 +97,24 @@ export const CodReconciliation = () => {
 
   if (data.isPending) {
     return (
-      <Panel>
+      <Card>
         <p className="text-body text-muted">Counting the cash…</p>
-      </Panel>
+      </Card>
     )
   }
 
   if (data.isError) {
     return (
-      <Panel>
+      <Card>
         <p
           role="alert"
-          className="text-[13px] text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2"
+          className="text-sm text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2"
         >
           {data.error instanceof ApiError
             ? data.error.message
             : 'The reconciliation table could not be loaded.'}
         </p>
-      </Panel>
+      </Card>
     )
   }
 
@@ -125,7 +123,7 @@ export const CodReconciliation = () => {
   return (
     <div className="grid gap-5">
       {/* The statstrip cell from the reference, as three key figures. */}
-      <Panel>
+      <Card>
         <div className="grid sm:grid-cols-3 gap-5 sm:gap-0">
           {[
             { k: 'COD outstanding', v: totals.outstanding, hint: 'held by riders' },
@@ -134,97 +132,97 @@ export const CodReconciliation = () => {
           ].map((cell, i) => (
             <div
               key={cell.k}
-              className={i < 2 ? 'sm:border-r sm:border-hairline sm:pr-5' : 'sm:pl-5'}
+              className={i < 2 ? 'sm:border-r sm:border-border sm:pr-5' : 'sm:pl-5'}
             >
               <Eyebrow>{cell.k}</Eyebrow>
-              <div className="mono text-[20px] font-medium tracking-[-0.025em]">
+              <div className="mono text-figure-lg font-medium tracking-[-0.04em]">
                 {formatTaka(cell.v)}
               </div>
-              <div className="text-[11.5px] text-faint mt-0.5">{cell.hint}</div>
+              <div className="text-tiny text-faint mt-0.5">{cell.hint}</div>
             </div>
           ))}
         </div>
-      </Panel>
+      </Card>
 
       {rows.length === 0 ? (
-        <Panel title="Per rider">
+        <Card title="Per rider">
           <p className="text-body text-muted">
             No COD has been collected yet. Deliver a cash-on-delivery parcel and
             the rider appears here.
           </p>
-        </Panel>
+        </Card>
       ) : (
-        <Panel title={`Per rider · ${rows.length}`}>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse min-w-[720px]">
-              <thead>
-                <tr>
-                  <th className={TH}>Rider</th>
-                  <th className={TH}>COD delivered</th>
-                  <th className={TH}>Outstanding</th>
-                  <th className={TH}>Settled</th>
-                  <th className={TH}>Uncollectable</th>
-                  <th className={TH}>Last settled</th>
-                  <th className={TH} />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.agentId} className="border-b border-hairline last:border-b-0">
-                    <td className="py-3 pr-4 text-[13px] font-medium">{r.agentName}</td>
-                    <td className="py-3 pr-4">
-                      <span className="mono text-[13px]">{r.deliveredCount}</span>
-                      <span className="text-[11.5px] text-faint">
-                        {r.deliveredCount === 1 ? ' parcel' : ' parcels'}
+        <Card title={`Per rider · ${rows.length}`} pad={false}>
+          <TableScroll min={860}>
+            <Thead
+              cols={[
+                'Rider',
+                'COD delivered',
+                'Outstanding',
+                'Settled',
+                'Uncollectable',
+                'Last settled',
+                '',
+              ]}
+            />
+            <tbody>
+              {rows.map((r) => (
+                <Tr key={r.agentId}>
+                  <Td>
+                    <Who name={r.agentName} sub={`${r.deliveredCount} COD delivered`} />
+                  </Td>
+                  <Td>
+                    <span className="mono text-small">{r.deliveredCount}</span>
+                    <span className="text-tiny text-faint">
+                      {r.deliveredCount === 1 ? ' parcel' : ' parcels'}
+                    </span>
+                  </Td>
+                  <Td>
+                    <Amount value={r.outstanding} strong />
+                    {r.outstandingCount > 0 ? (
+                      <span className="block text-eyebrow text-faint mono">
+                        {r.outstandingCount} unsettled
                       </span>
-                    </td>
-                    <td className="py-3 pr-4">
-                      <Amount value={r.outstanding} strong />
-                      {r.outstandingCount > 0 ? (
-                        <span className="block text-[11px] text-faint mono">
-                          {r.outstandingCount} unsettled
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="py-3 pr-4">
-                      <Amount value={r.settled} faint />
-                    </td>
-                    <td className="py-3 pr-4">
-                      {/*
-                        Reported, not hidden. A failed delivery's COD is not
-                        collectable — showing it is how the row explains why a
-                        rider who "delivered" five parcels holds four parcels'
-                        worth of cash.
-                      */}
-                      <Amount value={r.uncollectable} faint />
-                      {r.uncollectableCount > 0 ? (
-                        <span className="block text-[11px] text-failed-ink">
-                          {r.uncollectableCount} failed
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="py-3 pr-4">
-                      <span className="mono text-[12px] text-muted">
-                        {r.lastSettledAt ? formatDateTime(r.lastSettledAt) : '—'}
+                    ) : null}
+                  </Td>
+                  <Td>
+                    <Amount value={r.settled} faint />
+                  </Td>
+                  <Td>
+                    {/*
+                      Reported, not hidden. A failed delivery's COD is not
+                      collectable — showing it is how the row explains why a
+                      rider who "delivered" five parcels holds four parcels'
+                      worth of cash.
+                    */}
+                    <Amount value={r.uncollectable} faint />
+                    {r.uncollectableCount > 0 ? (
+                      <span className="block text-eyebrow text-failed-ink">
+                        {r.uncollectableCount} failed
                       </span>
-                    </td>
-                    <td className="py-3">
-                      <SettleRow row={r} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
+                    ) : null}
+                  </Td>
+                  <Td>
+                    <span className="mono text-meta text-muted">
+                      {r.lastSettledAt ? formatDateTime(r.lastSettledAt) : '—'}
+                    </span>
+                  </Td>
+                  <Td align="right">
+                    <SettleRow row={r} />
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </TableScroll>
+        </Card>
       )}
 
       {/* ---- the audit trail ---- */}
-      <Panel title="Settlement history">
+      <Card title="Settlement history" pad={false}>
         {trail.isPending ? (
-          <p className="text-[13px] text-muted">Loading the trail…</p>
+          <p className="text-sm text-muted">Loading the trail…</p>
         ) : trail.isError ? (
-          <p role="alert" className="text-[12.5px] text-failed-ink">
+          <p role="alert" className="text-small text-failed-ink">
             {trail.error instanceof ApiError
               ? trail.error.message
               : 'The settlement trail could not be loaded.'}
@@ -235,38 +233,28 @@ export const CodReconciliation = () => {
             covered — totals are never edited in place.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse min-w-[620px]">
-              <thead>
-                <tr>
-                  <th className={TH}>When</th>
-                  <th className={TH}>Rider</th>
-                  <th className={TH}>Amount</th>
-                  <th className={TH}>Parcels</th>
-                  <th className={TH}>Taken by</th>
-                </tr>
-              </thead>
-              <tbody>
-                {trail.data.map((s) => (
-                  <tr key={s._id} className="border-b border-hairline last:border-b-0">
-                    <td className="py-3 pr-4">
-                      <span className="mono text-[12px] text-muted">{formatDateTime(s.at)}</span>
-                    </td>
-                    <td className="py-3 pr-4 text-[13px]">{s.agentName}</td>
-                    <td className="py-3 pr-4">
-                      <Amount value={s.amount} strong />
-                    </td>
-                    <td className="py-3 pr-4">
-                      <span className="mono text-[13px]">{s.paymentCount}</span>
-                    </td>
-                    <td className="py-3 pr-4 text-[13px] text-ink-2">{s.settledByName}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <TableScroll min={640}>
+            <Thead cols={['When', 'Rider', 'Amount', 'Parcels', 'Taken by']} />
+            <tbody>
+              {trail.data.map((st) => (
+                <Tr key={st._id}>
+                  <Td>
+                    <span className="mono text-meta text-muted">{formatDateTime(st.at)}</span>
+                  </Td>
+                  <Td>{st.agentName}</Td>
+                  <Td>
+                    <Amount value={st.amount} strong />
+                  </Td>
+                  <Td>
+                    <span className="mono text-small">{st.paymentCount}</span>
+                  </Td>
+                  <Td className="text-ink-2">{st.settledByName}</Td>
+                </Tr>
+              ))}
+            </tbody>
+          </TableScroll>
         )}
-      </Panel>
+      </Card>
 
       <Note>
         Every figure here is <b>counted from payment records</b> on each load.

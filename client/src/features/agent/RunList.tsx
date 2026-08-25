@@ -1,6 +1,6 @@
 import type { DeliveryStatus } from '@pdms/shared'
 import { Badge } from '@/components/Badge'
-import { Eyebrow, Panel } from '@/components/Panel'
+import { Card, Eyebrow } from '@/components/Card'
 import { ApiError } from '@/lib/api'
 import { useDeliveries } from '../deliveries/useDeliveries'
 import { ActiveDelivery } from './ActiveDelivery'
@@ -24,17 +24,17 @@ export const RunList = () => {
       <ShiftControls />
 
       {deliveries.isPending ? (
-        <Panel>
+        <Card>
           <p className="text-body text-muted">Loading your runs…</p>
-        </Panel>
+        </Card>
       ) : deliveries.isError ? (
-        <Panel>
-          <p role="alert" className="text-[13px] text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2">
+        <Card>
+          <p role="alert" className="text-sm text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2">
             {deliveries.error instanceof ApiError
               ? deliveries.error.message
               : 'Your runs could not be loaded.'}
           </p>
-        </Panel>
+        </Card>
       ) : (
         <>
           {(() => {
@@ -55,35 +55,35 @@ export const RunList = () => {
                     ))}
                   </>
                 ) : (
-                  <Panel className="mb-5">
+                  <Card className="mb-5">
                     <p className="text-body text-muted">
                       Nothing to carry right now. Go available and set your
                       location — new bookings are assigned by proximity.
                     </p>
-                  </Panel>
+                  </Card>
                 )}
 
                 {done.length > 0 ? (
                   <>
                     <Eyebrow tone="strong">Finished · {done.length}</Eyebrow>
-                    <Panel>
+                    <Card>
                       {done.map((d) => (
                         <div
                           key={d._id}
-                          className="flex items-center justify-between gap-3 py-3 border-b border-hairline last:border-b-0"
+                          className="flex items-center justify-between gap-3 py-3 border-b border-border last:border-b-0"
                         >
                           <div>
-                            <span className="mono text-[12.5px] font-medium block">
+                            <span className="mono text-small font-medium block">
                               {d.trackingId}
                             </span>
-                            <span className="text-[12px] text-muted">
+                            <span className="text-meta text-muted">
                               {d.pickupArea} → {d.dropArea}
                             </span>
                           </div>
                           <Badge status={d.status} />
                         </div>
                       ))}
-                    </Panel>
+                    </Card>
                   </>
                 ) : null}
               </>

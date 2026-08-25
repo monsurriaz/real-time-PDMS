@@ -9,7 +9,7 @@ import {
   type LocationBroadcast,
   type StatusChanged,
 } from '@pdms/shared'
-import { Panel } from '@/components/Panel'
+import { Card } from '@/components/Card'
 import { LazyTrackingMap } from '@/components/LazyTrackingMap'
 import type { MapRider } from '@/components/TrackingMap'
 import { ApiError, api } from '@/lib/api'
@@ -140,19 +140,19 @@ export const FleetMap = () => {
   }))
 
   return (
-    <Panel
+    <Card
       title={`Fleet · ${riders.length} rider${riders.length === 1 ? '' : 's'} · ${(fleet.data ?? []).length} active deliver${(fleet.data ?? []).length === 1 ? 'y' : 'ies'}`}
       action={<ConnectionPill mode={mode} />}
       className="mb-5"
     >
       {fleet.isError ? (
-        <p role="alert" className="text-[13px] text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2">
+        <p role="alert" className="text-sm text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2">
           {fleet.error instanceof ApiError
             ? fleet.error.message
             : 'Rider positions could not be loaded.'}
         </p>
       ) : (
-        <div className="relative h-[380px] rounded-md overflow-hidden border border-hairline bg-surface-sunk">
+        <div className="relative h-[380px] rounded-md overflow-hidden border border-border bg-map-ground">
           <LazyTrackingMap className="absolute inset-0" riders={riders} animate />
           {/*
             Three states over one map, not two: an empty fleet and a fleet that
@@ -162,13 +162,13 @@ export const FleetMap = () => {
           */}
           {fleet.isPending ? (
             <div className="absolute inset-0 grid place-items-center pointer-events-none">
-              <p className="text-[13px] text-muted bg-paper/[0.92] border border-hairline rounded-sm px-3 py-2">
+              <p className="text-sm text-muted bg-page/[0.92] border border-border rounded-sm px-3 py-2">
                 Locating riders…
               </p>
             </div>
           ) : riders.length === 0 ? (
             <div className="absolute inset-0 grid place-items-center pointer-events-none">
-              <p className="text-[13px] text-muted bg-paper/[0.92] border border-hairline rounded-sm px-3 py-2">
+              <p className="text-sm text-muted bg-page/[0.92] border border-border rounded-sm px-3 py-2">
                 No active rider has reported a position yet. Run the simulator to
                 see movement.
               </p>
@@ -176,6 +176,6 @@ export const FleetMap = () => {
           ) : null}
         </div>
       )}
-    </Panel>
+    </Card>
   )
 }
