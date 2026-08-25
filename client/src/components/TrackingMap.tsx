@@ -42,6 +42,13 @@ export interface MapRider {
   point: GeoPoint
   label: string
   sublabel?: string
+  /**
+   * Solid, haloed dot vs. a hollow accent ring on white — "moving" vs.
+   * "on shift, idle" (M6.98's fleet map). Defaults to true: every caller
+   * before M6.98 only ever showed a rider mid-delivery, and that marker
+   * should stay exactly as it was.
+   */
+  busy?: boolean
 }
 
 interface Props {
@@ -124,9 +131,9 @@ interface MarkerState {
   startedAt: number
 }
 
-const riderElement = (label: string): HTMLElement => {
+const riderElement = (label: string, busy: boolean): HTMLElement => {
   const el = document.createElement('div')
-  el.className = 'pdms-rider'
+  el.className = busy ? 'pdms-rider' : 'pdms-rider pdms-rider--idle'
   el.innerHTML = `
     <span class="pdms-rider__halo"></span>
     <span class="pdms-rider__dot"></span>
@@ -430,7 +437,7 @@ export const TrackingMap = ({
 
       if (!existing) {
         const marker = new maplibregl.Marker({
-          element: riderElement(rider.label),
+          element: riderElement(rider.label, rider.busy ?? true),
           anchor: 'center',
         })
           .setLngLat(rider.point.coordinates)
@@ -443,6 +450,12 @@ export const TrackingMap = ({
         })
         continue
       }
+
+      // The fleet map's busy/idle split can flip under an already-placed
+      // marker (a rider picks up a job while the board is open) — kept in
+      // sync without tearing the marker down and losing its glide state.
+      const wantIdle = !(rider.busy ?? true)
+      existing.marker.getElement().classList.toggle('pdms-rider--idle', wantIdle)
 
       const target = rider.point.coordinates
       if (existing.to[0] === target[0] && existing.to[1] === target[1]) continue

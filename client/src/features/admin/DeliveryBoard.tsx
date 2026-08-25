@@ -11,6 +11,7 @@ import { Badge } from '@/components/Badge'
 import { Button } from '@/components/Button'
 import { Card, Eyebrow } from '@/components/Card'
 import { LifecycleRail } from '@/components/LifecycleRail'
+import { Modal } from '@/components/Modal'
 import {
   FilterBar,
   Pager,
@@ -61,18 +62,7 @@ const AssignPanel = ({
   const err = assign.error instanceof ApiError ? assign.error.message : null
 
   return (
-    <div className="bg-surface-sunk border border-border rounded-md p-4 mt-3">
-      <div className="flex items-baseline justify-between mb-3">
-        <Eyebrow>{currentAgentId ? 'Reassign' : 'Assign'}</Eyebrow>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-meta text-muted hover:text-ink"
-        >
-          Close
-        </button>
-      </div>
-
+    <>
       {err ? (
         <p role="alert" className="text-small text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2 mb-3">
           {err}
@@ -161,7 +151,7 @@ const AssignPanel = ({
           )}
         </>
       ) : null}
-    </div>
+    </>
   )
 }
 
@@ -203,6 +193,10 @@ export const DeliveryBoard = () => {
     set(v)
     setPage(1)
   }
+  /** The row the assign modal is open for — its tracking ID/recipient are the
+   * modal's header context, so which parcel is being (re)assigned is never
+   * ambiguous. */
+  const openForRow = rows.find((d) => d._id === openFor) ?? null
 
   if (deliveries.isPending) {
     return (
@@ -345,7 +339,7 @@ export const DeliveryBoard = () => {
                     <Button
                       size="sm"
                       variant={d.agentId ? 'quiet' : 'primary'}
-                      onClick={() => setOpenFor(openFor === d._id ? null : d._id)}
+                      onClick={() => setOpenFor(d._id)}
                     >
                       {d.agentId ? 'Reassign' : 'Assign'}
                     </Button>
@@ -361,14 +355,26 @@ export const DeliveryBoard = () => {
         </TableScroll>
       )}
 
-      {openFor ? (
-        <div className="px-18px pb-4">
+      {openForRow ? (
+        <Modal
+          open
+          onClose={() => setOpenFor(null)}
+          title={
+            <>
+              <Eyebrow>{openForRow.agentId ? 'Reassign' : 'Assign'}</Eyebrow>
+              <p className="text-base font-semibold tracking-[-0.015em] truncate">
+                {openForRow.trackingId}
+                <span className="text-muted font-normal"> · {openForRow.recipientName}</span>
+              </p>
+            </>
+          }
+        >
           <AssignPanel
-            deliveryId={openFor}
-            currentAgentId={rows.find((d) => d._id === openFor)?.agentId ?? null}
+            deliveryId={openForRow._id}
+            currentAgentId={openForRow.agentId}
             onClose={() => setOpenFor(null)}
           />
-        </div>
+        </Modal>
       ) : null}
 
       <Pager

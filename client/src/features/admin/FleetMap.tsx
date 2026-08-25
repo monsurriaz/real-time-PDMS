@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   REST_POLL_INTERVAL_MS,
   SOCKET_EVENTS,
+  type AgentStatus,
   type ConnectionMode,
-  type DeliveryStatus,
   type GeoPoint,
   type LocationBroadcast,
   type StatusChanged,
@@ -17,24 +17,35 @@ import { getSocket, joinParcelRoom, modeFor } from '@/lib/socket'
 import { ConnectionPill } from '../tracking/ConnectionPill'
 
 /**
- * Every active rider on one map (M4, step 4).
+ * Every on-shift rider on one map (M4, rebuilt M6.98).
  *
- * The admin joins each active parcel's room, so positions arrive over the same
- * socket the customer screen uses — there is no second broadcast path. When
- * the socket is down the same REST endpoint polls every 10s, which is section
- * 6's fallback applied to the fleet rather than to one parcel.
+ * Sourced from Agent directly, not from active delivery rooms — the old
+ * version joined every ACTIVE DELIVERY's room and drew one marker per row it
+ * got back, so a rider holding zero deliveries (the entire point of "who is
+ * idle and could take a job") never appeared at all. Every available or
+ * on_delivery agent with a known position is a row here regardless of
+ * whether they are carrying anything; offline agents show nowhere, since
+ * there is no meaningful position to show for someone not on shift.
+ *
+ * Live positions still arrive over the same socket the customer screen
+ * uses — one room per active PARCEL, joined only for busy riders' actual
+ * runs, since an idle rider has no delivery room to join in the first place.
+ * When the socket is down the same REST endpoint polls every 10s.
  */
 
-interface FleetRider {
+interface FleetDelivery {
   deliveryId: string
   parcelId: string
   trackingId: string
-  dropArea: string
-  status: DeliveryStatus
-  agentId: string | null
-  agentName: string | null
+}
+
+interface FleetAgent {
+  agentId: string
+  agentName: string
+  status: AgentStatus
   point: GeoPoint
   at: string | null
+  deliveries: FleetDelivery[]
 }
 
 const fleetKey = ['tracking', 'fleet'] as const
@@ -46,13 +57,24 @@ export const FleetMap = () => {
 
   const fleet = useQuery({
     queryKey: fleetKey,
-    queryFn: () => api.get<{ riders: FleetRider[] }>('/tracking/active/positions'),
+    queryFn: () => api.get<{ riders: FleetAgent[] }>('/tracking/active/positions'),
     select: (d) => d.riders,
     refetchInterval:
       mode === 'polling' || mode === 'offline' ? REST_POLL_INTERVAL_MS : false,
   })
 
-  // ---- join every active parcel's room ----
+  /** Every busy rider's delivery id resolves back to the agent it belongs to
+   * — location:broadcast only ever carries a deliveryId, so this is how a
+   * live tick finds its way back to the right marker. */
+  const agentByDelivery = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const r of fleet.data ?? []) {
+      for (const d of r.deliveries) m.set(d.deliveryId, r.agentId)
+    }
+    return m
+  }, [fleet.data])
+
+  // ---- join every busy rider's active run(s) ----
   useEffect(() => {
     const socket = getSocket()
     let cancelled = false
@@ -64,19 +86,23 @@ export const FleetMap = () => {
 
     const joinAll = (): void => {
       everConnected = true
-      for (const r of fleet.data ?? []) void joinParcelRoom(r.parcelId)
+      for (const r of fleet.data ?? []) {
+        for (const d of r.deliveries) void joinParcelRoom(d.parcelId)
+      }
       syncMode()
     }
 
     const onLocation = (raw: LocationBroadcast): void => {
       if (cancelled) return
-      setLivePoints((prev) => ({ ...prev, [raw.deliveryId]: raw.point }))
+      const agentId = agentByDelivery.get(raw.deliveryId)
+      if (!agentId) return
+      setLivePoints((prev) => ({ ...prev, [agentId]: raw.point }))
     }
 
     const onStatus = (_raw: StatusChanged): void => {
       if (cancelled) return
       /**
-       * Step 4: status:changed updates the board without a manual refresh.
+       * status:changed updates the board without a manual refresh.
        * Invalidating rather than patching keeps the table and the map reading
        * from the same server truth.
        */
@@ -102,46 +128,37 @@ export const FleetMap = () => {
       socket.off(SOCKET_EVENTS.locationBroadcast, onLocation)
       socket.off(SOCKET_EVENTS.statusChanged, onStatus)
     }
-  }, [fleet.data, fleet.isError, qc])
+  }, [fleet.data, fleet.isError, qc, agentByDelivery])
+
+  const busyCount = (fleet.data ?? []).filter((r) => r.status === 'on_delivery').length
+  const availableCount = (fleet.data ?? []).length - busyCount
+  const activeDeliveries = (fleet.data ?? []).reduce((n, r) => n + r.deliveries.length, 0)
 
   /**
-   * One marker per RIDER, not per delivery.
-   *
-   * A rider holding three parcels appeared three times, stacked at the same
-   * coordinates, and the panel counted deliveries while calling them riders.
-   * A person has one position, so the rows are collapsed by agent and the
-   * freshest position wins — a socket tick beating a persisted one that can be
-   * 30 seconds old.
+   * One marker per agent — the server already returns one row per rider, so
+   * there is no dedup left to do here, only the busy/idle split (a solid
+   * filled disc vs. a hollow accent ring — see TrackingMap's own note) and
+   * preferring a live socket point over the persisted one it can supersede.
    */
-  const byRider = new Map<string, { r: FleetRider; point: GeoPoint; count: number }>()
-  for (const r of fleet.data ?? []) {
-    const key = r.agentId ?? `delivery:${r.deliveryId}`
-    const point = livePoints[r.deliveryId] ?? r.point
-    const existing = byRider.get(key)
-    if (!existing) {
-      byRider.set(key, { r, point, count: 1 })
-      continue
+  const riders: MapRider[] = (fleet.data ?? []).map((r) => {
+    const busy = r.status === 'on_delivery'
+    const first = r.deliveries[0]
+    return {
+      id: r.agentId,
+      point: livePoints[r.agentId] ?? r.point,
+      label: r.agentName,
+      sublabel: busy
+        ? r.deliveries.length > 1
+          ? `${r.deliveries.length} parcels`
+          : (first?.trackingId ?? 'On delivery')
+        : 'Available',
+      busy,
     }
-    existing.count += 1
-    // Prefer a live socket point, then the more recent persisted one.
-    const isLive = Boolean(livePoints[r.deliveryId])
-    const newer = (r.at ?? '') > (existing.r.at ?? '')
-    if (isLive || newer) {
-      existing.r = r
-      existing.point = point
-    }
-  }
-
-  const riders: MapRider[] = [...byRider.entries()].map(([key, v]) => ({
-    id: key,
-    point: v.point,
-    label: v.r.agentName ?? v.r.trackingId,
-    sublabel: v.count > 1 ? `${v.count} parcels` : v.r.trackingId,
-  }))
+  })
 
   return (
     <Card
-      title={`Fleet · ${riders.length} rider${riders.length === 1 ? '' : 's'} · ${(fleet.data ?? []).length} active deliver${(fleet.data ?? []).length === 1 ? 'y' : 'ies'}`}
+      title={`Fleet · ${riders.length} rider${riders.length === 1 ? '' : 's'} (${busyCount} busy, ${availableCount} available) · ${activeDeliveries} active deliver${activeDeliveries === 1 ? 'y' : 'ies'}`}
       action={<ConnectionPill mode={mode} />}
       className="mb-5"
     >
@@ -169,8 +186,8 @@ export const FleetMap = () => {
           ) : riders.length === 0 ? (
             <div className="absolute inset-0 grid place-items-center pointer-events-none">
               <p className="text-sm text-muted bg-page/[0.92] border border-border rounded-sm px-3 py-2">
-                No active rider has reported a position yet. Run the simulator to
-                see movement.
+                No rider is on shift with a known position. Run the simulator,
+                or set a rider's location from Shift.
               </p>
             </div>
           ) : null}
