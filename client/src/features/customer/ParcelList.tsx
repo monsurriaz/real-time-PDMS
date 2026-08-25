@@ -22,6 +22,7 @@ import {
   Tr,
   paginate,
 } from '@/components/Table'
+import { useSearchable } from '@/features/shell/useHeaderSearch'
 import { ApiError } from '@/lib/api'
 import { WelcomeNotice } from '../auth/WelcomeNotice'
 import { formatDateTime, formatKg, formatTaka } from '@/lib/format'
@@ -303,18 +304,27 @@ const PER_PAGE = 8
 
 export const ParcelList = () => {
   const parcels = useParcels()
+  // Claims the header's search box for this screen — v3.1 addendum. Real
+  // client-side filtering over rows already fetched by useParcels above,
+  // not a new endpoint.
+  const search = useSearchable('Search tracking ID or address…')
   const [status, setStatus] = useState<DeliveryStatus | ''>('')
   const [zone, setZone] = useState<string>('')
   const [page, setPage] = useState(1)
 
   const rows = useMemo(() => {
     const all = parcels.data ?? []
+    const q = search.trim().toLowerCase()
     return all.filter(
       (p) =>
         (status === '' || p.status === status) &&
-        (zone === '' || p.dropArea.includes(zone) || p.pickupArea.includes(zone)),
+        (zone === '' || p.dropArea.includes(zone) || p.pickupArea.includes(zone)) &&
+        (q === '' ||
+          p.trackingId.toLowerCase().includes(q) ||
+          p.pickupArea.toLowerCase().includes(q) ||
+          p.dropArea.toLowerCase().includes(q)),
     )
-  }, [parcels.data, status, zone])
+  }, [parcels.data, status, zone, search])
 
   /**
    * Rendered in every branch below, the loading one included: a customer
@@ -449,8 +459,12 @@ export const ParcelList = () => {
                     {p.pickupArea} → {p.dropArea}
                   </Td>
                   <Td>
+                    {/*
+                      Compact: at this 86px width, five discrete segments read
+                      as an ellipsis rather than progress (v3.1 addendum).
+                    */}
                     <div className="w-[86px]">
-                      <LifecycleRail status={asStatus(p.status)} />
+                      <LifecycleRail status={asStatus(p.status)} rail="compact" />
                     </div>
                     <span className="sr-only">{p.status}</span>
                   </Td>
