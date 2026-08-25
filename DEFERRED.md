@@ -102,9 +102,9 @@ These are the pieces it deliberately stopped before.
 
 | Item | Milestone | Commit |
 |---|---|---|
-| Disabled buttons were a washed-out accent ("Mark delivered") | M6.5a | `PENDING3` |
-| Primary button contrast — v3's accent is 5.89:1 on white, against v1's 3.75:1 | M6.5a | `PENDING3` |
-| Topbar wordmark as a 26px target — the header shell is gone; the rail's is 37-46px | M6.5a | `PENDING3` |
+| Disabled buttons were a washed-out accent ("Mark delivered") | M6.5a | `b16ad74` |
+| Primary button contrast — v3's accent is 5.89:1 on white, against v1's 3.75:1 | M6.5a | `b16ad74` |
+| Topbar wordmark as a 26px target — the header shell is gone; the rail's is 37-46px | M6.5a | `b16ad74` |
 | **Socket room authorisation bypass** (agents could join any parcel room) | M6 | `cd8904f` |
 | `roleScope` merged with `Query.where`, so same-key filters overwrote | M6 | `cd8904f` |
 | Admin analytics: stat cards, zone chart, delayed alerts, revenue | M6 | `cd8904f` |
