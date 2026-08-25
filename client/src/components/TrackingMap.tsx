@@ -409,7 +409,19 @@ export const TrackingMap = ({
   // ---- riders, eased between positions ----
   useEffect(() => {
     const m = map.current
-    if (!m) return
+    /**
+     * `!ready.current`, not just `!m`. `map.current` is assigned
+     * synchronously right after construction — before the map's own 'load'
+     * fires, before the endpoints+camera effect has run at all (it correctly
+     * waits on `ready.current`). Without this guard, a rider's marker could
+     * be inserted into the DOM on the very first mapVersion bump, ahead of
+     * pickup/drop — and since z-index only breaks that tie by class now (see
+     * app.css), insertion order stopped mattering for THAT, but a marker
+     * added before the map is ready is still one MapLibre may reposition
+     * incorrectly once the style actually loads. Matching the other two
+     * effects' own guard.
+     */
+    if (!m || !ready.current) return
 
     const seen = new Set<string>()
     for (const rider of riders) {
