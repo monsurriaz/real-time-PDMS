@@ -149,9 +149,18 @@ export const createSocketServer = (httpServer: HttpServer): Server => {
           .model('User')
           .findById(claims.sub)
           .select('status')
-          .lean<{ status: string } | null>()
+          .lean<{ status?: string } | null>()
           .exec()
-        return user?.status === 'active'
+        if (!user) return false
+        /**
+         * `.lean()` skips the schema default, so an account created before
+         * `status` existed comes back with the field simply absent — see
+         * middleware/auth.ts's own note. Absent means active there; it has to
+         * mean active here too, or every account seeded before M6.9
+         * (every demo rider included) gets refused a socket connection
+         * outright, which is exactly what was happening.
+         */
+        return (user.status ?? 'active') === 'active'
       })
       if (!active) {
         next(new Error('unauthorised'))
