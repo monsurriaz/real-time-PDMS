@@ -154,8 +154,19 @@ export const startCheckout = async (args: {
     // The snapshot. Not `parcel.price.total` recomputed, not a request field.
     amountTaka: payment.amount,
     description: `Parcel delivery ${parcel.trackingId}`,
-    successUrl: `${env.CLIENT_ORIGIN}/?payment=success&parcel=${parcel._id.toString()}`,
-    cancelUrl: `${env.CLIENT_ORIGIN}/?payment=cancelled&parcel=${parcel._id.toString()}`,
+    /**
+     * Both return URLs land on the customer's parcel list, NOT on `/`.
+     *
+     * They used to point at the landing page, which meant a completed test
+     * payment dumped the customer on marketing copy with `?payment=success`
+     * hanging off the URL and nothing on the page reading it. The list is the
+     * screen that can actually answer the question they now have — where is
+     * my parcel, and did the money go through — and it is the one screen that
+     * knows the parcel's real payment state, so it can say "confirming" rather
+     * than claiming a webhook has landed that has not.
+     */
+    successUrl: `${env.CLIENT_ORIGIN}/customer/parcels?payment=success&parcel=${parcel._id.toString()}`,
+    cancelUrl: `${env.CLIENT_ORIGIN}/customer/parcels?payment=cancelled&parcel=${parcel._id.toString()}`,
   })
 
   /**

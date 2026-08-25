@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   advanceStatusInputSchema,
   deliveryStatusSchema,
   zoneName,
   type DeliveryStatus,
+  type ParcelListItem,
   type PaymentSummary,
 } from '@pdms/shared'
 import { Badge } from '@/components/Badge'
@@ -185,42 +186,110 @@ const PaymentCell = ({
 }
 
 /**
- * The strip shown on return from the hosted checkout page.
+ * The strip shown when a booking lands back on this screen.
  *
- * Success here means the customer completed the payment form, NOT that the money
- * has been confirmed — that is the webhook's job and it may be a second or two
- * behind. Saying "confirming" rather than "paid" is the honest version, and the
- * row below updates itself when the webhook lands.
+ * One component for both arrival paths — the COD booking that never sees a
+ * checkout page, and the return from Stripe — because they are the same
+ * question ("did that work?") and the honest answer comes from the parcel's
+ * ACTUAL state rather than from the query string. `?payment=success` only means
+ * the customer got through the form: a COD parcel was never paid at all, and a
+ * card payment is not confirmed until the webhook lands, which may be a second
+ * or two behind. So the copy is chosen from the row, not from the URL.
+ *
+ * The params are read ONCE, on mount, and the URL is cleaned immediately
+ * afterwards — a refresh must not re-announce a booking from ten minutes ago.
  */
-const CheckoutReturn = () => {
+const BookingReturn = ({ rows }: { rows: readonly ParcelListItem[] }) => {
   const [params, setParams] = useSearchParams()
-  const outcome = params.get('payment')
-  if (outcome !== 'success' && outcome !== 'cancelled') return null
 
-  const dismiss = (): void => {
+  /**
+   * Captured in state on first render, before the effect below strips the
+   * params. Reading them straight from `params` at render time would make the
+   * banner vanish the instant the URL is cleaned.
+   */
+  const [claim] = useState<{
+    outcome: 'success' | 'cancelled'
+    parcelId: string | null
+  } | null>(() => {
+    const outcome = params.get('payment')
+    if (outcome !== 'success' && outcome !== 'cancelled') return null
+    return { outcome, parcelId: params.get('parcel') }
+  })
+  const [dismissed, setDismissed] = useState(false)
+
+  /**
+   * `setSearchParams(..., { replace: true })` rather than a bare
+   * history.replaceState: it performs the same replaceState underneath, but
+   * keeps react-router's own idea of the location in step — a raw call leaves
+   * every other useSearchParams in the tree reading a URL that is no longer in
+   * the address bar.
+   */
+  useEffect(() => {
+    if (!params.has('payment') && !params.has('parcel')) return
     const next = new URLSearchParams(params)
     next.delete('payment')
     next.delete('parcel')
     setParams(next, { replace: true })
-  }
+  }, [params, setParams])
+
+  if (!claim || dismissed) return null
+
+  const parcel = claim.parcelId ? rows.find((p) => p._id === claim.parcelId) : undefined
+
+  const message = ((): { tone: 'good' | 'quiet' | 'bad'; text: string } => {
+    if (claim.outcome === 'cancelled') {
+      return {
+        tone: 'quiet',
+        text: 'Payment cancelled. Your parcel is still booked — you can pay for it from the list below.',
+      }
+    }
+
+    // The list has not arrived yet, or names no such parcel. The booking
+    // itself is the one thing we do know happened.
+    if (!parcel) return { tone: 'good', text: 'Parcel booked.' }
+
+    const named = ` ${parcel.trackingId}`
+
+    if (parcel.isCod) {
+      return {
+        tone: 'good',
+        text: `Parcel booked —${named}. The rider collects ${formatTaka(parcel.codAmount)} in cash at the door.`,
+      }
+    }
+
+    if (parcel.payment?.status === 'paid') {
+      return { tone: 'good', text: `Payment confirmed for${named}.` }
+    }
+
+    if (parcel.payment?.status === 'failed') {
+      return {
+        tone: 'bad',
+        text: `Parcel${named} is booked, but the payment did not go through. You can retry it from the row below.`,
+      }
+    }
+
+    return {
+      tone: 'good',
+      text: `Parcel booked —${named}. We are confirming the payment with the provider; the row below updates itself.`,
+    }
+  })()
 
   return (
     <div
+      role="status"
       className={[
         'flex items-start justify-between gap-4 rounded-md px-4 py-3 mb-5 text-sm',
-        outcome === 'success'
+        message.tone === 'good'
           ? 'bg-delivered-bg text-delivered-ink'
-          : 'bg-surface-sunk text-ink-2',
+          : message.tone === 'bad'
+            ? 'bg-failed-bg text-failed-ink'
+            : 'bg-surface-sunk text-ink-2',
       ].join(' ')}
     >
-      <p>
-        {outcome === 'success'
-          ? 'Payment submitted. We are confirming it with the payment provider — the row below updates itself.'
-          : 'Payment cancelled. Your parcel is still booked; you can pay from the list below.'}
-      </p>
+      <p>{message.text}</p>
       <button
         type="button"
-        onClick={dismiss}
+        onClick={() => setDismissed(true)}
         className="text-meta font-medium underline decoration-current/40 hover:decoration-current flex-none"
       >
         Dismiss
@@ -246,33 +315,47 @@ export const ParcelList = () => {
     )
   }, [parcels.data, status, zone])
 
+  /**
+   * Rendered in every branch below, the loading one included: a customer
+   * arriving straight from a booking should see it confirmed while the list is
+   * still in flight, and the copy sharpens on its own once the row it names
+   * turns up.
+   */
+  const banner = <BookingReturn rows={parcels.data ?? []} />
+
   if (parcels.isPending) {
     return (
-      <Card>
-        <p className="text-body text-muted">Loading your parcels…</p>
-      </Card>
+      <>
+        {banner}
+        <Card>
+          <p className="text-body text-muted">Loading your parcels…</p>
+        </Card>
+      </>
     )
   }
 
   if (parcels.isError) {
     return (
-      <Card>
-        <p
-          role="alert"
-          className="text-sm text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2"
-        >
-          {parcels.error instanceof ApiError
-            ? parcels.error.message
-            : 'Your parcels could not be loaded.'}
-        </p>
-      </Card>
+      <>
+        {banner}
+        <Card>
+          <p
+            role="alert"
+            className="text-sm text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2"
+          >
+            {parcels.error instanceof ApiError
+              ? parcels.error.message
+              : 'Your parcels could not be loaded.'}
+          </p>
+        </Card>
+      </>
     )
   }
 
   if ((parcels.data ?? []).length === 0) {
     return (
       <>
-        <CheckoutReturn />
+        {banner}
         <Card>
           <p className="text-body text-muted mb-4">You have not booked anything yet.</p>
           <Link to="/customer/book">
@@ -287,7 +370,7 @@ export const ParcelList = () => {
 
   return (
     <>
-      <CheckoutReturn />
+      {banner}
       <Card pad={false}>
         <FilterBar>
           <SelectFilter

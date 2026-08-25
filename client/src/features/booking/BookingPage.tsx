@@ -87,6 +87,22 @@ const validate = (d: Draft): { ok: true; value: BookParcelInput } | { ok: false;
   return { ok: false, errors }
 }
 
+/**
+ * Where a completed booking lands, whichever way it was paid for.
+ *
+ * One destination and one query shape for both paths — the COD booking that
+ * never sees a checkout page, and the return from Stripe — because the banner
+ * on the other end reads the parcel's ACTUAL state to decide what to say. Two
+ * URLs would mean two implementations of the same "did that work?" answer, and
+ * the redirect after a COD booking used to go somewhere else entirely (`/`),
+ * which is how it ended up on a page that read neither.
+ *
+ * Kept identical to the `successUrl` the server hands Stripe in
+ * services/payments.ts. If one moves, the other has to.
+ */
+export const bookedPath = (parcelId: string): string =>
+  `/customer/parcels?payment=success&parcel=${parcelId}`
+
 export const BookingPage = () => {
   const navigate = useNavigate()
   const zones = useZones()
@@ -167,7 +183,7 @@ export const BookingPage = () => {
         const payOnline =
           !booked.parcel.isCod && paymentConfig.data?.cardPayments === true
         if (!payOnline) {
-          navigate('/', { replace: true })
+          navigate(bookedPath(booked.parcel._id), { replace: true })
           return
         }
         checkout.mutate(booked.parcel._id, {
@@ -177,7 +193,7 @@ export const BookingPage = () => {
           },
           // The parcel is booked either way. Land on the list, where the row
           // says the payment is still pending and offers to retry it.
-          onError: () => navigate('/', { replace: true }),
+          onError: () => navigate(bookedPath(booked.parcel._id), { replace: true }),
         })
       },
     })
