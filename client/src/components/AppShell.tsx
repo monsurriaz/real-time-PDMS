@@ -436,9 +436,18 @@ interface Props {
   /** Right of the title — a status Pill on the tracking screen. */
   titleAside?: ReactNode
   children: ReactNode
+  /**
+   * The route's own identifying class — `<role>-<screen>`, e.g.
+   * `admin-board`. Every top-level page passes its own; see CLAUDE.md's
+   * "semantic page classes" convention. Carries no styles — it exists so a
+   * screen (or a test, or a future analytics hook) can be targeted by what it
+   * IS rather than by a CSS class that happens to describe its current
+   * layout and could change under it.
+   */
+  pageClass: string
 }
 
-export const AppShell = ({ title, titleAside, children }: Props) => {
+export const AppShell = ({ title, titleAside, children, pageClass }: Props) => {
   const me = useMe()
   const role = me.data?.role
   const counts = useRailCounts(role)
@@ -478,7 +487,7 @@ export const AppShell = ({ title, titleAside, children }: Props) => {
   }, [])
 
   return (
-    <div className="min-h-dvh grid grid-cols-[64px_1fr] md:grid-cols-[216px_1fr] bg-page">
+    <div className={`${pageClass} min-h-dvh grid grid-cols-[64px_1fr] md:grid-cols-[216px_1fr] bg-page`}>
       {/* ---------- the rail ---------- */}
       {/*
         `sticky top-0 h-dvh`, not just a tall block in the grid flow.

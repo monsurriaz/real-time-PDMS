@@ -54,7 +54,7 @@ export const AgentPendingPage = () => {
   }
 
   return (
-    <main className="min-h-dvh flex justify-center bg-page px-22px py-10">
+    <main className="agent-pending min-h-dvh flex justify-center bg-page px-22px py-10">
       <div className="w-full max-w-[400px] flex flex-col justify-center">
         <Card className="text-center" pad={false}>
           <div className="px-6 py-30px">

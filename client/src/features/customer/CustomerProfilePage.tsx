@@ -11,7 +11,7 @@ export const CustomerProfilePage = () => {
   const me = useMe()
 
   return (
-    <AppShell title="Profile">
+    <AppShell title="Profile" pageClass="customer-profile">
       <PageHead title="Profile" sub="Your account, saved addresses, and password." />
 
       {me.isPending ? (

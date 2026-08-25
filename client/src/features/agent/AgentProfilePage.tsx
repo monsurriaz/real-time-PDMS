@@ -24,7 +24,7 @@ export const AgentProfilePage = () => {
   const failed = me.isError || agent.isError || !me.data || !agent.data
 
   return (
-    <AppShell title="Profile">
+    <AppShell title="Profile" pageClass="agent-profile">
       <PageHead title="Profile" sub="Your account, rider details, and password." />
 
       {loading ? (

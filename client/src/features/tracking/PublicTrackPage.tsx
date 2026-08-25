@@ -41,7 +41,7 @@ export const PublicTrackPage = ({ trackingId }: { trackingId: string }) => {
   const tracking = usePublicTracking(trackingId)
 
   return (
-    <div className="min-h-dvh bg-page flex flex-col">
+    <div className="track-public min-h-dvh bg-page flex flex-col">
       <PublicNav />
 
       <div className="max-w-[720px] mx-auto px-22px pb-16 flex-1 w-full">

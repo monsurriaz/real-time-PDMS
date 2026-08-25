@@ -110,7 +110,7 @@ export const TrackParcelPage = () => {
 
   if (snapshot.isPending) {
     return (
-      <AppShell title="Tracking">
+      <AppShell title="Tracking" pageClass="customer-track">
         <Card>
           <p className="text-body text-muted">Loading the parcel…</p>
         </Card>
@@ -120,7 +120,7 @@ export const TrackParcelPage = () => {
 
   if (snapshot.isError || !snapshot.data) {
     return (
-      <AppShell title="Tracking">
+      <AppShell title="Tracking" pageClass="customer-track">
         <Card>
           <p
             role="alert"
@@ -159,6 +159,7 @@ export const TrackParcelPage = () => {
   return (
     <AppShell
       title={parcel.trackingId}
+      pageClass="customer-track"
       titleAside={
         <span className="flex items-center gap-2">
           <Badge status={delivery.status} />

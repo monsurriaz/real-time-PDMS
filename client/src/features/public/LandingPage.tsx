@@ -166,7 +166,7 @@ export const LandingPage = () => {
   const stats = usePublicPricingSummary()
 
   return (
-    <div className="min-h-dvh bg-page flex flex-col">
+    <div className="landing min-h-dvh bg-page flex flex-col">
       {/* ---------- dark hero ---------- */}
       <div className="on-chrome bg-chrome text-chrome-ink">
         <div className="max-w-[1040px] mx-auto px-22px">

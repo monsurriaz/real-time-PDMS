@@ -12,7 +12,7 @@ export const AdminProfilePage = () => {
   const me = useMe()
 
   return (
-    <AppShell title="Profile">
+    <AppShell title="Profile" pageClass="admin-profile">
       <PageHead title="Profile" sub="Your account and password." />
 
       {me.isPending ? (

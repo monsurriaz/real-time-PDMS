@@ -34,9 +34,18 @@ export const RiderWorkspace = () => {
   const { id } = useParams<{ id: string }>()
   const deliveries = useDeliveries()
 
+  /**
+   * `/agent/runs` and `/agent/runs/:id` are one component, per the file
+   * header's own note — but they're two different route entries in
+   * CLAUDE.md's semantic-page-class table (`agent-runs` / `agent-run-detail`),
+   * so the class has to be picked the same way `current` below is: by whether
+   * `:id` is present, not by which JSX literally rendered.
+   */
+  const pageClass = id ? 'agent-run-detail' : 'agent-runs'
+
   if (deliveries.isPending) {
     return (
-      <AppShell title="Today's runs">
+      <AppShell title="Today's runs" pageClass={pageClass}>
         <Card>
           <p className="text-body text-muted">Loading your runs…</p>
         </Card>
@@ -46,7 +55,7 @@ export const RiderWorkspace = () => {
 
   if (deliveries.isError) {
     return (
-      <AppShell title="Today's runs">
+      <AppShell title="Today's runs" pageClass={pageClass}>
         <Card>
           <p role="alert" className="text-sm text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2">
             {deliveries.error instanceof ApiError
@@ -63,7 +72,7 @@ export const RiderWorkspace = () => {
   const current = (id ? active.find((d) => d._id === id) : undefined) ?? active[0] ?? null
 
   return (
-    <AppShell title="Today's runs">
+    <AppShell title="Today's runs" pageClass={pageClass}>
       <PageHead
         title="Today's runs"
         sub={`${active.length} active · ${finishedCount} finished today`}
