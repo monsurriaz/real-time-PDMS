@@ -53,7 +53,14 @@ export const parcelSchema = z.object({
    * is a stored breakdown rather than a recomputation.
    */
   price: priceBreakdownSchema,
-  /** Cash on delivery: agent collects this amount at the door. */
+  /**
+   * Cash on delivery: the agent collects `codAmount` at the door.
+   *
+   * Snapshotted from `price.total` at booking, server-side — see
+   * bookParcelInputSchema, which has no such input field. Stored rather than
+   * derived on read for the same reason `price` is: it is what was agreed when
+   * the parcel was booked, and a later rate change must not move it.
+   */
   isCod: z.boolean().default(false),
   codAmount: taka.default(0),
   ...timestamps,
@@ -74,34 +81,25 @@ export const addressInputSchema = addressSchema.omit({
 })
 export type AddressInput = z.infer<typeof addressInputSchema>
 
-export const bookParcelInputSchema = z
-  .object({
-    pickup: addressInputSchema,
-    drop: addressInputSchema,
-    weightKg: z.number().positive().max(1000),
-    size: parcelSizeSchema,
-    description: z.string().max(300).optional(),
-    isCod: z.boolean().default(false),
-    codAmount: taka.default(0),
-  })
-  .superRefine((v, ctx) => {
-    // A COD amount on a non-COD parcel is never collected, so silently
-    // accepting it would promise the sender money that never arrives.
-    if (!v.isCod && v.codAmount > 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['codAmount'],
-        message: 'set isCod before entering a COD amount',
-      })
-    }
-    if (v.isCod && v.codAmount <= 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['codAmount'],
-        message: 'a COD parcel needs an amount to collect',
-      })
-    }
-  })
+/**
+ * `codAmount` is deliberately ABSENT, for the same reason `price` is.
+ *
+ * What a rider must collect at the door is the delivery fee the server
+ * computed and snapshotted — not a figure the sender types. It used to be an
+ * input on the booking form, which meant a customer could book a COD parcel
+ * and declare any amount they liked, including one below what the delivery
+ * actually cost. The route sets it from `price.total`; there is no field here
+ * for a client to send, so there is nothing to validate and nothing to forget
+ * to ignore.
+ */
+export const bookParcelInputSchema = z.object({
+  pickup: addressInputSchema,
+  drop: addressInputSchema,
+  weightKg: z.number().positive().max(1000),
+  size: parcelSizeSchema,
+  description: z.string().max(300).optional(),
+  isCod: z.boolean().default(false),
+})
 export type BookParcelInput = z.infer<typeof bookParcelInputSchema>
 
 /**

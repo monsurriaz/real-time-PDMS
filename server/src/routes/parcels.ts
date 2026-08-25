@@ -116,7 +116,13 @@ parcelsRouter.post('/', requireAuth, requireRole('customer'), async (req, res, n
        */
       price,
       isCod: input.isCod,
-      codAmount: input.codAmount,
+      /**
+       * The collectable amount IS the snapshotted price, set here and never
+       * read from the request. bookParcelInputSchema has no codAmount field
+       * at all, so a client cannot under-declare what the rider is owed —
+       * which it previously could, by simply posting a smaller number.
+       */
+      codAmount: input.isCod ? price.total : 0,
     })
 
     /**
@@ -151,9 +157,9 @@ parcelsRouter.post('/', requireAuth, requireRole('customer'), async (req, res, n
     /**
      * The ledger row, created at booking for every parcel — COD included.
      *
-     * Its amount comes from the price snapshot just written (or from the COD
-     * amount the sender stated), never from a later recomputation: the whole
-     * point of the snapshot is that this number cannot move afterwards.
+     * Its amount comes from the price snapshot just written, never from a
+     * later recomputation and never from the request: the whole point of the
+     * snapshot is that this number cannot move afterwards.
      */
     const payment = await createPaymentForParcel({
       _id: parcel._id,

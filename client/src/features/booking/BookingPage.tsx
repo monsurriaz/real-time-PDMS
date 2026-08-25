@@ -44,7 +44,6 @@ type Draft = {
   size: ParcelSize
   description: string
   isCod: boolean
-  codAmount: string
 }
 
 const EMPTY: Draft = {
@@ -53,7 +52,7 @@ const EMPTY: Draft = {
   dropLine1: '', dropArea: '', dropZone: '',
   recipientName: '', recipientPhone: '',
   weightKg: '1', size: 'small', description: '',
-  isCod: false, codAmount: '',
+  isCod: false,
 }
 
 /** Draft (all strings, as the DOM gives them) -> the shared booking schema. */
@@ -70,7 +69,6 @@ const toPayload = (d: Draft): unknown => ({
   size: d.size,
   ...(d.description ? { description: d.description } : {}),
   isCod: d.isCod,
-  codAmount: d.isCod ? Number(d.codAmount || 0) : 0,
 })
 
 type Errors = Record<string, string>
@@ -339,6 +337,13 @@ export const BookingPage = () => {
             onChange={(e) => set('description', e.target.value)}
           />
 
+          {/*
+            The checkbox and nothing else. There used to be an "Amount to
+            collect" field beside it, which was a customer setting what a rider
+            must hand in — the server now takes that from the price snapshot,
+            so there is no figure here to enter or to disagree with. The quote
+            panel states the amount before the booking is confirmed.
+          */}
           <label className="flex items-center gap-2 mb-15px text-body cursor-pointer">
             <input
               type="checkbox"
@@ -348,18 +353,6 @@ export const BookingPage = () => {
             />
             Collect cash on delivery
           </label>
-          {draft.isCod ? (
-            <Field
-              label="Amount to collect"
-              type="number"
-              min={1}
-              step={1}
-              suffix="৳"
-              value={draft.codAmount}
-              error={errors.codAmount}
-              onChange={(e) => set('codAmount', e.target.value)}
-            />
-          ) : null}
         </Card>
 
         <div>
@@ -459,7 +452,7 @@ export const BookingPage = () => {
             <p className="text-tiny text-faint mt-2">
               This price is fixed once booked, even if rates change later.
               {draft.isCod
-                ? ' The rider collects the cash at the door.'
+                ? ` The rider collects ${formatTaka(confirmed.price.total)} in cash at the door.`
                 : paymentConfig.data?.cardPayments
                   ? ' You will be taken to a secure checkout page.'
                   : ''}

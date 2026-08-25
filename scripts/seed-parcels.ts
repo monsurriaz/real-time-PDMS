@@ -72,7 +72,6 @@ interface Spec {
   /** Which seeded agent carries it, for anything past Booked. */
   agent?: 'rakib' | 'sabbir' | 'imran'
   isCod?: boolean
-  codAmount?: number
   /** Hours since booking, so the board has a plausible spread. */
   agedHours: number
   /** Marks the delayed-looking one: expectedBy already in the past. */
@@ -94,19 +93,19 @@ const SPECS: readonly Spec[] = [
   { n: 5, from: 'uttara4', to: 'mirpur1', weightKg: 3.4, size: 'medium', status: 'Assigned', customer: 'sadia', agent: 'imran', agedHours: 4 },
   { n: 6, from: 'dhanmondi27', to: 'mohammadpur', weightKg: 0.6, size: 'small', status: 'Assigned', customer: 'nusrat', agent: 'rakib', agedHours: 5 },
 
-  { n: 7, from: 'dhanmondi9', to: 'gulshan1', weightKg: 2.2, size: 'medium', status: 'PickedUp', customer: 'nusrat', agent: 'rakib', agedHours: 6, isCod: true, codAmount: 1500 },
+  { n: 7, from: 'dhanmondi9', to: 'gulshan1', weightKg: 2.2, size: 'medium', status: 'PickedUp', customer: 'nusrat', agent: 'rakib', agedHours: 6, isCod: true },
   { n: 8, from: 'bashundhara', to: 'uttara7', weightKg: 1.1, size: 'small', status: 'PickedUp', customer: 'tanvir', agent: 'sabbir', agedHours: 7 },
 
   { n: 9, from: 'gulshan1', to: 'mirpur10', weightKg: 4.8, size: 'large', status: 'InTransit', customer: 'tanvir', agent: 'sabbir', agedHours: 8 },
-  { n: 10, from: 'mohammadpur', to: 'dhanmondi27', weightKg: 0.9, size: 'small', status: 'InTransit', customer: 'nusrat', agent: 'rakib', agedHours: 9, isCod: true, codAmount: 800 },
+  { n: 10, from: 'mohammadpur', to: 'dhanmondi27', weightKg: 0.9, size: 'small', status: 'InTransit', customer: 'nusrat', agent: 'rakib', agedHours: 9, isCod: true },
   { n: 11, from: 'uttara7', to: 'bashundhara', weightKg: 2.7, size: 'medium', status: 'InTransit', customer: 'sadia', agent: 'imran', agedHours: 10 },
 
   { n: 12, from: 'dhanmondi27', to: 'gulshan2', weightKg: 1, size: 'small', status: 'Delivered', customer: 'nusrat', agent: 'rakib', agedHours: 30 },
   { n: 13, from: 'mirpur1', to: 'uttara4', weightKg: 3.1, size: 'medium', status: 'Delivered', customer: 'sadia', agent: 'imran', agedHours: 34 },
-  { n: 14, from: 'gulshan1', to: 'dhanmondi9', weightKg: 0.7, size: 'small', status: 'Delivered', customer: 'tanvir', agent: 'sabbir', agedHours: 38, isCod: true, codAmount: 2400 },
+  { n: 14, from: 'gulshan1', to: 'dhanmondi9', weightKg: 0.7, size: 'small', status: 'Delivered', customer: 'tanvir', agent: 'sabbir', agedHours: 38, isCod: true },
   { n: 15, from: 'bashundhara', to: 'mohammadpur', weightKg: 4.5, size: 'large', status: 'Delivered', customer: 'tanvir', agent: 'sabbir', agedHours: 44 },
   { n: 16, from: 'uttara7', to: 'mirpur10', weightKg: 2, size: 'medium', status: 'Delivered', customer: 'sadia', agent: 'imran', agedHours: 50 },
-  { n: 17, from: 'dhanmondi9', to: 'bashundhara', weightKg: 1.3, size: 'small', status: 'Delivered', customer: 'nusrat', agent: 'rakib', agedHours: 56, isCod: true, codAmount: 950 },
+  { n: 17, from: 'dhanmondi9', to: 'bashundhara', weightKg: 1.3, size: 'small', status: 'Delivered', customer: 'nusrat', agent: 'rakib', agedHours: 56, isCod: true },
 
   { n: 18, from: 'mirpur10', to: 'gulshan2', weightKg: 2.5, size: 'medium', status: 'Cancelled', customer: 'tanvir', agedHours: 20 },
   { n: 19, from: 'mohammadpur', to: 'uttara4', weightKg: 3.8, size: 'medium', status: 'Cancelled', customer: 'sadia', agedHours: 24 },
@@ -118,7 +117,7 @@ const SPECS: readonly Spec[] = [
    * must not count as collectable, and a rule with no demo data behind it is
    * a rule nobody can see working.
    */
-  { n: 20, from: 'gulshan2', to: 'mirpur1', weightKg: 1.9, size: 'small', status: 'Failed', customer: 'tanvir', agent: 'sabbir', agedHours: 15, isCod: true, codAmount: 1150, failureReason: 'Recipient not reachable after three attempts' },
+  { n: 20, from: 'gulshan2', to: 'mirpur1', weightKg: 1.9, size: 'small', status: 'Failed', customer: 'tanvir', agent: 'sabbir', agedHours: 15, isCod: true, failureReason: 'Recipient not reachable after three attempts' },
 ]
 
 const SEED_PREFIX = 'PD-SEED-'
@@ -261,7 +260,12 @@ export const seedParcels = async (): Promise<void> => {
       description: 'Demo parcel',
       price,
       isCod: spec.isCod ?? false,
-      codAmount: spec.isCod ? (spec.codAmount ?? 0) : 0,
+      /**
+       * Derived from the computed price, exactly as the booking route now
+       * does it — a seeded COD parcel whose collectable amount disagreed with
+       * its own price would be data the app itself can no longer produce.
+       */
+      codAmount: spec.isCod ? price.total : 0,
       createdAt: bookedAt,
       updatedAt: bookedAt,
     })
@@ -333,9 +337,10 @@ export const seedParcels = async (): Promise<void> => {
     })
 
     /**
-     * The amount is the same choice the live service makes: a COD payment
-     * tracks the cash at the door, a card payment the delivery fee from the
-     * price snapshot. Two different sums with two different payers.
+     * The amount is the same choice the live service makes — and since COD
+     * now collects the delivery fee itself, that is one figure for both
+     * methods. What still differs is WHO pays and WHEN, which is what
+     * `paymentFor` decides.
      */
     const ledger = paymentFor(spec, at('Delivered'))
     await PaymentModel.create({
@@ -344,7 +349,9 @@ export const seedParcels = async (): Promise<void> => {
       collectedBy: ledger.collected ? (agentEntry?.agentId ?? null) : null,
       method: ledger.method,
       status: ledger.status,
-      amount: spec.isCod ? (spec.codAmount ?? 0) : price.total,
+      // Same figure either way now: a COD parcel collects the delivery fee
+      // in cash, a card parcel charges it up front.
+      amount: price.total,
       // A seeded card payment has no real Stripe session behind it, and
       // inventing an id that resolves to nothing in the dashboard would be
       // worse than admitting there is none.
@@ -368,10 +375,5 @@ export const seedParcels = async (): Promise<void> => {
       .join(', ')})`,
   )
   const cod = SPECS.filter((s) => s.isCod)
-  console.log(
-    `  payments         ${SPECS.length} (${cod.length} COD worth BDT ${cod.reduce(
-      (sum, s) => sum + (s.codAmount ?? 0),
-      0,
-    )})`,
-  )
+  console.log(`  payments         ${SPECS.length} (${cod.length} COD)`)
 }

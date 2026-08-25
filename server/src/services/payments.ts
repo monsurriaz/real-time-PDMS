@@ -27,10 +27,11 @@ import { HttpError } from '../middleware/httpError'
  * Two rules shape everything here.
  *
  * ONE: an amount is never computed. `Parcel.price` is a snapshot, immutable on
- * the schema, and `Parcel.codAmount` is what the sender asked to be collected.
- * A payment reads one of those two numbers. Re-deriving a price at payment time
- * would mean a rate edit could change what someone owes, which section 5
- * forbids — and the reason the snapshot exists at all.
+ * the schema, and `Parcel.codAmount` is that same snapshot restated as the cash
+ * a rider must collect — both written at booking, neither ever read from a
+ * request. A payment reads one of those two numbers. Re-deriving a price at
+ * payment time would mean a rate edit could change what someone owes, which
+ * section 5 forbids — and the reason the snapshot exists at all.
  *
  * TWO: a running total is never stored. Outstanding COD is a query over Payment
  * documents, so the reconciliation table can be re-derived and audited.
@@ -48,11 +49,14 @@ interface ParcelMoney {
 /**
  * What a parcel's payment is FOR, and therefore how much it is.
  *
- * A COD parcel's payment tracks the cash the rider collects at the door — the
- * sender's stated amount. A prepaid parcel's payment is the delivery fee from
- * the price snapshot. Two different sums with two different payers, which is
- * why this is one function with the reasoning in it rather than an `amount`
- * argument each caller decides for itself.
+ * A COD parcel's payment tracks the cash the rider collects at the door; a
+ * prepaid parcel's is the delivery fee charged up front. Both now resolve to
+ * the same figure — `codAmount` is set from `price.total` at booking — so this
+ * reads as a redundancy and is kept anyway: the two fields answer different
+ * questions ("what was this delivery priced at" versus "what is the rider
+ * holding"), and a COD surcharge, or a parcel whose declared value is
+ * collected alongside the fee, would separate them again without touching a
+ * single call site.
  */
 export const amountFor = (parcel: ParcelMoney): number =>
   parcel.isCod ? parcel.codAmount : parcel.price.total
