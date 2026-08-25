@@ -195,6 +195,9 @@ change a rate. Seed values: ৳60 up to 1 kg, ৳90 for 1–3 kg, ৳130 for 3�
 Rules:
 - A price is **snapshotted onto the parcel at booking time**. Editing config later must
   never retroactively change an existing parcel's price.
+- **`Parcel.codAmount` is set server-side from that snapshot**, never from the request.
+  The booking input schema has no such field, so a customer cannot declare what a rider
+  must collect — which they could until M6.9.
 - Validate on save: tiers must be ascending and non-overlapping, all fees ≥ 0.
 - Show the admin a live worked example ("3 km, 2 kg → ৳ 126") as they edit.
 
@@ -227,6 +230,10 @@ but the override is still bound by the same approval check. A self-registered ri
 - Socket connections are authenticated on handshake; joining `parcel:{id}` is authorized
   against the same rules.
 - Never send `passwordHash`, payment secrets, or another user's phone number to the client.
+- **`User.status` is checked on every authenticated request**, in `requireAuth`, and on the
+  socket handshake. A JWT is a bearer token: checking it only at login means a suspended
+  account keeps working until its cookie expires. A suspended caller gets a 403 carrying
+  `reason: 'account_suspended'`, never a 401 — they are identified, just not allowed.
 
 ---
 
@@ -242,6 +249,7 @@ but the override is still bound by the same approval check. A self-registered ri
 | M5 | POD + payments | Photo/OTP stored, Stripe test checkout, COD flag, reconciliation table per agent |
 | M6 | Analytics + polish | Stat cards, one chart, delayed alerts, loading/empty/error states, agent mobile pass |
 | M6.5 | Visual system replacement (Meridian v3), three sessions: **a** shell + routes + re-skin existing screens, **b** rider workspace rebuild, **c** landing + signup + approval flow + profiles | Every screen matches docs/design-system-v3-meridian.html; no v1 token survives in the codebase |
+| M6.9 | Pre-deploy fixes: booking/payment redirect, customer suspension, one-time welcome, COD amount integrity, search copy | Six unrelated defects closed; suspension enforced in `requireAuth` on every request, not at login |
 | M7 | Deploy + rehearse | Live on Vercel + Render + Atlas, demo data seeded, run-through twice |
 
 See DEFERRED.md for work parked out of each milestone.
