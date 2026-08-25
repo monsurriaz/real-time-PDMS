@@ -5,6 +5,7 @@ import { Button } from '@/components/Button'
 import { Card } from '@/components/Card'
 import { Pill } from '@/components/Badge'
 import { TableScroll, Td, Thead, Tr, Who } from '@/components/Table'
+import { useSearchable } from '@/features/shell/useHeaderSearch'
 import { ApiError } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import { useAgentRoster, useApproveAgent, useRejectAgent } from './useAgentRoster'
@@ -57,26 +58,39 @@ const DecisionButtons = ({ agent }: { agent: AgentRosterItem }) => {
   )
 }
 
-export const AdminAgentsPage = () => {
+/**
+ * The actual roster tables — a component of its own, rendered AS A CHILD of
+ * `<AppShell>` rather than inline in the page that calls AppShell, so that
+ * `useSearchable` runs where React actually provides the header's search
+ * context: inside AppShell's rendered tree, not in the parent component that
+ * constructs `<AppShell>` as an element. Calling it directly in
+ * AdminAgentsPage's own body would see no provider yet and the box would
+ * stay unclaimed — a silent bug, not a crash, which is exactly why this is a
+ * separate component rather than a shortcut.
+ */
+const RidersContent = () => {
   const roster = useAgentRoster()
   const [rejectedOpen, setRejectedOpen] = useState(false)
+  const search = useSearchable('Search rider name, phone or zone…')
 
   const { pending, approved, rejected } = useMemo(() => {
-    const rows = roster.data ?? []
+    const q = search.trim().toLowerCase()
+    const rows = (roster.data ?? []).filter(
+      (a) =>
+        q === '' ||
+        a.name.toLowerCase().includes(q) ||
+        a.phone.toLowerCase().includes(q) ||
+        a.zones.some((z) => z.toLowerCase().includes(q)),
+    )
     return {
       pending: rows.filter((a) => a.approvalStatus === 'pending'),
       approved: rows.filter((a) => a.approvalStatus === 'approved'),
       rejected: rows.filter((a) => a.approvalStatus === 'rejected'),
     }
-  }, [roster.data])
+  }, [roster.data, search])
 
   return (
-    <AppShell title="Riders">
-      <PageHead
-        title="Riders"
-        sub="Applications waiting on a decision, and everyone already on the roster."
-      />
-
+    <>
       {roster.isPending ? (
         <Card>
           <p className="text-body text-muted">Loading riders…</p>
@@ -192,6 +206,16 @@ export const AdminAgentsPage = () => {
           ) : null}
         </div>
       )}
-    </AppShell>
+    </>
   )
 }
+
+export const AdminAgentsPage = () => (
+  <AppShell title="Riders">
+    <PageHead
+      title="Riders"
+      sub="Applications waiting on a decision, and everyone already on the roster."
+    />
+    <RidersContent />
+  </AppShell>
+)

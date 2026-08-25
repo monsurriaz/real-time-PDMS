@@ -1,10 +1,17 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
-import type { Role } from '@pdms/shared'
+import type { DeliveryStatus, Role } from '@pdms/shared'
 import { useLogout, useMe } from '@/features/auth/useAuth'
 import { useRailCounts, type RailCounts } from '@/features/shell/useRailCounts'
+import { HeaderSearchContext } from '@/features/shell/useHeaderSearch'
+import {
+  getLastSeenAt,
+  markNotificationsSeen,
+  useNotifications,
+} from '@/features/shell/useNotifications'
 import { homeForRole } from '@/features/auth/roles'
 import { ShiftRail } from '@/features/agent/ShiftRail'
+import { formatRelativeTime } from '@/lib/format'
 import { Avatar } from './Table'
 
 /**
@@ -313,6 +320,116 @@ const BELL = (
   </svg>
 )
 
+/** The dot colour for a notification — overdue is always the failed red, a
+ *  status change carries its own lifecycle colour. */
+const DOT_COLOUR: Record<DeliveryStatus, string> = {
+  Booked: 'bg-booked',
+  Assigned: 'bg-assigned',
+  PickedUp: 'bg-picked',
+  InTransit: 'bg-transit',
+  Delivered: 'bg-delivered',
+  Cancelled: 'bg-cancelled',
+  Failed: 'bg-failed',
+}
+
+/**
+ * The header bell — v3.1 addendum. Built from data that already exists:
+ * recent delivery status changes on whatever this actor can see, plus
+ * overdue alerts for admins (routes/notifications.ts does the scoping, the
+ * same role rules as everything else). The unread dot compares the newest
+ * notification's timestamp against when this browser last opened the
+ * dropdown, so it only ever appears when something is genuinely unread.
+ */
+const NotificationsBell = () => {
+  const notifications = useNotifications()
+  const [open, setOpen] = useState(false)
+  const [lastSeenAt, setLastSeenAt] = useState(() => getLastSeenAt())
+  const box = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onPointer = (e: MouseEvent): void => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onPointer)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onPointer)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  const rows = notifications.data ?? []
+  const newest = rows[0]?.at
+  const unread = Boolean(newest && new Date(newest).getTime() > lastSeenAt)
+
+  const toggle = (): void => {
+    setOpen((v) => !v)
+    if (!open) {
+      markNotificationsSeen()
+      setLastSeenAt(Date.now())
+    }
+  }
+
+  return (
+    <div ref={box} className="relative">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label={unread ? 'Notifications, unread' : 'Notifications'}
+        className="w-11 h-11 md:w-[33px] md:h-[33px] rounded-sm border border-border grid place-items-center text-ink-2 relative hover:bg-surface-sunk"
+      >
+        {BELL}
+        {unread ? (
+          <span
+            aria-hidden="true"
+            className="absolute top-5px right-6px w-6px h-6px rounded-full bg-failed border-[1.5px] border-surface"
+          />
+        ) : null}
+      </button>
+
+      {open ? (
+        <div
+          role="menu"
+          className="absolute right-0 top-full mt-2 w-[296px] bg-surface border border-border rounded-md p-1 z-10"
+        >
+          <div className="px-10px pt-8px pb-6px text-micro font-semibold uppercase tracking-[0.11em] text-faint">
+            Notifications
+          </div>
+          {notifications.isPending ? (
+            <p className="px-10px py-3 text-small text-muted">Loading…</p>
+          ) : rows.length === 0 ? (
+            <p className="px-10px py-3 text-small text-muted">Nothing new.</p>
+          ) : (
+            rows.map((n) => (
+              <div key={n.id} className="flex gap-10px px-10px py-9px rounded-sm items-start hover:bg-page">
+                <span
+                  className={`w-6px h-6px rounded-full mt-5px flex-none ${
+                    n.kind === 'overdue' ? 'bg-failed' : DOT_COLOUR[n.status] ?? 'bg-booked'
+                  }`}
+                  aria-hidden="true"
+                />
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">{n.title}</div>
+                  <div className="text-tiny text-muted truncate">{n.subtitle}</div>
+                </div>
+                <span className="mono text-micro text-faint ml-auto whitespace-nowrap">
+                  {formatRelativeTime(n.at)}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 interface Props {
   /** The header's title. The page's own <h1> lives in `children`. */
   title: string
@@ -334,6 +451,31 @@ export const AppShell = ({ title, titleAside, children }: Props) => {
    * floor is applied for that role rather than to everyone's chrome.
    */
   const touch = role === 'agent'
+
+  /**
+   * The header search — v3.1 addendum. AppShell owns the query text and the
+   * one `<input>`; whichever screen has a searchable table claims it via
+   * `useSearchable` (see useHeaderSearch.ts), setting `placeholder` and
+   * reading `query` back. `placeholder === null` is the honest "nothing to
+   * search on this screen" state, which is why the input stays disabled
+   * until a page claims it, rather than sitting there enabled and silently
+   * doing nothing.
+   */
+  const [query, setQuery] = useState('')
+  const [placeholder, setPlaceholder] = useState<string | null>(null)
+  const searchInput = useRef<HTMLInputElement>(null)
+
+  // Cmd+K / Ctrl+K focuses the search box, from anywhere on the screen.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        searchInput.current?.focus()
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
 
   return (
     <div className="min-h-dvh grid grid-cols-[64px_1fr] md:grid-cols-[216px_1fr] bg-page">
@@ -430,17 +572,12 @@ export const AppShell = ({ title, titleAside, children }: Props) => {
           {titleAside}
 
           {/*
-            Still presentational, and the label no longer names a milestone
-            that has shipped.
-
-            Not wired, deliberately. The cheap version — filtering the rows a
-            table already fetched — cannot be done from here: the field is in
-            the shell and the rows are in each page, so it would need a channel
-            between them (a context or a store) that nothing else in the build
-            wants. And it would search one screen's current page of rows while
-            looking like a global search, which is worse than a control that
-            says it does nothing. Real search is a server lookup across
-            tracking IDs, customers and riders — see DEFERRED.md.
+            Real now — v3.1 addendum. `placeholder === null` means no screen
+            below has claimed the box yet (useSearchable hasn't run), which is
+            the honest "nothing to search here" state; it stays disabled
+            rather than sitting there enabled and doing nothing. Once a page
+            claims it, the placeholder names what IT searches — not a generic
+            "Search" implying a reach this box doesn't have.
           */}
           <label className="hidden lg:flex items-center gap-2 bg-surface-sunk border border-border rounded-pill px-15px py-7px ml-18px min-w-[230px]">
             <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 flex-none text-faint" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -448,28 +585,37 @@ export const AppShell = ({ title, titleAside, children }: Props) => {
               <path d="m20 20-3.5-3.5" />
             </svg>
             <input
+              ref={searchInput}
               type="search"
-              disabled
-              placeholder="Search — coming soon"
-              aria-label="Search (not yet available)"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              disabled={placeholder === null}
+              placeholder={placeholder ?? 'Nothing to search on this screen'}
+              aria-label={placeholder ?? 'Search (nothing to search on this screen)'}
               className="bg-transparent outline-none text-sm text-ink placeholder:text-faint w-full disabled:cursor-not-allowed"
             />
+            {placeholder !== null ? (
+              <span className="mono text-micro text-faint bg-surface border border-border rounded-[4px] px-5px py-0.5 flex-none">
+                ⌘K
+              </span>
+            ) : null}
           </label>
 
           <div className="ml-auto flex items-center gap-11px">
-            <button
-              type="button"
-              disabled
-              aria-label="Notifications (not yet available)"
-              className="w-11 h-11 md:w-[33px] md:h-[33px] rounded-sm border border-border grid place-items-center text-ink-2 disabled:cursor-not-allowed"
-            >
-              {BELL}
-            </button>
-            <Avatar size="md" />
+            {/*
+              The header avatar is gone, not wired up — the rail's account
+              block at its foot already owns identity, Profile and Sign out.
+              A second account menu here would be two doors to one room.
+            */}
+            <NotificationsBell />
           </div>
         </header>
 
-        <main className="p-22px overflow-auto">{children}</main>
+        <main className="p-22px overflow-auto">
+          <HeaderSearchContext.Provider value={{ query, setPlaceholder }}>
+            {children}
+          </HeaderSearchContext.Provider>
+        </main>
       </div>
     </div>
   )

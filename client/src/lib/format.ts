@@ -28,3 +28,17 @@ const dateFormatter = new Intl.DateTimeFormat('en-BD', {
 
 export const formatDateTime = (d: Date | string): string =>
   dateFormatter.format(typeof d === 'string' ? new Date(d) : d)
+
+/**
+ * 2m, 18m, 1h, 3h — the header's notification list, where an absolute
+ * timestamp would ask the reader to do the subtraction themselves for
+ * something that's supposed to be a glance. Caps at hours: nothing surfaces
+ * here old enough to need days (the bell only ever shows recent activity).
+ */
+export const formatRelativeTime = (d: Date | string): string => {
+  const then = typeof d === 'string' ? new Date(d) : d
+  const minutes = Math.max(0, Math.round((Date.now() - then.getTime()) / 60_000))
+  if (minutes < 1) return 'now'
+  if (minutes < 60) return `${minutes}m`
+  return `${Math.floor(minutes / 60)}h`
+}
