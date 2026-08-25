@@ -253,6 +253,7 @@ const AccountMenu = ({
             to a screen that does not exist is worse than a greyed one.
           */}
           <span
+            title="Profile — arriving in M6.5c"
             className="block px-3 py-2 text-body text-chrome-faint cursor-not-allowed"
             aria-disabled="true"
           >
