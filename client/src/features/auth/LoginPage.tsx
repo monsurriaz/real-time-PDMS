@@ -54,6 +54,7 @@ export const LoginPage = () => {
      * rather than v3's lone card floating on the cool page — see AuthSplit.
      */
     <AuthSplit
+      pageClass="login"
       heading="Dhaka's parcels, tracked to the door."
       body="Six zones, live rider positions, and proof of delivery on every handover."
     >

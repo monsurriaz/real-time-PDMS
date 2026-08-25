@@ -29,6 +29,8 @@ interface Props {
   /** The left panel's one paragraph of proposition copy. */
   body: string
   children: ReactNode
+  /** The calling route's own identifying class — `login` or `signup`. */
+  pageClass: string
 }
 
 const QUOTE = {
@@ -36,8 +38,8 @@ const QUOTE = {
   who: 'From the design principles',
 }
 
-export const AuthSplit = ({ heading, body, children }: Props) => (
-  <main className="min-h-dvh bg-page flex flex-col">
+export const AuthSplit = ({ heading, body, children, pageClass }: Props) => (
+  <main className={`${pageClass} min-h-dvh bg-page flex flex-col`}>
     <div className="grid min-[860px]:grid-cols-2 flex-1">
       {/* ---------- left: the proposition ---------- */}
       <div

@@ -267,7 +267,7 @@ const CustomersContent = () => {
 }
 
 export const AdminCustomersPage = () => (
-  <AppShell title="Customers">
+  <AppShell title="Customers" pageClass="admin-customers">
     <PageHead
       title="Customers"
       sub="Everyone who can book a parcel, and whether their account is still allowed to."

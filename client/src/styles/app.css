@@ -54,16 +54,27 @@
   /**
    * The rider draws above the endpoint pins.
    *
-   * MapLibre stacks markers in DOM order, so a rider parked at the pick-up
-   * point disappeared under the ink pin and read as a black dot — the one
-   * moment in a delivery when someone is most likely to be looking. z-index is
-   * on the marker element MapLibre positions, not on this inner node, which is
-   * why the rule reaches up with :has().
+   * MapLibre stacks markers in DOM order (no z-index of its own), so a rider
+   * parked at the pick-up point disappeared under the ink pin and read as a
+   * black dot — the one moment in a delivery when someone is most likely to
+   * be looking.
+   *
+   * This used to be `.maplibregl-marker:has(.pdms-rider)` — reaching up from
+   * an inner node on the assumption that MapLibre wraps the element you hand
+   * it in its OWN container div, the way most marker libraries do. It
+   * doesn't: `new maplibregl.Marker({ element })` adds its `maplibregl-marker`
+   * class straight onto the SAME element you passed in. `.pdms-rider` and
+   * `.maplibregl-marker` are one node, not ancestor and descendant, so
+   * `:has()` could never match — z-index silently stayed `auto` for every
+   * marker, and which one painted on top fell back to DOM insertion order,
+   * which is exactly as unreliable as the comment above already knew. Plain
+   * compound selectors below fix it for real, because there's no wrapper to
+   * reach through in the first place.
    */
-  .maplibregl-marker:has(.pdms-rider) {
+  .maplibregl-marker.pdms-rider {
     z-index: 2;
   }
-  .maplibregl-marker:has(.pdms-pin) {
+  .maplibregl-marker.pdms-pin {
     z-index: 1;
   }
 

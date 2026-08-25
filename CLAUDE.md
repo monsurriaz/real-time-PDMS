@@ -84,6 +84,17 @@ CLAUDE.md
 .env.example     every required key, with empty values
 ```
 
+**Semantic page classes** (M6.97). Every top-level route component carries an identifying
+class on its own outermost element — `<role>-<screen>`, kebab-case, matching the route
+(`/admin/board` → `admin-board`, `/agent/runs/:id` → `agent-run-detail`). It carries no
+styles; it exists so a screen can be targeted by what it IS, not by a layout class that
+could change under it. `AppShell` takes this as a required `pageClass` prop (so the
+compiler catches a page that forgot one); `AuthSplit` takes the same for `/login` and
+`/signup`; the handful of routes with no shared shell (`/`, `/agent/pending`,
+`/track/:trackingId`) put the class directly on their own root element. A new route
+follows this automatically — `pageClass` being required is what makes it a compile error
+to skip, not tribal knowledge.
+
 ---
 
 ## 4. Design tokens — v3 Meridian
@@ -265,7 +276,8 @@ but the override is still bound by the same approval check. A self-registered ri
 | M6 | Analytics + polish | Stat cards, one chart, delayed alerts, loading/empty/error states, agent mobile pass |
 | M6.5 | Visual system replacement (Meridian v3), three sessions: **a** shell + routes + re-skin existing screens, **b** rider workspace rebuild, **c** landing + signup + approval flow + profiles | Every screen matches docs/design-system-v3-meridian.html; no v1 token survives in the codebase |
 | M6.9 | Pre-deploy fixes: booking/payment redirect, customer suspension, one-time welcome, COD amount integrity, search copy | Six unrelated defects closed; suspension enforced in `requireAuth` on every request, not at login |
-| M6.96 | UI corrections against the v3.1 addendum: footer rule, landing hero, auth split-screen, header search/notifications/avatar, compact rail variant, map rendering | Every item in the addendum matches; branched off main, not merged |
+| M6.96 | UI corrections against the v3.1 addendum: footer rule, landing hero, auth split-screen, header search/notifications/avatar, compact rail variant, map rendering | Every item in the addendum matches; merged to main via PR |
+| M6.97 | Map regression fix (rider z-index never actually applied, a marker-ordering race, a socket-auth bug blocking every pre-M6.9 rider from a live connection at all) + semantic page classes on every route | All four map-bearing surfaces re-verified individually with real position data; every route in the table carries its class, compiler-enforced |
 | M7 | Deploy + rehearse | Live on Vercel + Render + Atlas, demo data seeded, run-through twice |
 
 See DEFERRED.md for work parked out of each milestone.

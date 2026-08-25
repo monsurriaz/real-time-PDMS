@@ -436,9 +436,18 @@ interface Props {
   /** Right of the title — a status Pill on the tracking screen. */
   titleAside?: ReactNode
   children: ReactNode
+  /**
+   * The route's own identifying class — `<role>-<screen>`, e.g.
+   * `admin-board`. Every top-level page passes its own; see CLAUDE.md's
+   * "semantic page classes" convention. Carries no styles — it exists so a
+   * screen (or a test, or a future analytics hook) can be targeted by what it
+   * IS rather than by a CSS class that happens to describe its current
+   * layout and could change under it.
+   */
+  pageClass: string
 }
 
-export const AppShell = ({ title, titleAside, children }: Props) => {
+export const AppShell = ({ title, titleAside, children, pageClass }: Props) => {
   const me = useMe()
   const role = me.data?.role
   const counts = useRailCounts(role)
@@ -478,7 +487,7 @@ export const AppShell = ({ title, titleAside, children }: Props) => {
   }, [])
 
   return (
-    <div className="min-h-dvh grid grid-cols-[64px_1fr] md:grid-cols-[216px_1fr] bg-page">
+    <div className={`${pageClass} min-h-dvh grid grid-cols-[64px_1fr] md:grid-cols-[216px_1fr] bg-page`}>
       {/* ---------- the rail ---------- */}
       {/*
         `sticky top-0 h-dvh`, not just a tall block in the grid flow.
@@ -567,7 +576,22 @@ export const AppShell = ({ title, titleAside, children }: Props) => {
 
       {/* ---------- the workspace ---------- */}
       <div className="flex flex-col min-w-0">
-        <header className="flex items-center gap-13px px-22px py-13px bg-surface border-b border-border min-h-[65px]">
+        {/*
+          `sticky top-0`, not a bare header sitting still inside a clipped
+          `<main>`. That was the old trick: `<main>` was the only element with
+          `overflow-auto`, so it was the only thing that ever scrolled, which
+          made the header LOOK pinned without it doing anything itself. The
+          real cost of that trick is that `<main>` becomes the nearest
+          scrolling ancestor for everything inside it — including any
+          `position: sticky` a PAGE renders in its own content (the booking
+          screen's price panel, `lg:sticky lg:top-[78px]`). Nested sticky
+          inside a clipped scroll container is exactly the fragile case that
+          breaks across browsers; sticking the header itself and letting the
+          document scroll is the well-supported version, and it's what lets a
+          page's own sticky elements bind to the viewport the way `top-[78px]`
+          assumes they will.
+        */}
+        <header className="sticky top-0 z-20 flex items-center gap-13px px-22px py-13px bg-surface border-b border-border min-h-[65px]">
           <span className="text-lg font-semibold tracking-[-0.025em] truncate">{title}</span>
           {titleAside}
 
@@ -613,7 +637,13 @@ export const AppShell = ({ title, titleAside, children }: Props) => {
           </div>
         </header>
 
-        <main className="p-22px overflow-auto">
+        {/*
+          No `overflow-auto` here any more — see the header's own comment.
+          The document scrolls now, which is what lets a page's own
+          `position: sticky` content (the booking screen's price panel) bind
+          to the viewport instead of to this box.
+        */}
+        <main className="p-22px">
           <HeaderSearchContext.Provider value={{ query, setPlaceholder }}>
             {children}
           </HeaderSearchContext.Provider>

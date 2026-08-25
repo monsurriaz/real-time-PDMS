@@ -211,7 +211,7 @@ const RidersContent = () => {
 }
 
 export const AdminAgentsPage = () => (
-  <AppShell title="Riders">
+  <AppShell title="Riders" pageClass="admin-agents">
     <PageHead
       title="Riders"
       sub="Applications waiting on a decision, and everyone already on the roster."

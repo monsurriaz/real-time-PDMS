@@ -79,6 +79,7 @@ export const SignupPage = () => {
      * the v3.1 addendum's own note ("not two page designs").
      */
     <AuthSplit
+      pageClass="signup"
       heading="Dhaka's parcels, tracked to the door."
       body="Six zones, live rider positions, and proof of delivery on every handover."
     >
