@@ -415,9 +415,17 @@ export const AppShell = ({ title, titleAside, children }: Props) => {
           {titleAside}
 
           {/*
-            Presentational this session — see the handoff note. It is a real
-            input so it can be focused and typed into, and it says what it will
-            do rather than pretending to already do it.
+            Still presentational, and the label no longer names a milestone
+            that has shipped.
+
+            Not wired, deliberately. The cheap version — filtering the rows a
+            table already fetched — cannot be done from here: the field is in
+            the shell and the rows are in each page, so it would need a channel
+            between them (a context or a store) that nothing else in the build
+            wants. And it would search one screen's current page of rows while
+            looking like a global search, which is worse than a control that
+            says it does nothing. Real search is a server lookup across
+            tracking IDs, customers and riders — see DEFERRED.md.
           */}
           <label className="hidden lg:flex items-center gap-2 bg-surface-sunk border border-border rounded-pill px-15px py-7px ml-18px min-w-[230px]">
             <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 flex-none text-faint" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -427,7 +435,7 @@ export const AppShell = ({ title, titleAside, children }: Props) => {
             <input
               type="search"
               disabled
-              placeholder="Search — coming in M6.5c"
+              placeholder="Search — coming soon"
               aria-label="Search (not yet available)"
               className="bg-transparent outline-none text-sm text-ink placeholder:text-faint w-full disabled:cursor-not-allowed"
             />

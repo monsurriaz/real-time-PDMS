@@ -52,7 +52,7 @@ building for its own sake.
 
 | Item | Notes |
 |---|---|
-| Search field | Presentational. A real input, disabled, labelled "coming in M6.5c" — that label is now stale copy rather than a real target; it means "not yet built", full stop. Wiring it means a server search across tracking IDs, customers and riders. |
+| Search field | Presentational. A real input, disabled, now labelled "coming soon" — M6.9 dropped the stale M6.5c reference. Left unwired on purpose: the field lives in the shell and the rows live in each page, so even the cheap version (filtering already-fetched rows) needs a shell-to-page channel nothing else wants, and it would search one page of one table while looking global. Real search is a server lookup across tracking IDs, customers and riders. |
 | Notification bell | Presentational and disabled. There is no notification store; v3 draws an unread dot, and showing one over nothing would be a lie. |
 | Zones nav item | v3's admin rail has Operations / Analytics / COD, then Riders / Pricing / **Zones**. Zones has no screen and no count, so it is omitted rather than dimmed — an empty row for a screen nobody has asked for is noise. |
 
