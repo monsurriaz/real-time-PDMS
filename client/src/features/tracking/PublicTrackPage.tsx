@@ -3,6 +3,7 @@ import { Badge } from '@/components/Badge'
 import { LazyTrackingMap } from '@/components/LazyTrackingMap'
 import type { MapRider } from '@/components/TrackingMap'
 import { LifecycleRail } from '@/components/LifecycleRail'
+import { PublicFooter } from '@/components/PublicFooter'
 import { ApiError } from '@/lib/api'
 import { usePublicTracking } from './usePublicTracking'
 
@@ -40,10 +41,10 @@ export const PublicTrackPage = ({ trackingId }: { trackingId: string }) => {
   const tracking = usePublicTracking(trackingId)
 
   return (
-    <div className="min-h-dvh bg-page">
+    <div className="min-h-dvh bg-page flex flex-col">
       <PublicNav />
 
-      <div className="max-w-[720px] mx-auto px-22px pb-16">
+      <div className="max-w-[720px] mx-auto px-22px pb-16 flex-1 w-full">
         {tracking.isPending ? (
           <p className="text-body text-muted text-center py-16">Looking it up…</p>
         ) : tracking.isError || !tracking.data ? (
@@ -115,6 +116,8 @@ export const PublicTrackPage = ({ trackingId }: { trackingId: string }) => {
           </div>
         )}
       </div>
+
+      <PublicFooter />
     </div>
   )
 }
