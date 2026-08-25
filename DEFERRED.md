@@ -102,8 +102,8 @@ These are the pieces it deliberately stopped before.
 
 | Item | Milestone | Commit |
 |---|---|---|
-| **Rider workspace rebuild** — route map beside the active delivery, `/agent/runs/:id`, shift folded into the rail | M6.5b | `PENDING` |
-| `/agent/finished` | M6.5b | `PENDING` |
+| **Rider workspace rebuild** — route map beside the active delivery, `/agent/runs/:id`, shift folded into the rail | M6.5b | `9b4e696` |
+| `/agent/finished` | M6.5b | `9b4e696` |
 | Seed leaves settlement records behind | M6.5b | `09ba383` |
 | Sidebar account block scrolled away with the page instead of staying pinned | M6.5b | `a82f3c3` |
 | Account menu's Profile item disabled with no explanation | M6.5b | `b86f049` |
