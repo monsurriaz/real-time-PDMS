@@ -567,7 +567,7 @@ export const AppShell = ({ title, titleAside, children }: Props) => {
 
       {/* ---------- the workspace ---------- */}
       <div className="flex flex-col min-w-0">
-        <header className="flex items-center gap-13px px-22px py-13px bg-surface border-b border-border">
+        <header className="flex items-center gap-13px px-22px py-13px bg-surface border-b border-border min-h-[65px]">
           <span className="text-lg font-semibold tracking-[-0.025em] truncate">{title}</span>
           {titleAside}
 
@@ -579,27 +579,29 @@ export const AppShell = ({ title, titleAside, children }: Props) => {
             claims it, the placeholder names what IT searches — not a generic
             "Search" implying a reach this box doesn't have.
           */}
-          <label className="hidden lg:flex items-center gap-2 bg-surface-sunk border border-border rounded-pill px-15px py-7px ml-18px min-w-[230px]">
-            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 flex-none text-faint" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-3.5-3.5" />
-            </svg>
-            <input
-              ref={searchInput}
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              disabled={placeholder === null}
-              placeholder={placeholder ?? 'Nothing to search on this screen'}
-              aria-label={placeholder ?? 'Search (nothing to search on this screen)'}
-              className="bg-transparent outline-none text-sm text-ink placeholder:text-faint w-full disabled:cursor-not-allowed"
-            />
-            {placeholder !== null ? (
-              <span className="mono text-micro text-faint bg-surface border border-border rounded-[4px] px-5px py-0.5 flex-none">
-                ⌘K
-              </span>
-            ) : null}
-          </label>
+          {placeholder !== null ? 
+            <label className="hidden lg:flex items-center gap-2 bg-surface-sunk border border-border rounded-pill px-15px py-7px ml-18px min-w-[230px]">
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 flex-none text-faint" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
+              </svg>
+              <input
+                ref={searchInput}
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                disabled={placeholder === null}
+                placeholder={placeholder ?? 'Nothing to search on this screen'}
+                aria-label={placeholder ?? 'Search (nothing to search on this screen)'}
+                className="bg-transparent outline-none text-sm text-ink placeholder:text-faint w-full disabled:cursor-not-allowed"
+              />
+              {placeholder !== null ? (
+                <span className="mono text-micro text-faint bg-surface border border-border rounded-[4px] px-5px py-0.5 flex-none">
+                  ⌘K
+                </span>
+              ) : null}
+            </label>
+          : null }
 
           <div className="ml-auto flex items-center gap-11px">
             {/*
