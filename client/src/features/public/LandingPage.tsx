@@ -150,7 +150,7 @@ const ProductShowcase = () => (
       <div className="flex items-center gap-10px">
         <Avatar size="md" />
         <div className="flex-1 min-w-0">
-          <div className="text-body font-semibold tracking-[-0.01em] truncate">
+          <div className="text-body text-chrome font-semibold tracking-[-0.01em] truncate">
             Rakib Hasan
           </div>
           <div className="text-meta text-muted">1.2 km away · arriving ~14:38</div>
