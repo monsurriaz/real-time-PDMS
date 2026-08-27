@@ -8,7 +8,8 @@ import type { DeliveryEvent, DeliveryStatus } from '@pdms/shared'
 
 const LABEL: Record<DeliveryStatus, string> = {
   Booked: 'Booked',
-  Assigned: 'Rider assigned',
+  Assigned: 'Offered to a rider',
+  Accepted: 'Rider accepted',
   PickedUp: 'Picked up',
   InTransit: 'In transit',
   Delivered: 'Delivered',

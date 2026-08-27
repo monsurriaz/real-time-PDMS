@@ -43,7 +43,12 @@ interface AgentLean {
   locationUpdatedAt?: Date
 }
 
-const ACTIVE_STATUSES = ['Assigned', 'PickedUp', 'InTransit'] as const
+/**
+ * M8: bare 'Assigned' is now just an unanswered offer — it isn't real load
+ * until the rider says Accepted, so it doesn't count toward their own
+ * "active deliveries" figure either (matches assignment.ts's ACTIVE_STATUSES).
+ */
+const ACTIVE_STATUSES = ['Accepted', 'PickedUp', 'InTransit'] as const
 
 const objectIdParam = (raw: string | undefined): string => {
   if (!raw || !mongoose.Types.ObjectId.isValid(raw)) {

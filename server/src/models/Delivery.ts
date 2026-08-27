@@ -13,9 +13,20 @@ import { ALLOW_ALL, DENY_ALL, roleScopePlugin } from './plugins/roleScope'
 /**
  * `podOtp` is intersected in rather than added to /shared's Delivery: /shared
  * holds what crosses the client/server boundary, and this never does.
+ *
+ * `excludedAgents` is re-typed rather than picked up as a `Doc<>` ref: the
+ * shared schema models it as `objectId[]` (a string array, for the wire),
+ * and `Doc<>`'s `Refs` mechanism only maps a single nullable ref field to
+ * `Types.ObjectId | null` — not an array — so it is omitted from the base
+ * mapping and reintroduced here as the real `Types.ObjectId[]` Mongoose
+ * stores.
  */
-export type DeliveryDoc = Doc<Delivery, 'parcel' | 'agent'> & {
+export type DeliveryDoc = Omit<
+  Doc<Delivery, 'parcel' | 'agent'>,
+  'excludedAgents'
+> & {
   podOtp?: PodOtp
+  excludedAgents: Types.ObjectId[]
 }
 
 const deliveryEvent = new Schema(
@@ -106,8 +117,18 @@ const deliveryMongooseSchema = new Schema<DeliveryDoc>(
     events: { type: [deliveryEvent], required: true, default: [] },
 
     assignedAt: { type: Date, required: false, default: null },
+    acceptedAt: { type: Date, required: false, default: null },
     pickedUpAt: { type: Date, required: false, default: null },
     deliveredAt: { type: Date, required: false, default: null },
+
+    /** M8: the current offer's deadline, while status is 'Assigned'. */
+    offerExpiresAt: { type: Date, required: false, default: null },
+    /** M8: riders who declined (or let expire) THIS delivery — never re-offered it. */
+    excludedAgents: {
+      type: [{ type: Schema.Types.ObjectId, ref: 'Agent' }],
+      required: true,
+      default: [],
+    },
 
     proofOfDelivery: { type: proofOfDelivery, required: false },
     podOtp: { type: podOtp, required: false, select: false, default: undefined },

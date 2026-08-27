@@ -22,6 +22,16 @@ import type { DeliveryStatus } from '@pdms/shared'
  * frozen means the socket dropped and the screen is on the REST fallback. That
  * is why passing `live` is required rather than defaulted — a rail that
  * shimmered unconditionally would be lying.
+ *
+ * M8 adds `Accepted` to the lifecycle without adding a sixth ramp colour —
+ * CLAUDE.md's palette is frozen at five. `Accepted` shares the `Assigned`
+ * step's position on the rail (both mean "a rider is on this, not yet in
+ * hand") and its colour; the two are told apart the same way the fleet
+ * map's idle/busy riders are (a lighter fill vs. the full one) rather than
+ * an outline — a fill this thin (4px on `full`, 6px on `compact`) can't draw
+ * a legible ring, so this reaches for the option CLAUDE.md's brief for this
+ * milestone offered instead: reduced opacity while offered, full once
+ * accepted.
  */
 
 /** The happy path, in order. Terminal side-exits are not rail positions. */
@@ -32,6 +42,13 @@ const STEPS: ReadonlyArray<{ status: DeliveryStatus; label: string }> = [
   { status: 'InTransit', label: 'Transit' },
   { status: 'Delivered', label: 'Delivered' },
 ]
+
+/** Offered and accepted sit at the same rail position — see the file header. */
+const railStatus = (status: DeliveryStatus): DeliveryStatus =>
+  status === 'Accepted' ? 'Assigned' : status
+
+/** Only the outstanding-offer state gets the lighter fill. */
+const OFFERED_OPACITY = 'opacity-45'
 
 const PASSED_COLOUR: Record<string, string> = {
   Booked: 'bg-booked',
@@ -56,17 +73,21 @@ interface Props {
 export const LifecycleRail = ({ status, live = false, labels = false, rail = 'full' }: Props) => {
   /**
    * Cancelled and Failed leave the path rather than advancing along it, so the
-   * rail shows how far the parcel actually got.
+   * rail shows how far the parcel actually got. Accepted maps onto Assigned's
+   * position — see railStatus above.
    */
   const reached =
     status === 'Failed'
       ? STEPS.findIndex((s) => s.status === 'InTransit')
       : status === 'Cancelled'
         ? STEPS.findIndex((s) => s.status === 'Assigned')
-        : STEPS.findIndex((s) => s.status === status)
+        : STEPS.findIndex((s) => s.status === railStatus(status))
 
   const finished =
     status === 'Delivered' || status === 'Cancelled' || status === 'Failed'
+
+  /** The outstanding-offer state — lighter fill, not yet a commitment. */
+  const offered = status === 'Assigned'
 
   /**
    * The colour and liveness of the CURRENT position — the one segment (full)
@@ -93,7 +114,10 @@ export const LifecycleRail = ({ status, live = false, labels = false, rail = 'fu
         aria-label={ariaLabel}
         {...(isLiveSegment ? { 'data-live': String(live) } : {})}
       >
-        <div className={`h-full rounded-pill ${currentColour}`} style={{ width: `${pct}%` }} />
+        <div
+          className={`h-full rounded-pill ${currentColour}${offered ? ` ${OFFERED_OPACITY}` : ''}`}
+          style={{ width: `${pct}%` }}
+        />
       </div>
     )
   }
@@ -112,11 +136,12 @@ export const LifecycleRail = ({ status, live = false, labels = false, rail = 'fu
 
           // Only the in-progress segment can shimmer, and only when live.
           const isLiveCurrentSegment = current && isLiveSegment
+          const isOfferedSegment = current && offered
 
           return (
             <span
               key={step.status}
-              className={`h-1 flex-1 rounded-pill ${colour}${isLiveCurrentSegment ? ' rail-live' : ''}`}
+              className={`h-1 flex-1 rounded-pill ${colour}${isLiveCurrentSegment ? ' rail-live' : ''}${isOfferedSegment ? ` ${OFFERED_OPACITY}` : ''}`}
               {...(isLiveCurrentSegment ? { 'data-live': String(live) } : {})}
             />
           )

@@ -3,6 +3,7 @@ import mongoose from 'mongoose'
 import {
   advanceStatusInputSchema,
   assignInputSchema,
+  declineOfferInputSchema,
   recordPodInputSchema,
   type DeliveryListItem,
   type DeliveryStatus,
@@ -19,7 +20,7 @@ import { HttpError, unauthorized } from '../middleware/httpError'
 import { assignDelivery, suggestAgents } from '../services/assignment'
 import { codStatusForParcels } from '../services/payments'
 import { issueOtp, recordProof } from '../services/pod'
-import { advanceStatus, availableTransitions } from '../services/lifecycle'
+import { advanceStatus, availableTransitions, evaluateOfferExpiry } from '../services/lifecycle'
 
 export const deliveriesRouter = Router()
 
@@ -36,9 +37,30 @@ interface DeliveryRow {
   agent: mongoose.Types.ObjectId | null
   status: DeliveryStatus
   proofOfDelivery?: { method: PodMethod }
+  offerExpiresAt: Date | null
   expectedBy: Date | null
   createdAt: Date
   updatedAt: Date
+}
+
+/**
+ * M8: evaluation-on-read. Every list/detail read passes its rows through
+ * this before building a response, so an offer past its deadline is caught
+ * the moment anyone actually looks at it — see lifecycle.ts's own note on
+ * why this isn't a scheduled job. Mutates matching rows in place (status
+ * back to Booked, agent cleared) rather than re-querying, since
+ * evaluateOfferExpiry already tells us exactly what changed.
+ */
+const applyOfferExpiry = async (rows: DeliveryRow[]): Promise<void> => {
+  for (const row of rows) {
+    if (row.status !== 'Assigned' || !row.offerExpiresAt) continue
+    const newStatus = await evaluateOfferExpiry(row)
+    if (newStatus !== row.status) {
+      row.status = newStatus
+      row.agent = null
+      row.offerExpiresAt = null
+    }
+  }
 }
 
 interface ParcelRow {
@@ -135,6 +157,7 @@ const toListItems = async (
          * the server already said.
          */
         allowedTransitions: [...availableTransitions(d.status, role)],
+        offerExpiresAt: d.status === 'Assigned' ? d.offerExpiresAt : null,
         expectedBy: d.expectedBy,
         isOverdue:
           d.expectedBy !== null &&
@@ -164,10 +187,18 @@ deliveriesRouter.get('/', requireAuth, async (req, res, next) => {
     const rows = await DeliveryModel.find(filter)
       .sort({ updatedAt: -1 })
       .limit(200)
-      .select('parcel agent status proofOfDelivery expectedBy createdAt updatedAt')
+      .select('parcel agent status proofOfDelivery offerExpiresAt expectedBy createdAt updatedAt')
       .lean<DeliveryRow[]>()
 
-    res.json({ deliveries: await toListItems(rows, actor.role) })
+    await applyOfferExpiry(rows)
+    /**
+     * A row whose offer just expired during THIS read no longer matches an
+     * explicit `?status=` filter (it flipped to Booked) — drop it rather
+     * than answer "status=Assigned" with a row that says Booked.
+     */
+    const visible = statusParam ? rows.filter((r) => r.status === statusParam) : rows
+
+    res.json({ deliveries: await toListItems(visible, actor.role) })
   } catch (err) {
     next(err)
   }
@@ -187,9 +218,10 @@ deliveriesRouter.get(
     try {
       const id = objectIdParam(req.params.id)
 
-      const delivery = await DeliveryModel.findById(id).select('parcel status').lean<{
+      const delivery = await DeliveryModel.findById(id).select('parcel status excludedAgents').lean<{
         parcel: mongoose.Types.ObjectId
         status: DeliveryStatus
+        excludedAgents: mongoose.Types.ObjectId[]
       } | null>()
       if (!delivery) throw new HttpError(404, 'delivery not found')
 
@@ -201,6 +233,7 @@ deliveriesRouter.get(
       const suggestion = await suggestAgents({
         pickup: parcel.pickup.point,
         zone: parcel.pickup.zone,
+        excludeAgentIds: delivery.excludedAgents.map((a) => a.toString()),
       })
 
       res.json({
@@ -273,6 +306,36 @@ deliveriesRouter.post('/:id/status', requireAuth, async (req, res, next) => {
 })
 
 /**
+ * POST /deliveries/:id/decline — the offered rider turns the job down.
+ *
+ * A dedicated route rather than reusing /status with `to: 'Booked'`: the
+ * client's confirm-step UX and the optional reason both want their own
+ * shape. Internally it is still just an advanceStatus() call — no route
+ * mutates status directly, decline included. TRANSITION_AUTHORITY.Booked is
+ * agent-only, so ownership and role are already enforced generically; there
+ * is nothing extra to check here.
+ */
+deliveriesRouter.post('/:id/decline', requireAuth, async (req, res, next) => {
+  try {
+    const actor = req.actor
+    if (!actor) throw unauthorized()
+    const id = objectIdParam(req.params.id)
+    const input = declineOfferInputSchema.parse(req.body ?? {})
+
+    const result = await advanceStatus({
+      deliveryId: id,
+      to: 'Booked',
+      actor,
+      note: input.reason ? `Declined: ${input.reason}` : 'Declined by rider',
+    })
+
+    res.json(result)
+  } catch (err) {
+    next(err)
+  }
+})
+
+/**
  * POST /deliveries/:id/pod/otp — send a delivery code.
  *
  * Returns when it was issued and when it dies, never the code itself. See
@@ -323,8 +386,10 @@ deliveriesRouter.get('/:id', requireAuth, async (req, res, next) => {
     const id = objectIdParam(req.params.id)
 
     const rows = await DeliveryModel.find({ _id: new mongoose.Types.ObjectId(id) })
-      .select('parcel agent status proofOfDelivery expectedBy createdAt updatedAt')
+      .select('parcel agent status proofOfDelivery offerExpiresAt expectedBy createdAt updatedAt')
       .lean<DeliveryRow[]>()
+
+    await applyOfferExpiry(rows)
 
     const [item] = await toListItems(rows, actor.role)
     if (!item) throw new HttpError(404, 'delivery not found')

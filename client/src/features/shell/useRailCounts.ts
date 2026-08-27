@@ -23,7 +23,9 @@ import { useCodReconciliation } from '@/features/payments/usePayments'
  * refers to costs no extra request — TanStack serves both from one fetch.
  */
 
-const ACTIVE = ['Booked', 'Assigned', 'PickedUp', 'InTransit']
+// M8: Accepted sits alongside Assigned — both are "not finished yet" from
+// this angle, matching notifications.ts's/analytics.ts's OPEN.
+const ACTIVE = ['Booked', 'Assigned', 'Accepted', 'PickedUp', 'InTransit']
 
 export interface RailCounts {
   /** Parcels or deliveries in flight, depending on the role asking. */

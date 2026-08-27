@@ -28,7 +28,13 @@ import { RunQueue } from './RunQueue'
  * (see AppShell), and that is a separate, pre-existing breakpoint.
  */
 
-const ACTIVE: readonly DeliveryStatus[] = ['Assigned', 'PickedUp', 'InTransit']
+/**
+ * M8: `Assigned` (an outstanding offer) has to be in this list too, not just
+ * `Accepted` onward — the run queue is where a rider Accepts or Declines
+ * one in the first place, so an offer that never showed up here could never
+ * be answered.
+ */
+const ACTIVE: readonly DeliveryStatus[] = ['Assigned', 'Accepted', 'PickedUp', 'InTransit']
 
 export const RiderWorkspace = () => {
   const { id } = useParams<{ id: string }>()

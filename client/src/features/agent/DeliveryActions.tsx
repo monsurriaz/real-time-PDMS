@@ -7,7 +7,7 @@ import {
 import { Button } from '@/components/Button'
 import { ApiError } from '@/lib/api'
 import { formatTaka } from '@/lib/format'
-import { currentPosition, useAdvanceStatus } from '../deliveries/useDeliveries'
+import { currentPosition, useAdvanceStatus, useDeclineOffer } from '../deliveries/useDeliveries'
 import { PodCapture } from './PodCapture'
 
 /**
@@ -22,9 +22,17 @@ import { PodCapture } from './PodCapture'
  * No padded wrapper of its own — the caller (RiderWorkspace) puts this and
  * RunQueue inside one shared `p-[18px]` box, so the two don't stack their
  * own padding into a double gap between them.
+ *
+ * M8: while `status === 'Assigned'` (offered, awaiting a response),
+ * `allowedTransitions` for an agent is `['Accepted', 'Booked']` — `Accepted`
+ * becomes the one enormous button exactly like any other next step, and
+ * `Booked` (declining) gets its own reveal-and-confirm block, the same
+ * pattern `Failed` already uses, so a mis-tap can't silently bounce the
+ * parcel back to the pool.
  */
 
 const ADVANCE_LABEL: Record<string, string> = {
+  Accepted: 'Accept',
   PickedUp: 'Picked up',
   InTransit: 'Start delivery',
   Delivered: 'Mark delivered',
@@ -34,21 +42,31 @@ const CAPS = 'text-eyebrow font-semibold uppercase tracking-[0.13em] text-ink-2'
 
 export const DeliveryActions = ({ d }: { d: DeliveryListItem }) => {
   const advance = useAdvanceStatus()
+  const decline = useDeclineOffer()
   const [failureNote, setFailureNote] = useState('')
   const [showFail, setShowFail] = useState(false)
+  const [declineReason, setDeclineReason] = useState('')
+  const [showDecline, setShowDecline] = useState(false)
 
   /**
-   * The single next step. Failed is excluded: it is the exception, not the
-   * next step, and the mockup gives the one big button to progress.
+   * The single next step. Failed and Booked are excluded: Failed is the
+   * exception path, not the next step, and Booked (M8) means declining —
+   * its own block below, not the primary button.
    */
   const nextStep = d.allowedTransitions.find(
-    (t): t is DeliveryStatus => t !== 'Failed' && t !== 'Cancelled',
+    (t): t is DeliveryStatus => t !== 'Failed' && t !== 'Cancelled' && t !== 'Booked',
   )
   const canFail = d.allowedTransitions.includes('Failed')
+  const canDecline = d.allowedTransitions.includes('Booked')
   const needsProof = nextStep === 'Delivered' && !d.hasProofOfDelivery
-  const busy = advance.isPending
+  const busy = advance.isPending || decline.isPending
 
-  const err = advance.error instanceof ApiError ? advance.error.message : null
+  const err =
+    advance.error instanceof ApiError
+      ? advance.error.message
+      : decline.error instanceof ApiError
+        ? decline.error.message
+        : null
 
   const move = async (to: DeliveryStatus, note?: string): Promise<void> => {
     const point = await currentPosition()
@@ -161,6 +179,53 @@ export const DeliveryActions = ({ d }: { d: DeliveryListItem }) => {
             className="w-full min-h-12 text-small font-medium text-muted hover:text-ink mt-4 py-2"
           >
             Can&apos;t deliver
+          </button>
+        )
+      ) : null}
+
+      {/* ---- M8: decline an offer — its own confirm step, same shape as Failed ---- */}
+      {canDecline ? (
+        showDecline ? (
+          <div className="mt-5 pt-4 border-t border-border">
+            <label htmlFor={`dr-${d._id}`} className="block text-small font-medium text-ink-2 mb-1.5">
+              Why decline? (optional)
+            </label>
+            <input
+              id={`dr-${d._id}`}
+              value={declineReason}
+              placeholder="Too far, already on a job…"
+              onChange={(e) => setDeclineReason(e.target.value)}
+              className="w-full min-h-12 font-sans text-control text-ink px-13px py-11px mb-3
+                         border border-border-strong rounded-sm bg-surface outline-none
+                         focus:border-accent focus:ring-[3px] focus:ring-accent-tint"
+            />
+            <Button
+              className="w-full min-h-12"
+              disabled={busy}
+              onClick={() =>
+                decline.mutate(
+                  { deliveryId: d._id, ...(declineReason.trim() ? { reason: declineReason.trim() } : {}) },
+                  { onSuccess: () => setShowDecline(false) },
+                )
+              }
+            >
+              {decline.isPending ? 'Declining…' : 'Confirm decline'}
+            </Button>
+            <button
+              type="button"
+              onClick={() => setShowDecline(false)}
+              className="w-full min-h-12 text-meta text-muted hover:text-ink mt-3"
+            >
+              Back
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowDecline(true)}
+            className="w-full min-h-12 text-small font-medium text-muted hover:text-ink mt-4 py-2"
+          >
+            Decline this job
           </button>
         )
       ) : null}

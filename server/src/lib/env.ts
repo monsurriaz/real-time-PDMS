@@ -48,6 +48,17 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(5001),
   CLIENT_ORIGIN: z.string().url().default('http://localhost:5173'),
 
+  /**
+   * M8: how long a rider has to Accept or Decline an offered delivery before
+   * it expires and returns to the pool, evaluated on read (not a scheduled
+   * job — Render's free tier sleeps after 15 minutes idle, so cron/
+   * setInterval would not reliably fire). Minutes, not milliseconds, so a
+   * demo can set this to a fraction of a minute in plain language, e.g.
+   * `OFFER_WINDOW_MINUTES=1` for a ~60s expiry instead of the 60-minute
+   * default — restart the server after changing it.
+   */
+  OFFER_WINDOW_MINUTES: z.coerce.number().positive().default(60),
+
   MONGODB_URI: z
     .string()
     .min(1, 'MONGODB_URI is required — copy .env.example to .env and fill it in'),

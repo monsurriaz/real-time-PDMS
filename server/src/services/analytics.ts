@@ -30,8 +30,8 @@ import { UserModel } from '../models/User'
  * an explicit `$match`, not scoping that silently does nothing.
  */
 
-/** Statuses that mean "still moving". */
-const OPEN: readonly DeliveryStatus[] = ['Booked', 'Assigned', 'PickedUp', 'InTransit']
+/** Statuses that mean "still moving" — matches notifications.ts's own. */
+const OPEN: readonly DeliveryStatus[] = ['Booked', 'Assigned', 'Accepted', 'PickedUp', 'InTransit']
 const isOpen = (s: DeliveryStatus): boolean => OPEN.includes(s)
 
 /**

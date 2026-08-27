@@ -103,9 +103,11 @@ const agentOwnsDelivery = async (
 
     /**
      * Section 6: a rider publishes "while a delivery is active". A finished
-     * parcel should not keep moving on a customer's map.
+     * parcel should not keep moving on a customer's map — and (M8) neither
+     * should one merely OFFERED to them: bare 'Assigned' means awaiting a
+     * response, not a rider who has agreed to carry anything yet.
      */
-    if (!['Assigned', 'PickedUp', 'InTransit'].includes(delivery.status)) {
+    if (!['Accepted', 'PickedUp', 'InTransit'].includes(delivery.status)) {
       return { ok: false }
     }
 

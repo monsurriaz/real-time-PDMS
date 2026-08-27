@@ -5,7 +5,7 @@ import { runAsSystem } from '../lib/context'
 import { AgentModel } from '../models/Agent'
 import { DeliveryModel } from '../models/Delivery'
 import { HttpError } from '../middleware/httpError'
-import { advanceStatus, type TransitionActor } from './lifecycle'
+import { advanceStatus, offerWindowMs, type TransitionActor } from './lifecycle'
 
 /**
  * Nearest-available-agent assignment (CLAUDE.md section 5):
@@ -82,8 +82,16 @@ const haversineMetres = (a: GeoPoint, b: GeoPoint): number => {
   return 2 * R * Math.asin(Math.sqrt(h))
 }
 
-/** Statuses that mean a rider is already carrying something. */
-const ACTIVE_STATUSES = ['Assigned', 'PickedUp', 'InTransit'] as const
+/**
+ * Statuses that mean a rider is already carrying something.
+ *
+ * M8: bare `Assigned` is now just an offer sitting in someone's queue,
+ * awaiting a yes or no — it isn't real load until they answer `Accepted`.
+ * Counting an offer as carried work would make a rider's workload look
+ * higher than what they've actually committed to, and could deprioritise
+ * them for closer bookings they'd otherwise still take.
+ */
+const ACTIVE_STATUSES = ['Accepted', 'PickedUp', 'InTransit'] as const
 
 /**
  * How many active deliveries each of these riders holds.
@@ -186,14 +194,23 @@ export const suggestAgents = async (args: {
   pickup?: GeoPoint
   zone: ZoneName
   limit?: number
+  /**
+   * M8: riders who already declined THIS delivery, or let its offer expire —
+   * never resurfaced as a candidate for it again, whether by auto-assign's
+   * $near pool or the zone-only fallback below.
+   */
+  excludeAgentIds?: readonly string[]
 }): Promise<AssignmentSuggestion> => {
   const limit = args.limit ?? 5
+  const exclude = (args.excludeAgentIds ?? []).map((id) => new mongoose.Types.ObjectId(id))
+  const excludeFilter = exclude.length > 0 ? { _id: { $nin: exclude } } : {}
 
   return runAsSystem('assignment: suggest', async () => {
     // ---- 1. nearest available agent in the zone, within 5 km ----
     if (args.pickup) {
       const near = await AgentModel.find({
         ...ASSIGNABLE_AGENT_FILTER,
+        ...excludeFilter,
         zones: args.zone,
         currentLocation: {
           $near: {
@@ -229,7 +246,11 @@ export const suggestAgents = async (args: {
      * also when the parcel has no geocoded pickup point at all — in which
      * case proximity is not a question we can ask.
      */
-    const inZone = await AgentModel.find({ ...ASSIGNABLE_AGENT_FILTER, zones: args.zone })
+    const inZone = await AgentModel.find({
+      ...ASSIGNABLE_AGENT_FILTER,
+      ...excludeFilter,
+      zones: args.zone,
+    })
       .limit(limit)
       .select('user vehicle zones currentLocation')
       .lean<AgentRow[]>()
@@ -255,6 +276,7 @@ interface DeliveryForAssign {
   parcel: mongoose.Types.ObjectId
   agent: mongoose.Types.ObjectId | null
   status: DeliveryStatus
+  excludedAgents: mongoose.Types.ObjectId[]
 }
 
 interface ParcelForAssign {
@@ -262,16 +284,18 @@ interface ParcelForAssign {
 }
 
 /**
- * Assign or reassign a delivery.
+ * Assign or reassign a delivery. Three cases now (M8 adds the third):
  *
- * Two distinct cases, deliberately handled by different mechanisms:
- *
- * - Booked -> Assigned is a state change, so it goes through advanceStatus()
- *   like every other transition (section 5: no route mutates status).
- * - Assigned -> Assigned with a different rider is NOT a state change. The
- *   status is already correct; only the agent moves. It still appends an
- *   event, because "who is carrying this" changing is exactly the kind of
- *   thing the audit trail exists to record.
+ * - Booked -> Assigned is a state change (the first offer), so it goes
+ *   through advanceStatus() like every other transition (section 5: no
+ *   route mutates status).
+ * - Accepted -> Assigned is ALSO a state change: reassigning after the
+ *   original rider already accepted has to reset to a fresh offer for the
+ *   new one — they haven't agreed to anything yet.
+ * - Assigned -> Assigned with a different rider is NOT a state change; the
+ *   delivery was already an outstanding offer, and only who it's offered TO
+ *   moves. It still appends an event and refreshes the offer's deadline —
+ *   the new rider gets a full window, not whatever was left of the old one.
  */
 export const assignDelivery = async (args: {
   deliveryId: string
@@ -292,18 +316,19 @@ export const assignDelivery = async (args: {
 
   const delivery = await runAsSystem('assignment: load delivery', async () =>
     DeliveryModel.findById(deliveryId)
-      .select('parcel agent status')
+      .select('parcel agent status excludedAgents')
       .lean<DeliveryForAssign | null>()
       .exec(),
   )
   if (!delivery) throw new HttpError(404, 'delivery not found')
 
   /**
-   * Section 5: "Reassignment is allowed only before PickedUp." Once a rider
-   * physically holds the parcel, handing it to someone else is a real-world
-   * operation this system does not model.
+   * Section 5: "Reassignment is allowed only before PickedUp." M8 extends
+   * "before PickedUp" across one more state (Accepted) without changing what
+   * the rule means: once a rider physically holds the parcel, handing it to
+   * someone else is a real-world operation this system does not model.
    */
-  if (delivery.status !== 'Booked' && delivery.status !== 'Assigned') {
+  if (!['Booked', 'Assigned', 'Accepted'].includes(delivery.status)) {
     throw new HttpError(
       422,
       `cannot assign a delivery that is already ${delivery.status} — reassignment is only allowed before pickup`,
@@ -320,18 +345,21 @@ export const assignDelivery = async (args: {
   )
   if (!parcel) throw new HttpError(404, 'the parcel for this delivery is missing')
 
+  const excludeAgentIds = delivery.excludedAgents.map((id) => id.toString())
+
   // ---- choose a rider ----
   let chosen: Candidate
   let strategy: MatchStrategy | 'override'
 
   if (args.agentId) {
-    chosen = await validateOverride(args.agentId)
+    chosen = await validateOverride(args.agentId, excludeAgentIds)
     strategy = 'override'
   } else {
     const suggestion = await suggestAgents({
       pickup: parcel.pickup.point,
       zone: parcel.pickup.zone,
       limit: 1,
+      excludeAgentIds,
     })
     const first = suggestion.candidates[0]
     if (!first) {
@@ -345,14 +373,15 @@ export const assignDelivery = async (args: {
   }
 
   const agentObjectId = new mongoose.Types.ObjectId(chosen.agentId)
-  const reassigned = delivery.status === 'Assigned'
+  const reassigned = delivery.status !== 'Booked'
 
   if (reassigned && delivery.agent?.equals(agentObjectId)) {
     throw new HttpError(409, `${chosen.name} already has this delivery`)
   }
 
-  if (!reassigned) {
-    // First assignment: set the rider, then let the state machine move it.
+  if (delivery.status === 'Booked') {
+    // First assignment: set the rider, then let the state machine move it —
+    // advanceStatus itself stamps the fresh offer's deadline.
     await runAsSystem('assignment: attach agent', async () =>
       DeliveryModel.updateOne(
         { _id: delivery._id, status: 'Booked' },
@@ -369,14 +398,42 @@ export const assignDelivery = async (args: {
     return { status: result.status, agent: chosen, strategy, reassigned: false }
   }
 
-  // Reassignment: the status is already Assigned, so this is an agent swap
-  // plus an audit entry. $push, because events is append-only.
+  if (delivery.status === 'Accepted') {
+    // Reassigning after acceptance: the new rider has agreed to nothing, so
+    // this resets to a fresh offer — Accepted -> Assigned is its own legal
+    // edge for exactly this. Same shape as first assignment: attach, then
+    // let the state machine move it.
+    await runAsSystem('assignment: attach agent (reassign)', async () =>
+      DeliveryModel.updateOne(
+        { _id: delivery._id, status: 'Accepted' },
+        { $set: { agent: agentObjectId } },
+      ).exec(),
+    )
+
+    const result = await advanceStatus({
+      deliveryId,
+      to: 'Assigned',
+      actor,
+      note: `Reassigned to ${chosen.name}`,
+    })
+    return { status: result.status, agent: chosen, strategy, reassigned: true }
+  }
+
+  // delivery.status === 'Assigned': already an outstanding offer, not yet
+  // answered. Not a state change — only who it's offered to moves — so this
+  // stays a direct update rather than a call through advanceStatus, same as
+  // before M8. The offer's deadline is refreshed: the new rider gets a full
+  // window, not whatever was left of the old one.
   const at = new Date()
   const updated = await runAsSystem('assignment: reassign', async () =>
     DeliveryModel.findOneAndUpdate(
       { _id: delivery._id, status: 'Assigned' },
       {
-        $set: { agent: agentObjectId, assignedAt: at },
+        $set: {
+          agent: agentObjectId,
+          assignedAt: at,
+          offerExpiresAt: new Date(at.getTime() + offerWindowMs()),
+        },
         $push: {
           events: {
             status: 'Assigned',
@@ -448,9 +505,21 @@ export const autoAssignAfterBooking = async (args: {
  * override of *who* — not of whether the rider can work: an offline agent
  * would silently never move.
  */
-export const validateOverride = async (agentId: string): Promise<Candidate> => {
+export const validateOverride = async (
+  agentId: string,
+  /** M8: the same per-delivery exclusion suggestAgents applies automatically
+   * — an admin's manual pick is still not allowed to re-offer it to someone
+   * who already declined or let it expire. */
+  excludeAgentIds: readonly string[] = [],
+): Promise<Candidate> => {
   if (!mongoose.Types.ObjectId.isValid(agentId)) {
     throw new HttpError(400, 'not a valid agent id')
+  }
+  if (excludeAgentIds.includes(agentId)) {
+    throw new HttpError(
+      422,
+      'that rider already declined this delivery (or let the offer expire) and cannot be re-offered it',
+    )
   }
 
   return runAsSystem('assignment: validate override', async () => {
