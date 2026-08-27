@@ -122,6 +122,20 @@
   }
 
   /**
+   * The fleet map's idle treatment (M6.98): a rider on shift but carrying
+   * nothing. Solid + haloed reads as "moving", which an available rider
+   * is not — so the dot goes hollow (white fill, accent ring) and the halo
+   * drops out entirely rather than glowing over nothing.
+   */
+  .pdms-rider--idle .pdms-rider__halo {
+    display: none;
+  }
+  .pdms-rider--idle .pdms-rider__dot {
+    background: #fff;
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+
+  /**
    * Pickup is an ink dot with a white centre; drop is v3.1's ink teardrop.
    *
    * The drop marker used to be this same circle with the fill and the ring

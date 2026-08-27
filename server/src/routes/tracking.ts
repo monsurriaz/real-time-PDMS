@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import mongoose from 'mongoose'
 import type {
+  AgentStatus,
   DeliveryEvent,
   DeliveryStatus,
   GeoPoint,
@@ -274,80 +275,118 @@ trackingRouter.get('/:parcelId', requireAuth, async (req, res, next) => {
 })
 
 /**
- * GET /tracking/active/positions — every moving rider, for the admin board.
+ * GET /tracking/active/positions — every ON-SHIFT rider, for the admin fleet
+ * map (M6.98).
  *
- * Admin-only by scoping: the Delivery model's rule gives a customer their own
- * parcels and a rider their own runs, so a non-admin simply sees a short list
- * of their own rather than the whole fleet.
+ * Sourced from Agent directly (status + currentLocation), not from active
+ * delivery rooms — that was the root cause of a real gap: an available rider
+ * carrying nothing has no active Delivery row to be found through, so they
+ * were simply absent from the map, and "which idle capacity do I have" is
+ * exactly what an admin opens this board to answer. Offline agents are
+ * excluded outright — there is no meaningful position to show for someone
+ * not on shift, current-but-stale coordinates from their last shift included.
+ *
+ * Admin-only by scoping: Agent's rule gives an admin every record and an
+ * agent only their own, so a non-admin caller simply sees a fleet of one (or
+ * none) rather than the whole roster.
  */
 trackingRouter.get('/active/positions', requireAuth, async (_req, res, next) => {
   try {
-    const rows = await DeliveryModel.find({
-      status: { $in: ['Assigned', 'PickedUp', 'InTransit'] },
+    const agents = await AgentModel.find({
+      status: { $in: ['available', 'on_delivery'] },
+      approvalStatus: 'approved',
+      currentLocation: { $exists: true },
     })
-      .select('parcel agent status lastKnownLocation lastLocationAt')
+      .select('user status currentLocation locationUpdatedAt')
       .limit(200)
       .lean<
         Array<{
           _id: mongoose.Types.ObjectId
-          parcel: mongoose.Types.ObjectId
-          agent: mongoose.Types.ObjectId | null
-          status: DeliveryStatus
-          lastKnownLocation?: GeoPoint
-          lastLocationAt?: Date
+          user: mongoose.Types.ObjectId
+          status: AgentStatus
+          currentLocation?: GeoPoint
+          locationUpdatedAt?: Date
         }>
       >()
 
-    const withPosition = rows.filter((r) => r.lastKnownLocation)
+    const withPosition = agents.filter(
+      (a): a is typeof a & { currentLocation: GeoPoint } => a.currentLocation !== undefined,
+    )
     if (withPosition.length === 0) {
       res.json({ riders: [] })
       return
     }
 
-    const parcels = await ParcelModel.find({
-      _id: { $in: withPosition.map((r) => r.parcel) },
-    })
-      .select('trackingId drop.area')
-      .lean<Array<{ _id: mongoose.Types.ObjectId; trackingId: string; drop: { area: string } }>>()
-    const parcelById = new Map(parcels.map((p) => [p._id.toString(), p]))
-
     const names = await runAsSystem('tracking: fleet names', async () => {
-      const agentIds = withPosition
-        .map((r) => r.agent)
-        .filter((a): a is mongoose.Types.ObjectId => a !== null)
-      if (agentIds.length === 0) return new Map<string, string>()
-      const agents = await AgentModel.find({ _id: { $in: agentIds } })
-        .select('user')
-        .lean<Array<{ _id: mongoose.Types.ObjectId; user: mongoose.Types.ObjectId }>>()
-        .exec()
-      const users = await UserModel.find({ _id: { $in: agents.map((a) => a.user) } })
+      const users = await UserModel.find({ _id: { $in: withPosition.map((a) => a.user) } })
         .select('name')
         .lean<Array<{ _id: mongoose.Types.ObjectId; name: string }>>()
         .exec()
-      const byUser = new Map(users.map((u) => [u._id.toString(), u.name]))
-      return new Map(
-        agents.map((a) => [a._id.toString(), byUser.get(a.user.toString()) ?? 'Rider']),
-      )
+      return new Map(users.map((u) => [u._id.toString(), u.name]))
     })
 
-    res.json({
-      riders: withPosition.flatMap((r) => {
-        const parcel = parcelById.get(r.parcel.toString())
-        if (!parcel || !r.lastKnownLocation) return []
-        return [
-          {
+    /**
+     * A busy rider's active runs, so the map can offer a real live-tracking
+     * room to join and a sensible sublabel — a rider can be carrying more
+     * than one job at once (assignment.ts's own tie-break exists because of
+     * this), so this is a list per agent, not one delivery.
+     */
+    const busyIds = withPosition
+      .filter((a) => a.status === 'on_delivery')
+      .map((a) => a._id)
+    const deliveriesByAgent = await runAsSystem(
+      'tracking: fleet active deliveries',
+      async () => {
+        const empty = new Map<
+          string,
+          Array<{ deliveryId: string; parcelId: string; trackingId: string }>
+        >()
+        if (busyIds.length === 0) return empty
+
+        const rows = await DeliveryModel.find({
+          agent: { $in: busyIds },
+          status: { $in: ['Assigned', 'PickedUp', 'InTransit'] },
+        })
+          .select('agent parcel')
+          .lean<
+            Array<{
+              _id: mongoose.Types.ObjectId
+              agent: mongoose.Types.ObjectId
+              parcel: mongoose.Types.ObjectId
+            }>
+          >()
+          .exec()
+
+        const parcels = await ParcelModel.find({ _id: { $in: rows.map((r) => r.parcel) } })
+          .select('trackingId')
+          .lean<Array<{ _id: mongoose.Types.ObjectId; trackingId: string }>>()
+          .exec()
+        const trackingById = new Map(parcels.map((p) => [p._id.toString(), p.trackingId]))
+
+        const byAgent = empty
+        for (const r of rows) {
+          const key = r.agent.toString()
+          const list = byAgent.get(key) ?? []
+          list.push({
             deliveryId: r._id.toString(),
             parcelId: r.parcel.toString(),
-            trackingId: parcel.trackingId,
-            dropArea: parcel.drop.area,
-            status: r.status,
-            agentId: r.agent ? r.agent.toString() : null,
-            agentName: r.agent ? (names.get(r.agent.toString()) ?? 'Rider') : null,
-            point: r.lastKnownLocation,
-            at: r.lastLocationAt ?? null,
-          },
-        ]
-      }),
+            trackingId: trackingById.get(r.parcel.toString()) ?? '',
+          })
+          byAgent.set(key, list)
+        }
+        return byAgent
+      },
+    )
+
+    res.json({
+      riders: withPosition.map((a) => ({
+        agentId: a._id.toString(),
+        agentName: names.get(a.user.toString()) ?? 'Rider',
+        status: a.status,
+        point: a.currentLocation,
+        at: a.locationUpdatedAt ?? null,
+        deliveries: deliveriesByAgent.get(a._id.toString()) ?? [],
+      })),
     })
   } catch (err) {
     next(err)
