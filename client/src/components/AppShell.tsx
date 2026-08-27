@@ -325,6 +325,7 @@ const BELL = (
 const DOT_COLOUR: Record<DeliveryStatus, string> = {
   Booked: 'bg-booked',
   Assigned: 'bg-assigned',
+  Accepted: 'bg-assigned',
   PickedUp: 'bg-picked',
   InTransit: 'bg-transit',
   Delivered: 'bg-delivered',

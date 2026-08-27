@@ -7,6 +7,7 @@ import {
 } from '@pdms/shared'
 import type { Actor } from '../lib/context'
 import { runAsSystem } from '../lib/context'
+import { env } from '../lib/env'
 import { DeliveryModel, LIFECYCLE_WRITE } from '../models/Delivery'
 import { ParcelModel } from '../models/Parcel'
 import { HttpError } from '../middleware/httpError'
@@ -18,9 +19,22 @@ import { syncCodOnTransition } from './payments'
  * here, every status change goes through advanceStatus(), and no route
  * mutates status directly.
  *
- *   Booked -> Assigned -> PickedUp -> InTransit -> Delivered   (terminal)
- *                     \-> Cancelled (before PickedUp only)
- *                     \-> Failed    (from InTransit only)
+ *   Booked -> Assigned(offered) -> Accepted -> PickedUp -> InTransit -> Delivered   (terminal)
+ *                        \-> Cancelled (before PickedUp only)
+ *                        \-> Failed    (from InTransit only)
+ *   Assigned -> Booked    (declined by the offered rider, or the offer expired)
+ *   Accepted -> Assigned  (admin reassigns before pickup — a fresh offer)
+ *
+ * M8: `Assigned` changed meaning. It used to mean "a rider has this"; it now
+ * means "offered to a rider, awaiting their response" — `Accepted` is the
+ * state that means the rider actually took the job. Everything downstream
+ * that used to treat bare `Assigned` as committed load (workload tie-break,
+ * the GPS-publish gate, a rider's own active-count) now keys off `Accepted`
+ * instead — see the ACTIVE_STATUSES-style constants in assignment.ts,
+ * agents.ts, sockets/index.ts and simulate.ts. Anything that means "still
+ * open, not yet finished" (notifications, analytics, the customer's rail
+ * count) adds `Accepted` alongside the `Assigned` it already had, since both
+ * are "not delivered yet" from that angle.
  */
 
 /**
@@ -33,9 +47,13 @@ export const LEGAL_TRANSITIONS: Record<
   readonly DeliveryStatus[]
 > = {
   Booked: ['Assigned', 'Cancelled'],
-  // Cancelled is reachable from Assigned because section 5 allows it "before
-  // PickedUp", and Assigned is before PickedUp.
-  Assigned: ['PickedUp', 'Cancelled'],
+  // Accepted: the offered rider took it. Booked: they declined, or the offer
+  // expired — either way back to the pool, unassigned. Cancelled: still
+  // before PickedUp, so still allowed.
+  Assigned: ['Accepted', 'Booked', 'Cancelled'],
+  // Assigned: an admin reassigns before pickup — a FRESH offer to someone
+  // else, so the new rider starts at Assigned (offered), not Accepted.
+  Accepted: ['PickedUp', 'Assigned', 'Cancelled'],
   // Not Cancelled: the parcel is in our hands now. Not Failed either — that
   // is InTransit-only.
   PickedUp: ['InTransit'],
@@ -53,16 +71,23 @@ export const LEGAL_TRANSITIONS: Record<
  * - An agent moves their own delivery through the physical steps.
  * - A customer may cancel their own parcel while nobody has collected it.
  * - An admin can do anything the state machine permits, because someone has
- *   to be able to unstick a delivery during a demo.
+ *   to be able to unstick a delivery during a demo — EXCEPT Accepted and
+ *   this Booked edge (M8): "only the assigned rider may accept or decline"
+ *   is explicit, so admin is deliberately left off both. An admin can still
+ *   reassign (a fresh Assigned offer) or cancel outright; they cannot answer
+ *   an offer on a rider's behalf.
  */
 export const TRANSITION_AUTHORITY: Record<DeliveryStatus, readonly Role[]> = {
   Assigned: ['admin'],
+  Accepted: ['agent'],
+  // Reached only from Assigned (a decline) — 'system' bypasses this check
+  // entirely, which is how an expired offer returns to Booked with no actor.
+  Booked: ['agent'],
   PickedUp: ['agent', 'admin'],
   InTransit: ['agent', 'admin'],
   Delivered: ['agent', 'admin'],
   Failed: ['agent', 'admin'],
   Cancelled: ['customer', 'admin'],
-  Booked: [], // only creation produces Booked
 }
 
 /**
@@ -136,6 +161,7 @@ interface DeliverySnapshot {
   agent: mongoose.Types.ObjectId | null
   status: DeliveryStatus
   proofOfDelivery?: unknown
+  offerExpiresAt?: Date | null
 }
 
 /**
@@ -144,9 +170,27 @@ interface DeliverySnapshot {
  */
 const TIMESTAMP_FIELD: Partial<Record<DeliveryStatus, string>> = {
   Assigned: 'assignedAt',
+  Accepted: 'acceptedAt',
   PickedUp: 'pickedUpAt',
   Delivered: 'deliveredAt',
 }
+
+/**
+ * M8: how long a fresh offer stays open, in milliseconds. Read at the moment
+ * an offer is made (see `advanceStatus`'s write step) and snapshotted onto
+ * `offerExpiresAt`, the same way a price is snapshotted onto a parcel — a
+ * later config change must not retroactively shorten an offer already in
+ * flight. `OFFER_WINDOW_MINUTES` in `.env` — see that file's comment for how
+ * to shorten it for a demo.
+ */
+export const offerWindowMs = (): number => env.OFFER_WINDOW_MINUTES * 60_000
+
+/** Has this delivery's outstanding offer passed its deadline? */
+export const isOfferExpired = (d: {
+  status: DeliveryStatus
+  offerExpiresAt?: Date | null
+}): boolean =>
+  d.status === 'Assigned' && Boolean(d.offerExpiresAt) && d.offerExpiresAt!.getTime() < Date.now()
 
 /**
  * The one way a delivery's status changes.
@@ -169,7 +213,7 @@ export const advanceStatus = async (
   // admin-shaped mistake.
   const delivery = await runAsSystem('lifecycle: load delivery', async () =>
     DeliveryModel.findById(deliveryId)
-      .select('parcel agent status proofOfDelivery')
+      .select('parcel agent status proofOfDelivery offerExpiresAt')
       .lean<DeliverySnapshot | null>()
       .exec(),
   )
@@ -262,10 +306,34 @@ export const advanceStatus = async (
     // A failed delivery with no stated reason is unreconcilable later.
     throw new TransitionError(422, 'a failure needs a reason', from, to)
   }
+  if (to === 'Accepted' && isOfferExpired(delivery)) {
+    /**
+     * A defensive race guard, not the expiry mechanism itself (that is
+     * evaluation-on-read, at each read path). This only catches the narrow
+     * window where a rider's Accept tap lands after the deadline but before
+     * any read has re-evaluated it — refusing here rather than accepting is
+     * what makes the deadline real rather than advisory.
+     */
+    throw new TransitionError(409, 'this offer has expired', from, to)
+  }
 
   // ---- 4. append the event and move ----
   const at = new Date()
   const timestampField = TIMESTAMP_FIELD[to]
+
+  /**
+   * M8: moving TO Assigned is always a FRESH offer — the first one (from
+   * Booked) or a reassignment's new one (from Accepted, or a different rider
+   * while still Assigned) — so it always gets a new deadline.
+   *
+   * Moving TO Booked is only ever reachable from Assigned (the map above is
+   * what guarantees that), and only ever means "the offer didn't stick" — a
+   * decline (actor is the agent) or an expiry (actor is 'system'). Either
+   * way: unassign, close out the offer window, and remember who let it go so
+   * they are never offered this SAME delivery again.
+   */
+  const isFreshOffer = to === 'Assigned'
+  const isOfferFallthrough = to === 'Booked'
 
   const updated = await runAsSystem('lifecycle: advance', async () =>
     DeliveryModel.findOneAndUpdate(
@@ -277,6 +345,8 @@ export const advanceStatus = async (
           ...(timestampField ? { [timestampField]: at } : {}),
           ...(to === 'Failed' && note ? { failureReason: note.trim() } : {}),
           ...(point ? { lastKnownLocation: point, lastLocationAt: at } : {}),
+          ...(isFreshOffer ? { offerExpiresAt: new Date(at.getTime() + offerWindowMs()) } : {}),
+          ...(isOfferFallthrough ? { agent: null, offerExpiresAt: null } : {}),
         },
         // $push, never $set — delivery.events is append-only and the model
         // rejects any other operator against it.
@@ -290,6 +360,7 @@ export const advanceStatus = async (
             ...(point ? { point } : {}),
             ...(note?.trim() ? { note: note.trim() } : {}),
           },
+          ...(isOfferFallthrough && delivery.agent ? { excludedAgents: delivery.agent } : {}),
         },
       },
       // The marker that identifies this as THE lifecycle write. Delivery's
@@ -415,3 +486,38 @@ export const availableTransitions = (
   role: Role,
 ): readonly DeliveryStatus[] =>
   LEGAL_TRANSITIONS[from].filter((to) => TRANSITION_AUTHORITY[to].includes(role))
+
+/**
+ * M8's offer expiry, evaluated on read rather than on a schedule (Render's
+ * free tier sleeps after 15 minutes idle, so cron/setInterval would not
+ * reliably fire). Every read path that lists or loads a delivery — the admin
+ * board, an agent's runs, a tracking screen — calls this on each row first,
+ * so an expired offer is caught the moment anyone actually looks at it.
+ *
+ * Idempotent by construction, not by a separate check: advanceStatus's own
+ * optimistic lock (conditional on `status: from`) means a second concurrent
+ * call finds the row already moved and throws a 409 — caught here and
+ * treated as "already expired", never as a real error. Two reads racing to
+ * expire the same offer cannot double-apply it.
+ */
+export const evaluateOfferExpiry = async (d: {
+  _id: mongoose.Types.ObjectId | string
+  status: DeliveryStatus
+  offerExpiresAt?: Date | null
+}): Promise<DeliveryStatus> => {
+  if (!isOfferExpired(d)) return d.status
+  try {
+    const result = await advanceStatus({
+      deliveryId: d._id.toString(),
+      to: 'Booked',
+      actor: 'system',
+      note: 'Offer expired',
+    })
+    return result.status
+  } catch (err) {
+    // A concurrent read already applied the same expiry — the outcome is the
+    // same either way, so this is not a failure worth surfacing.
+    if (err instanceof TransitionError) return 'Booked'
+    throw err
+  }
+}

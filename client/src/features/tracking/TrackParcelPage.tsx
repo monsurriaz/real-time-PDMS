@@ -139,7 +139,10 @@ export const TrackParcelPage = () => {
   }
 
   const { parcel, delivery, rider, route } = snapshot.data
-  const moving = ['Assigned', 'PickedUp', 'InTransit'].includes(delivery.status)
+  // M8: a bare 'Assigned' delivery is only an offer, awaiting a rider's
+  // response — nobody has agreed to move it yet, so there's no live
+  // position worth promising on the map until they've accepted.
+  const moving = ['Accepted', 'PickedUp', 'InTransit'].includes(delivery.status)
 
   const riders: MapRider[] =
     point && moving

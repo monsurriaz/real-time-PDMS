@@ -3,11 +3,20 @@ import { geoPoint, objectId, role, timestamps } from './common'
 import { paymentStatusSchema } from './payment'
 
 /**
- * The delivery lifecycle, exactly as drawn in CLAUDE.md section 5:
+ * The delivery lifecycle, exactly as drawn in CLAUDE.md section 5 (M8):
  *
- *   Booked -> Assigned -> PickedUp -> InTransit -> Delivered   (terminal)
- *                     \-> Cancelled (before PickedUp only)
- *                     \-> Failed    (from InTransit only)
+ *   Booked -> Assigned(offered) -> Accepted -> PickedUp -> InTransit -> Delivered   (terminal)
+ *                        \-> Cancelled (before PickedUp only)
+ *                        \-> Failed    (from InTransit only)
+ *   Assigned -> Booked  (declined by the offered rider, or the offer expired — unassigned)
+ *   Accepted -> Assigned (admin reassigns before pickup — a fresh offer to someone new)
+ *
+ * `Assigned` no longer means "a rider has it" — it means "offered to a rider,
+ * awaiting their response." `Accepted` is the state that means the rider has
+ * actually taken the job. Both still show as the same purple badge/rail
+ * segment (see Badge.tsx and LifecycleRail.tsx) — the ramp stays five
+ * colours, offered-vs-accepted is a fill/opacity variation within it, not a
+ * sixth colour.
  *
  * The legal-transition MAP is deliberately not in /shared. CLAUDE.md rule 3
  * says the client never decides what transition is legal, so the map lives
@@ -17,6 +26,7 @@ import { paymentStatusSchema } from './payment'
 export const deliveryStatusSchema = z.enum([
   'Booked',
   'Assigned',
+  'Accepted',
   'PickedUp',
   'InTransit',
   'Delivered',
@@ -129,8 +139,29 @@ export const deliverySchema = z.object({
   events: z.array(deliveryEventSchema),
 
   assignedAt: z.coerce.date().nullable(),
+  /** When the offered rider accepted. Null while offered, declined, or expired. */
+  acceptedAt: z.coerce.date().nullable(),
   pickedUpAt: z.coerce.date().nullable(),
   deliveredAt: z.coerce.date().nullable(),
+
+  /**
+   * The deadline on the CURRENT outstanding offer — only meaningful while
+   * `status === 'Assigned'`. Stamped fresh every time a delivery moves TO
+   * `Assigned` (first offer or a reassignment's fresh offer), from whatever
+   * the configured window was AT THAT MOMENT — snapshotted the same way a
+   * price is, so a later config change can't retroactively shorten an offer
+   * already in flight. Read, not scheduled: M8's evaluation-on-read model
+   * checks this against the clock whenever a delivery is loaded, rather than
+   * relying on a cron/setInterval Render's free tier would not reliably run.
+   */
+  offerExpiresAt: z.coerce.date().nullable(),
+  /**
+   * Riders who declined this SPECIFIC delivery, or let its offer expire —
+   * permanently excluded from being offered it again, by both auto-assign's
+   * $near pool and an admin's manual override. Per-delivery, not per-rider:
+   * declining one booking says nothing about the next one.
+   */
+  excludedAgents: z.array(objectId),
 
   proofOfDelivery: proofOfDeliverySchema.optional(),
   failureReason: z.string().max(300).optional(),
@@ -168,6 +199,19 @@ export const assignInputSchema = z.object({
   agentId: objectId.optional(),
 })
 export type AssignInput = z.infer<typeof assignInputSchema>
+
+/**
+ * POST /deliveries/:id/decline — the offered rider turning down a job.
+ *
+ * A dedicated endpoint rather than reusing the generic advance-status one:
+ * decline needs its own confirm-step semantics on the client (a mis-tap must
+ * not silently bounce a parcel back to the pool) and its own optional reason,
+ * which the generic `to`/`note` shape doesn't name as clearly.
+ */
+export const declineOfferInputSchema = z.object({
+  reason: z.string().max(300).optional(),
+})
+export type DeclineOfferInput = z.infer<typeof declineOfferInputSchema>
 
 /**
  * What the rider submits to record proof. One arm per method, discriminated on
@@ -265,6 +309,8 @@ export const deliveryListItemSchema = z.object({
   agentId: objectId.nullable(),
   /** What this viewer is allowed to do next, per the server's own map. */
   allowedTransitions: z.array(deliveryStatusSchema),
+  /** The outstanding offer's deadline, while `status === 'Assigned'`; null otherwise. */
+  offerExpiresAt: z.coerce.date().nullable(),
   expectedBy: z.coerce.date().nullable(),
   isOverdue: z.boolean(),
   createdAt: z.coerce.date(),

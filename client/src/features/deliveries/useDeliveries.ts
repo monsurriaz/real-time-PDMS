@@ -78,6 +78,20 @@ export const useAssign = () =>
   )
 
 /**
+ * M8: the offered rider turns the job down. A dedicated mutation rather than
+ * reusing useAdvanceStatus — decline has its own optional reason and its own
+ * confirm-step UX (DeliveryActions), and the server has a dedicated route
+ * for exactly the same reasons (see routes/deliveries.ts).
+ */
+export const useDeclineOffer = () =>
+  useDeliveryMutation((input: { deliveryId: string; reason?: string }) =>
+    api.post<{ status: DeliveryStatus; at: string }>(
+      `/deliveries/${input.deliveryId}/decline`,
+      input.reason ? { reason: input.reason } : {},
+    ),
+  )
+
+/**
  * The target status is a request, not a decision — the server checks it
  * against the transition map and can refuse (CLAUDE.md rule 3).
  */

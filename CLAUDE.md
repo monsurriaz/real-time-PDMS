@@ -195,12 +195,33 @@ Entities: `User`, `Agent`, `Parcel`, `Delivery`, `Payment`, `Zone`.
 ### Delivery lifecycle
 
 ```
-Booked → Assigned → PickedUp → InTransit → Delivered   (terminal)
-                 ↘ Cancelled (before PickedUp only)
-                 ↘ Failed    (from InTransit only)
+Booked → Assigned(offered) → Accepted → PickedUp → InTransit → Delivered   (terminal)
+                    ↘ Cancelled (before PickedUp only)
+                    ↘ Failed    (from InTransit only)
+Assigned  ↘ declined by the rider, or the offer expired → Booked, unassigned
+Accepted  ↘ admin reassigns before pickup                → Assigned, a fresh offer
 ```
 
-- Reassignment is allowed **only** before `PickedUp`.
+- **`Assigned` means offered, not held** (M8). A rider has not committed until `Accepted`.
+  Anywhere in the code that means "this rider is actually carrying it" — workload
+  counting, a rider's own active-count, the GPS-publish gate — keys off `Accepted`, not
+  bare `Assigned`. Anywhere that means "still open, not yet finished" — notifications,
+  analytics, the customer's rail count — keys off both.
+- Only the assigned rider may accept or decline an offer, and only before `PickedUp`.
+  Admin cannot accept or decline on a rider's behalf — it can reassign (a fresh offer)
+  or cancel outright, but not answer an offer for someone else.
+- **Decline** returns the delivery to `Booked`, unassigned, and records who declined —
+  that rider is permanently excluded from being offered *that* delivery again (not from
+  the roster generally). Auto-assignment and an admin's manual override both honour the
+  exclusion.
+- **Offer expiry is evaluated on read, not on a schedule** — Render's free tier sleeps,
+  so cron/`setInterval` cannot be trusted to fire. Every read path that loads a delivery
+  (the admin board, an agent's runs, a tracking screen) checks the current offer's
+  deadline first; past it, the delivery falls through to `Booked` at that moment,
+  idempotently, and the rider who let it lapse is excluded the same way a decline is.
+  The window defaults to one hour and is configured by `OFFER_WINDOW_MINUTES` in `.env`.
+- Reassignment is allowed **only** before `PickedUp` — now spanning `Assigned` and
+  `Accepted` both.
 - `Delivered` requires proof of delivery already stored on the record.
 - Legal transitions live in one map in `server/src/services/lifecycle.ts`. Every status
   change goes through `advanceStatus()`. No route mutates `status` directly.
@@ -278,9 +299,12 @@ but the override is still bound by the same approval check. A self-registered ri
 | M6.9 | Pre-deploy fixes: booking/payment redirect, customer suspension, one-time welcome, COD amount integrity, search copy | Six unrelated defects closed; suspension enforced in `requireAuth` on every request, not at login |
 | M6.96 | UI corrections against the v3.1 addendum: footer rule, landing hero, auth split-screen, header search/notifications/avatar, compact rail variant, map rendering | Every item in the addendum matches; merged to main via PR |
 | M6.97 | Map regression fix (rider z-index never actually applied, a marker-ordering race, a socket-auth bug blocking every pre-M6.9 rider from a live connection at all) + semantic page classes on every route | All four map-bearing surfaces re-verified individually with real position data; every route in the table carries its class, compiler-enforced |
-| M7 | Deploy + rehearse | Live on Vercel + Render + Atlas, demo data seeded, run-through twice |
+| M6.98 | Live board fixes: fleet map sourced from Agent (not delivery rooms), showing every on-shift rider — idle and busy, two marker treatments; assign/reassign moved from an inline panel to a modal; the rail's Shift editor rebuilt on the same modal after it turned out to render underneath the map on wide viewports | Fleet map verified with both marker types and idle riders visible; the assign modal and the Shift modal both confirmed by screenshot; merged via PR |
+| M8 | Offer/accept/decline lifecycle: `Assigned` redefined as an offer awaiting response, a new `Accepted` state, decline with per-delivery exclusion from re-offer, expiry evaluated on read (not scheduled), agent Accept/Decline UI with a countdown | Exhaustive NxN transition tests pass; a declined or expired offer is never re-offered to the same rider; the lifecycle ramp still uses five colours; expiry demoed end to end with a short window |
+| M10 | Deploy + rehearse | Live on Vercel + Render + Atlas, demo data seeded, run-through twice |
 
-See DEFERRED.md for work parked out of each milestone.
+See DEFERRED.md for work parked out of each milestone. M9 is not yet scoped — M10 is
+numbered ahead of it on purpose, so deploy stays last regardless of what M9 turns out to be.
 
 If M3 slips, cut M6 before cutting anything in M4. Live tracking is the flagship.
 

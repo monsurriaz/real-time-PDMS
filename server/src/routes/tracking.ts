@@ -17,6 +17,7 @@ import { ParcelModel } from '../models/Parcel'
 import { UserModel } from '../models/User'
 import { requireAuth } from '../middleware/auth'
 import { HttpError } from '../middleware/httpError'
+import { evaluateOfferExpiry } from '../services/lifecycle'
 import { outstandingChallenge } from '../services/pod'
 
 export const trackingRouter = Router()
@@ -55,6 +56,7 @@ interface DeliveryDoc {
   lastLocationAt?: Date
   expectedBy: Date | null
   proofOfDelivery?: unknown
+  offerExpiresAt?: Date | null
 }
 
 /**
@@ -100,14 +102,25 @@ trackingRouter.get('/by-id/:trackingId', async (req, res, next) => {
       if (!parcel) return null
 
       const delivery = await DeliveryModel.findOne({ parcel: parcel._id })
-        .select('agent status lastKnownLocation')
+        .select('_id agent status lastKnownLocation offerExpiresAt')
         .lean<{
+          _id: mongoose.Types.ObjectId
           agent: mongoose.Types.ObjectId | null
           status: DeliveryStatus
           lastKnownLocation?: GeoPoint
+          offerExpiresAt?: Date | null
         } | null>()
         .exec()
       if (!delivery) return null
+
+      // M8: evaluation-on-read — an offer past its deadline is treated as
+      // expired the moment anyone loads this delivery, this public lookup
+      // included.
+      const newStatus = await evaluateOfferExpiry(delivery)
+      if (newStatus !== delivery.status) {
+        delivery.status = newStatus
+        delivery.agent = null
+      }
 
       const rider = delivery.agent
         ? await (async () => {
@@ -170,9 +183,16 @@ trackingRouter.get('/:parcelId', requireAuth, async (req, res, next) => {
     if (!parcel) throw new HttpError(404, 'parcel not found')
 
     const delivery = await DeliveryModel.findOne({ parcel: parcel._id })
-      .select('agent status events lastKnownLocation lastLocationAt expectedBy proofOfDelivery')
+      .select('agent status events lastKnownLocation lastLocationAt expectedBy proofOfDelivery offerExpiresAt')
       .lean<DeliveryDoc | null>()
     if (!delivery) throw new HttpError(404, 'delivery not found')
+
+    // M8: evaluation-on-read, same as the public lookup above.
+    const newStatus = await evaluateOfferExpiry(delivery)
+    if (newStatus !== delivery.status) {
+      delivery.status = newStatus
+      delivery.agent = null
+    }
 
     /**
      * The rider, as a projection. Section 7 forbids sending another user's
@@ -345,7 +365,9 @@ trackingRouter.get('/active/positions', requireAuth, async (_req, res, next) => 
 
         const rows = await DeliveryModel.find({
           agent: { $in: busyIds },
-          status: { $in: ['Assigned', 'PickedUp', 'InTransit'] },
+          // M8: bare 'Assigned' is an unanswered offer, not work this rider
+          // is actually carrying — matches assignment.ts's ACTIVE_STATUSES.
+          status: { $in: ['Accepted', 'PickedUp', 'InTransit'] },
         })
           .select('agent parcel')
           .lean<

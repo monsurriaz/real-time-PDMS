@@ -9,11 +9,12 @@ import { unauthorized } from '../middleware/httpError'
 export const notificationsRouter = Router()
 
 /** Statuses a delivery can still be late for — matches analytics.ts's own. */
-const OPEN: readonly DeliveryStatus[] = ['Booked', 'Assigned', 'PickedUp', 'InTransit']
+const OPEN: readonly DeliveryStatus[] = ['Booked', 'Assigned', 'Accepted', 'PickedUp', 'InTransit']
 
 const STATUS_PHRASE: Record<DeliveryStatus, string> = {
   Booked: 'booked',
-  Assigned: 'assigned to a rider',
+  Assigned: 'offered to a rider',
+  Accepted: 'accepted by the rider',
   PickedUp: 'picked up',
   InTransit: 'in transit',
   Delivered: 'delivered',
@@ -25,7 +26,7 @@ interface DeliveryLean {
   _id: mongoose.Types.ObjectId
   parcel: mongoose.Types.ObjectId
   status: DeliveryStatus
-  events: Array<{ status: DeliveryStatus; at: Date }>
+  events: Array<{ status: DeliveryStatus; at: Date; note?: string }>
   expectedBy: Date | null
 }
 
@@ -90,7 +91,18 @@ notificationsRouter.get('/', requireAuth, async (req, res, next) => {
           id: `status:${d._id.toString()}:${lastEvent.at.getTime()}`,
           kind: 'status' as const,
           status: d.status,
-          title: `${parcel.trackingId} ${STATUS_PHRASE[d.status] ?? d.status}`,
+          /**
+           * M8: a 'Booked' event only ever carries a note in ONE case — a
+           * decline or an expired offer bouncing the delivery back to the
+           * pool (the original booking-time 'Booked' event has no note at
+           * all). Surfacing that note is what tells an admin what actually
+           * happened rather than a generic "booked" that reads like a new
+           * order. Every other status keeps the plain phrase.
+           */
+          title:
+            d.status === 'Booked' && lastEvent.note
+              ? `${parcel.trackingId} — ${lastEvent.note}`
+              : `${parcel.trackingId} ${STATUS_PHRASE[d.status] ?? d.status}`,
           subtitle: parcel.drop.area,
           at: lastEvent.at,
         },

@@ -4,16 +4,22 @@ import type { DeliveryStatus } from '@pdms/shared'
  * The status pill from docs/design-system-v3-meridian.html — `.badge` plus its
  * `.b-*` variant, including the 5.5px dot.
  *
- * v3 draws seven badges and the lifecycle has seven states, but they are not
- * the same seven: v3's seventh is `pending` (a rider awaiting approval, not a
- * parcel), and Cancelled shares Booked's neutral grey. That sharing is
- * deliberate — a cancelled parcel is inert, not failed, so borrowing the red
- * would misreport it — and `cancelled-*` exists as its own token name so the
- * two are separable without touching this file.
+ * v3 draws seven badges and the pre-M8 lifecycle had seven states, but they
+ * were not the same seven: v3's seventh is `pending` (a rider awaiting
+ * approval, not a parcel), and Cancelled shares Booked's neutral grey. That
+ * sharing is deliberate — a cancelled parcel is inert, not failed, so
+ * borrowing the red would misreport it — and `cancelled-*` exists as its own
+ * token name so the two are separable without touching this file.
+ *
+ * M8 adds `Accepted` the same way: it shares Assigned's purple rather than
+ * getting a sixth colour. CLAUDE.md's ramp is frozen at five — offered and
+ * accepted both mean "a rider is on this, not yet in hand," and only the
+ * label text tells them apart, same as Booked/Cancelled already do.
  */
 const VARIANT: Record<DeliveryStatus, string> = {
   Booked: 'bg-booked-bg text-booked-ink',
   Assigned: 'bg-assigned-bg text-assigned-ink',
+  Accepted: 'bg-assigned-bg text-assigned-ink',
   PickedUp: 'bg-picked-bg text-picked-ink',
   InTransit: 'bg-transit-bg text-transit-ink',
   Delivered: 'bg-delivered-bg text-delivered-ink',
@@ -24,7 +30,8 @@ const VARIANT: Record<DeliveryStatus, string> = {
 /** Lifecycle names are PascalCase in the domain; people read them spaced. */
 const LABEL: Record<DeliveryStatus, string> = {
   Booked: 'Booked',
-  Assigned: 'Assigned',
+  Assigned: 'Offered',
+  Accepted: 'Accepted',
   PickedUp: 'Picked up',
   InTransit: 'In transit',
   Delivered: 'Delivered',

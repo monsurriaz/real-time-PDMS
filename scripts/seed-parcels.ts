@@ -21,6 +21,7 @@ import type {
 } from '@pdms/shared'
 import { geocodeAddress } from '../server/src/lib/geocode'
 import { routeBetween } from '../server/src/lib/routing'
+import { offerWindowMs } from '../server/src/services/lifecycle'
 import { priceFor } from '../server/src/services/pricing'
 import {
   AgentModel,
@@ -89,9 +90,15 @@ const SPECS: readonly Spec[] = [
   // the delayed-looking one
   { n: 3, from: 'mohammadpur', to: 'bashundhara', weightKg: 4.2, size: 'large', status: 'Booked', customer: 'tanvir', agedHours: 27, overdue: true },
 
+  // M8: the one delivery demoing the offered state — Assigned now means
+  // "offered, awaiting the rider's response", not "has it". Its offer window
+  // is stamped fresh (from now, not backdated) below, so it's a real,
+  // not-yet-expired offer on a freshly seeded database.
   { n: 4, from: 'gulshan2', to: 'dhanmondi9', weightKg: 1.5, size: 'small', status: 'Assigned', customer: 'tanvir', agent: 'sabbir', agedHours: 3 },
-  { n: 5, from: 'uttara4', to: 'mirpur1', weightKg: 3.4, size: 'medium', status: 'Assigned', customer: 'sadia', agent: 'imran', agedHours: 4 },
-  { n: 6, from: 'dhanmondi27', to: 'mohammadpur', weightKg: 0.6, size: 'small', status: 'Assigned', customer: 'nusrat', agent: 'rakib', agedHours: 5 },
+  // These two used to be 'Assigned' under the old meaning ("a rider has it,
+  // not yet picked up") — that's 'Accepted' now.
+  { n: 5, from: 'uttara4', to: 'mirpur1', weightKg: 3.4, size: 'medium', status: 'Accepted', customer: 'sadia', agent: 'imran', agedHours: 4 },
+  { n: 6, from: 'dhanmondi27', to: 'mohammadpur', weightKg: 0.6, size: 'small', status: 'Accepted', customer: 'nusrat', agent: 'rakib', agedHours: 5 },
 
   { n: 7, from: 'dhanmondi9', to: 'gulshan1', weightKg: 2.2, size: 'medium', status: 'PickedUp', customer: 'nusrat', agent: 'rakib', agedHours: 6, isCod: true },
   { n: 8, from: 'bashundhara', to: 'uttara7', weightKg: 1.1, size: 'small', status: 'PickedUp', customer: 'tanvir', agent: 'sabbir', agedHours: 7 },
@@ -135,11 +142,12 @@ const hoursAgo = (h: number): Date => new Date(Date.now() - h * 3_600_000)
 const CHAIN: Record<DeliveryStatus, readonly DeliveryStatus[]> = {
   Booked: ['Booked'],
   Assigned: ['Booked', 'Assigned'],
-  PickedUp: ['Booked', 'Assigned', 'PickedUp'],
-  InTransit: ['Booked', 'Assigned', 'PickedUp', 'InTransit'],
-  Delivered: ['Booked', 'Assigned', 'PickedUp', 'InTransit', 'Delivered'],
+  Accepted: ['Booked', 'Assigned', 'Accepted'],
+  PickedUp: ['Booked', 'Assigned', 'Accepted', 'PickedUp'],
+  InTransit: ['Booked', 'Assigned', 'Accepted', 'PickedUp', 'InTransit'],
+  Delivered: ['Booked', 'Assigned', 'Accepted', 'PickedUp', 'InTransit', 'Delivered'],
   Cancelled: ['Booked', 'Cancelled'],
-  Failed: ['Booked', 'Assigned', 'PickedUp', 'InTransit', 'Failed'],
+  Failed: ['Booked', 'Assigned', 'Accepted', 'PickedUp', 'InTransit', 'Failed'],
 }
 
 
@@ -298,8 +306,18 @@ export const seedParcels = async (): Promise<void> => {
       status: spec.status,
       events,
       assignedAt: at('Assigned'),
+      acceptedAt: at('Accepted'),
       pickedUpAt: at('PickedUp'),
       deliveredAt: at('Delivered'),
+      /**
+       * M8: only the one spec still sitting at 'Assigned' has a real,
+       * currently-open offer — stamped from NOW rather than backdated like
+       * everything else here, so a fresh seed is immediately demoable
+       * (OFFER_WINDOW_MINUTES in .env controls how long it stays open).
+       */
+      ...(spec.status === 'Assigned'
+        ? { offerExpiresAt: new Date(Date.now() + offerWindowMs()) }
+        : {}),
       /**
        * Section 5: Delivered requires proof of delivery already on the
        * record. Seeding a Delivered parcel without it would create demo data

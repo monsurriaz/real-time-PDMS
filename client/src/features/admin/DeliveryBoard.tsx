@@ -333,9 +333,11 @@ export const DeliveryBoard = () => {
                 <Td align="right">
                   {/*
                     Assignment is only offered while it is legal — before
-                    pickup (section 5). The server refuses regardless.
+                    pickup (section 5, extended by M8 to also cover Accepted:
+                    a rider who's accepted but not yet picked up can still be
+                    reassigned). The server refuses regardless.
                   */}
-                  {d.status === 'Booked' || d.status === 'Assigned' ? (
+                  {['Booked', 'Assigned', 'Accepted'].includes(d.status) ? (
                     <Button
                       size="sm"
                       variant={d.agentId ? 'quiet' : 'primary'}

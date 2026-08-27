@@ -136,9 +136,9 @@ const main = async (): Promise<void> => {
   if (!delivery.agent) {
     throw new Error('this delivery has no rider assigned — assign one first')
   }
-  if (!['Assigned', 'PickedUp', 'InTransit'].includes(delivery.status)) {
+  if (!['Accepted', 'PickedUp', 'InTransit'].includes(delivery.status)) {
     throw new Error(
-      `delivery is ${delivery.status}; the server only accepts positions while a delivery is active`,
+      `delivery is ${delivery.status}; the server only accepts positions once a rider has accepted it`,
     )
   }
 

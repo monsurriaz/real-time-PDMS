@@ -27,7 +27,7 @@ debt are all in Resolved. What is left is what M6 stopped short of, and why.
 
 | Item | Origin | Status |
 |---|---|---|
-| **Admin fleet map joins every active room** | M4 | **Deliberately not done in M6.** The change rewires socket room topology — a single `admin:fleet` room the server publishes to, instead of N joins — and live tracking is the flagship demo. At 20 active deliveries N joins costs nothing measurable, so this is real work with no demo-visible payoff, taken on immediately before M7's deploy and rehearsal. Do it after the demo, or not at all. |
+| **Admin fleet map joins every active room** | M4 | **Deliberately not done in M6.** The change rewires socket room topology — a single `admin:fleet` room the server publishes to, instead of N joins — and live tracking is the flagship demo. At 20 active deliveries N joins costs nothing measurable, so this is real work with no demo-visible payoff, taken on immediately before the deploy and rehearsal milestone (M10). Do it after the demo, or not at all. |
 | Zone base differentiation | M2 | Untouched. All zones still seed at `baseFare: 0` so the ৳126 example reproduces exactly. One-line seed change whenever demo texture matters more than the documented example. |
 | **Tier price monotonicity unvalidated** | M5 | Untouched. Tiers are validated ascending and non-overlapping as CLAUDE.md requires, but an admin could still configure a formula tier that prices a heavier parcel cheaper than a lighter one. A unit test asserts the seeded ladder is monotonic; the editor would accept an inverted one. |
 | **Payment does not gate the lifecycle** | M5 | Untouched, and still deliberate: a card parcel can reach `Delivered` with payment `pending`. Making prepayment mandatory means a new precondition in `advanceStatus`, decided on purpose. |
@@ -71,6 +71,15 @@ user's request after reviewing a screenshot:
 
 ---
 
+## M8 — offer/accept/decline lifecycle
+
+| Item | Notes |
+|---|---|
+| Authenticated tracking's `events[]` can lag by one entry immediately after an on-read expiry | `GET /tracking/:parcelId` and `GET /deliveries/:id` both re-evaluate offer expiry before responding, but the in-memory `delivery.events` array they already loaded predates the "Offer expired" event `evaluateOfferExpiry` just pushed to the database — the STATUS in the response is correct (patched explicitly), but the event timeline for that one read is one entry behind. Self-heals on the very next read (nothing re-expires, the array comes back fresh). Left alone rather than re-querying `events` on every status-changed-by-expiry read, which would add a query to a path that's supposed to stay cheap for the common case (nothing expired). |
+| No admin-visible flag that a Booked delivery already exhausted every eligible rider | Deliberate, per the M8 brief itself: "reuse the existing no-rider-available path, don't build a second." Opening Assign for a delivery every eligible rider has declined shows the same `strategy: 'none'` / "No available rider covers X" message the panel has always shown for an empty zone — an admin has to open Assign to see it, same as before M8, rather than a passive badge on the row. |
+
+---
+
 ## Post-M6.5 — open backlog, no milestone attached
 
 M6.5a, b and c between them did every screen v3's route table names. These
@@ -94,11 +103,14 @@ building for its own sake.
 
 | Item | Origin | Notes |
 |---|---|---|
-| **Email verification / OTP by email** | M6.9 | Descoped on purpose, four days from the demo. It needs an outbound mail service (a provider account, a domain, a sender identity, deliverability that does not land in spam), which is a new external dependency and a new failure mode in the one path every account has to walk through. M6.9 shipped a one-time welcome instead — `User.welcomeSeenAt`, server-decided, no mail involved — which is what the flow was actually going to *use* the email for. Real verification is post-course work, not M7. |
+| **Email verification / OTP by email** | M6.9 | Descoped on purpose, four days from the demo. It needs an outbound mail service (a provider account, a domain, a sender identity, deliverability that does not land in spam), which is a new external dependency and a new failure mode in the one path every account has to walk through. M6.9 shipped a one-time welcome instead — `User.welcomeSeenAt`, server-decided, no mail involved — which is what the flow was actually going to *use* the email for. Real verification is post-course work, not the deploy milestone (M10). |
 
 ---
 
-## M7 — Deploy + rehearse
+## M10 — Deploy + rehearse
+
+Renumbered from M7 (M8 this session, M9 not yet scoped) — CLAUDE.md's milestone table
+has the full note.
 
 | Item | Origin | Notes |
 |---|---|---|
@@ -207,7 +219,7 @@ building for its own sake.
 | Assignment ignored rider workload | M6 | `ced8989` |
 | **Weight cap gap** (pulled forward from M6) | M5 | `b31345f` |
 | Real proof-of-delivery capture | M5 | `b31345f` |
-| Rehearsal check: weight cap (M7) — moot, 20 kg now prices | M5 | `b31345f` |
+| Rehearsal check: weight cap (M10) — moot, 20 kg now prices | M5 | `b31345f` |
 | react-router-dom v6 → v7 (2 moderate advisories) | M1 | `3bd0b92` |
 | Optional GeoJSON points materializing as empty arrays | M1 | — |
 | `runAsSystem` receiving un-executed Mongoose Query | M1 | — |
