@@ -190,6 +190,22 @@ export const ASSIGNABLE_AGENT_FILTER = {
   approvalStatus: 'approved',
 } as const
 
+/**
+ * M9: a suspended rider must never be a candidate, the same way a pending or
+ * rejected one already isn't. Not folded into ASSIGNABLE_AGENT_FILTER above —
+ * that constant is asserted byte-for-byte in assignment.test.ts, and
+ * suspension lives on the rider's User account (reused from M6.9), not on
+ * Agent, so answering it needs a small join rather than a literal field.
+ */
+const suspendedAgentUserIds = async (): Promise<mongoose.Types.ObjectId[]> => {
+  const UserModel = mongoose.model('User')
+  const rows = await UserModel.find({ role: 'agent', status: 'suspended' })
+    .select('_id')
+    .lean<Array<{ _id: mongoose.Types.ObjectId }>>()
+    .exec()
+  return rows.map((r) => r._id)
+}
+
 export const suggestAgents = async (args: {
   pickup?: GeoPoint
   zone: ZoneName
@@ -206,11 +222,15 @@ export const suggestAgents = async (args: {
   const excludeFilter = exclude.length > 0 ? { _id: { $nin: exclude } } : {}
 
   return runAsSystem('assignment: suggest', async () => {
+    const suspendedIds = await suspendedAgentUserIds()
+    const suspendedFilter = suspendedIds.length > 0 ? { user: { $nin: suspendedIds } } : {}
+
     // ---- 1. nearest available agent in the zone, within 5 km ----
     if (args.pickup) {
       const near = await AgentModel.find({
         ...ASSIGNABLE_AGENT_FILTER,
         ...excludeFilter,
+        ...suspendedFilter,
         zones: args.zone,
         currentLocation: {
           $near: {
@@ -249,6 +269,7 @@ export const suggestAgents = async (args: {
     const inZone = await AgentModel.find({
       ...ASSIGNABLE_AGENT_FILTER,
       ...excludeFilter,
+      ...suspendedFilter,
       zones: args.zone,
     })
       .limit(limit)
@@ -345,7 +366,10 @@ export const assignDelivery = async (args: {
   )
   if (!parcel) throw new HttpError(404, 'the parcel for this delivery is missing')
 
-  const excludeAgentIds = delivery.excludedAgents.map((id) => id.toString())
+  // `.lean()` skips the schema default, so a delivery from before M8 added
+  // this field comes back with it simply absent, not an empty array — found
+  // while verifying M9's suspension work against the live demo database.
+  const excludeAgentIds = (delivery.excludedAgents ?? []).map((id) => id.toString())
 
   // ---- choose a rider ----
   let chosen: Candidate
@@ -540,6 +564,22 @@ export const validateOverride = async (
     }
     if (agent.status === 'offline') {
       throw new HttpError(422, 'that rider is offline and cannot be assigned')
+    }
+
+    /**
+     * M9: an admin's manual override is bound by the same suspended-rider
+     * exclusion suggestAgents applies automatically — suspension lives on
+     * the rider's User account, so this is the one extra join a direct pick
+     * needs that the zone/near queries above already fold in via
+     * suspendedAgentUserIds.
+     */
+    const UserModel = mongoose.model('User')
+    const user = await UserModel.findById(agent.user)
+      .select('status')
+      .lean<{ status?: string } | null>()
+      .exec()
+    if ((user?.status ?? 'active') === 'suspended') {
+      throw new HttpError(422, 'that rider is suspended and cannot be assigned')
     }
 
     const [candidate] = await withNames([agent], null)

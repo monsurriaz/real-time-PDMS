@@ -23,6 +23,8 @@ export const SOCKET_EVENTS = {
   locationBroadcast: 'location:broadcast',
   /** Server -> room: the delivery moved through the lifecycle. */
   statusChanged: 'status:changed',
+  /** Server -> room: a customer or rider posted into the delivery's thread (M9). */
+  messageNew: 'message:new',
 } as const
 
 /** Section 6's cadence limits, shared so client and server cannot disagree. */

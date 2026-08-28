@@ -1,4 +1,4 @@
-import type { LocationBroadcast, StatusChanged } from '@pdms/shared'
+import type { LocationBroadcast, MessageBroadcast, StatusChanged } from '@pdms/shared'
 
 /**
  * A one-slot registry so the lifecycle service can announce a status change
@@ -14,11 +14,14 @@ import type { LocationBroadcast, StatusChanged } from '@pdms/shared'
 export interface Broadcaster {
   statusChanged: (payload: StatusChanged) => void
   location: (payload: LocationBroadcast) => void
+  /** M9: a customer or rider posted into a delivery's message thread. */
+  message: (payload: MessageBroadcast) => void
 }
 
 const noop: Broadcaster = {
   statusChanged: () => undefined,
   location: () => undefined,
+  message: () => undefined,
 }
 
 let current: Broadcaster = noop
@@ -38,5 +41,8 @@ export const broadcast: Broadcaster = {
   },
   location: (payload) => {
     current.location(payload)
+  },
+  message: (payload) => {
+    current.message(payload)
   },
 }

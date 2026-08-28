@@ -102,6 +102,22 @@ export const updateAgentDetailsInputSchema = z.object({
 export type UpdateAgentDetailsInput = z.infer<typeof updateAgentDetailsInputSchema>
 
 /**
+ * M9: the rider's ACCOUNT status — User.status (M6.9), a moderation
+ * decision, kept deliberately separate from `approvalStatus` above (an
+ * application decision) rather than folded into a third value of it —
+ * see routes/agents.ts's own note for why.
+ *
+ * Mirrors userStatusSchema's two values without importing it from user.ts:
+ * user.ts already imports FROM this file (agentApplicationFieldsSchema), so
+ * the reverse import would be a circular module dependency that breaks at
+ * evaluation time (this schema would see `undefined` where user.ts's export
+ * should be), not merely a lint complaint. Two literal strings duplicated
+ * once is the cheaper price.
+ */
+export const agentAccountStatusSchema = z.enum(['active', 'suspended'])
+export type AgentAccountStatus = z.infer<typeof agentAccountStatusSchema>
+
+/**
  * One row of the admin's roster / approval queue. NID arrives already
  * masked — see maskNid — so the wire shape itself cannot leak the full
  * number regardless of what the screen does with it.
@@ -116,6 +132,8 @@ export const agentRosterItemSchema = z.object({
   zones: z.array(zoneName),
   status: agentStatusSchema,
   approvalStatus: agentApprovalStatusSchema,
+  /** M9: whether this rider's ACCOUNT (not their application) is suspended. */
+  accountStatus: agentAccountStatusSchema,
   maskedNid: z.string(),
   appliedAt: z.coerce.date(),
 })

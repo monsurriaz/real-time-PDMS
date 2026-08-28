@@ -6,6 +6,12 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant
   size?: 'sm' | 'md' | 'lg'
   children: ReactNode
+  /**
+   * Renders as an `<a>` instead of a `<button>`, same look — a `tel:` link
+   * needs real anchor semantics (long-press, share sheet), not a button that
+   * fakes one with an onClick. No other props apply in this mode.
+   */
+  href?: string
 }
 
 /**
@@ -46,19 +52,29 @@ export const Button = ({
   size = 'md',
   className = '',
   children,
+  href,
   ...rest
-}: Props) => (
-  <button
-    className={[
-      'inline-flex items-center justify-center gap-7px font-sans font-semibold',
-      'border cursor-pointer transition-colors duration-100 tracking-[-0.01em]',
-      SIZES[size],
-      VARIANTS[variant],
-      DISABLED,
-      className,
-    ].join(' ')}
-    {...rest}
-  >
-    {children}
-  </button>
-)
+}: Props) => {
+  const classes = [
+    'inline-flex items-center justify-center gap-7px font-sans font-semibold',
+    'border cursor-pointer transition-colors duration-100 tracking-[-0.01em]',
+    SIZES[size],
+    VARIANTS[variant],
+    DISABLED,
+    className,
+  ].join(' ')
+
+  if (href !== undefined) {
+    return (
+      <a href={href} className={classes}>
+        {children}
+      </a>
+    )
+  }
+
+  return (
+    <button className={classes} {...rest}>
+      {children}
+    </button>
+  )
+}

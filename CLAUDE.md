@@ -276,11 +276,23 @@ but the override is still bound by the same approval check. A self-registered ri
 - Enforce role scoping in a query middleware, not in each route handler.
 - Socket connections are authenticated on handshake; joining `parcel:{id}` is authorized
   against the same rules.
-- Never send `passwordHash`, payment secrets, or another user's phone number to the client.
+- Never send `passwordHash`, payment secrets, or another user's phone number to the client —
+  **narrowed by M9**: the recipient of a delivery has no account on the platform, so the
+  rider at the door has to be able to call them. Their phone reaches the currently assigned
+  rider only, and only while the delivery is non-terminal — never any other rider, never a
+  customer (including the sender who typed it in at booking), never the public tracking
+  payload. Scoped server-side (`routes/deliveries.ts`'s `toListItems`), never left to the
+  client to withhold.
 - **`User.status` is checked on every authenticated request**, in `requireAuth`, and on the
   socket handshake. A JWT is a bearer token: checking it only at login means a suspended
   account keeps working until its cookie expires. A suspended caller gets a 403 carrying
   `reason: 'account_suspended'`, never a 401 — they are identified, just not allowed.
+- **Customer <-> rider messaging (M9)** reuses the `parcel:{id}` socket room and its
+  existing role scoping wholesale, rather than a second room topology or permission model.
+  Participants are the parcel's customer and its currently assigned rider only; an admin may
+  read a thread but never post to it. The window opens at `PickedUp` and closes the moment
+  the delivery reaches any terminal state — enforced server-side on every post, not just by
+  hiding the input client-side.
 
 ---
 
@@ -301,10 +313,10 @@ but the override is still bound by the same approval check. A self-registered ri
 | M6.97 | Map regression fix (rider z-index never actually applied, a marker-ordering race, a socket-auth bug blocking every pre-M6.9 rider from a live connection at all) + semantic page classes on every route | All four map-bearing surfaces re-verified individually with real position data; every route in the table carries its class, compiler-enforced |
 | M6.98 | Live board fixes: fleet map sourced from Agent (not delivery rooms), showing every on-shift rider — idle and busy, two marker treatments; assign/reassign moved from an inline panel to a modal; the rail's Shift editor rebuilt on the same modal after it turned out to render underneath the map on wide viewports | Fleet map verified with both marker types and idle riders visible; the assign modal and the Shift modal both confirmed by screenshot; merged via PR |
 | M8 | Offer/accept/decline lifecycle: `Assigned` redefined as an offer awaiting response, a new `Accepted` state, decline with per-delivery exclusion from re-offer, expiry evaluated on read (not scheduled), agent Accept/Decline UI with a countdown | Exhaustive NxN transition tests pass; a declined or expired offer is never re-offered to the same rider; the lifecycle ramp still uses five colours; expiry demoed end to end with a short window |
+| M9 | Recipient phone narrowed to the assigned rider (Call as a real `tel:` link, Navigate removed outright), customer <-> rider messaging windowed to PickedUp-through-terminal reusing the existing socket room, agent suspension via `User.status` refused while carrying a picked-up parcel | A full message exchange demoed, then the thread goes read-only on delivery and the server rejects a post after that; a third customer cannot read the thread; the recipient's phone reaches the assigned rider only, confirmed against the public tracking payload and another rider's payload; suspension refused for an agent carrying a picked-up parcel, and pre-pickup offers/accepted jobs return to the pool through the existing reassign-before-pickup transition, no new one added |
 | M10 | Deploy + rehearse | Live on Vercel + Render + Atlas, demo data seeded, run-through twice |
 
-See DEFERRED.md for work parked out of each milestone. M9 is not yet scoped — M10 is
-numbered ahead of it on purpose, so deploy stays last regardless of what M9 turns out to be.
+See DEFERRED.md for work parked out of each milestone.
 
 If M3 slips, cut M6 before cutting anything in M4. Live tracking is the flagship.
 
