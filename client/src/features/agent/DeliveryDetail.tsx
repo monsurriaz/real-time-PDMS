@@ -2,6 +2,7 @@ import type { DeliveryListItem } from '@pdms/shared'
 import { Badge } from '@/components/Badge'
 import { Button } from '@/components/Button'
 import { LifecycleRail } from '@/components/LifecycleRail'
+import { MessageThread } from '../messaging/MessageThread'
 import { RunMap } from './RunMap'
 import { formatOfferCountdown, useOfferCountdown } from './useOfferCountdown'
 
@@ -44,23 +45,35 @@ export const DeliveryDetail = ({ d }: { d: DeliveryListItem }) => {
         <div className="text-body text-muted mt-0.5">
           {d.dropArea}, {d.dropZone}
         </div>
+        {d.recipientPhone ? (
+          <div className="mono text-small text-ink-2 mt-1">{d.recipientPhone}</div>
+        ) : null}
 
-        <div className="flex gap-9px mt-14px">
-          {/*
-            Both are in the reference. Navigate needs the drop coordinates,
-            which this projection does not carry, and Call needs the
-            recipient's number, which CLAUDE.md section 7 keeps off this
-            payload — so both are present and disabled rather than pretending
-            to work.
-          */}
-          {/* min-h-12: section 4's 48px floor for anything a rider taps. */}
-          <Button className="flex-1 min-h-12" disabled>
-            Call
-          </Button>
-          <Button className="flex-1 min-h-12" disabled>
-            Navigate
-          </Button>
-        </div>
+        {d.recipientPhone ? (
+          <div className="flex gap-9px mt-14px">
+            {/*
+              M9: the recipient has no account of their own, so a rider at
+              the door has to be able to reach them by phone — the number now
+              reaches THIS view precisely because it's the currently assigned
+              rider's (routes/deliveries.ts scopes it there, never wider).
+              Navigate needed the drop coordinates, which CLAUDE.md section 7
+              still keeps off this payload — a permanently dead control is
+              worse than an absent one (the same call already made for the
+              removed header avatar), so it's gone rather than left disabled.
+            */}
+            {/* min-h-12: section 4's 48px floor for anything a rider taps. */}
+            <Button href={`tel:${d.recipientPhone}`} className="flex-1 min-h-12">
+              Call
+            </Button>
+          </div>
+        ) : null}
+
+        {/*
+          M9: the customer <-> rider thread. Opens at PickedUp, closes at
+          any terminal state — the server decides which state applies, this
+          just renders it.
+        */}
+        <MessageThread deliveryId={d._id} parcelId={d.parcelId} />
       </div>
     </div>
   )

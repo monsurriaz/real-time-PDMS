@@ -24,6 +24,7 @@ import {
   paginate,
 } from '@/components/Table'
 import { useSearchable } from '@/features/shell/useHeaderSearch'
+import { MessageThread } from '@/features/messaging/MessageThread'
 import { ApiError } from '@/lib/api'
 import { formatKm, formatTaka } from '@/lib/format'
 import {
@@ -163,6 +164,7 @@ export const DeliveryBoard = () => {
   const [rider, setRider] = useState<string>('')
   const [page, setPage] = useState(1)
   const [openFor, setOpenFor] = useState<string | null>(null)
+  const [messagesFor, setMessagesFor] = useState<string | null>(null)
   const deliveries = useDeliveries(filter)
   // Claims the header's search box for this screen — v3.1 addendum. Filters
   // the rows useDeliveries already fetched; no new request.
@@ -197,6 +199,8 @@ export const DeliveryBoard = () => {
    * modal's header context, so which parcel is being (re)assigned is never
    * ambiguous. */
   const openForRow = rows.find((d) => d._id === openFor) ?? null
+  /** M9: which row's read-only thread the admin has open. */
+  const messagesForRow = rows.find((d) => d._id === messagesFor) ?? null
 
   if (deliveries.isPending) {
     return (
@@ -346,9 +350,20 @@ export const DeliveryBoard = () => {
                       {d.agentId ? 'Reassign' : 'Assign'}
                     </Button>
                   ) : (
-                    <Link to={`/customer/track/${d.parcelId}`} className="inline-flex">
-                      <Button size="sm">View</Button>
-                    </Link>
+                    <span className="inline-flex items-center gap-2">
+                      <Link to={`/customer/track/${d.parcelId}`} className="inline-flex">
+                        <Button size="sm">View</Button>
+                      </Link>
+                      {/*
+                        M9: an admin can read a delivery's thread but never
+                        post to it — the same window (PickedUp onward) that
+                        makes Assign/Reassign unavailable is exactly when a
+                        thread might have anything in it.
+                      */}
+                      <Button size="sm" onClick={() => setMessagesFor(d._id)}>
+                        Messages
+                      </Button>
+                    </span>
                   )}
                 </Td>
               </Tr>
@@ -356,6 +371,24 @@ export const DeliveryBoard = () => {
           </tbody>
         </TableScroll>
       )}
+
+      {messagesForRow ? (
+        <Modal
+          open
+          onClose={() => setMessagesFor(null)}
+          title={
+            <>
+              <Eyebrow>Messages</Eyebrow>
+              <p className="text-base font-semibold tracking-[-0.015em] truncate">
+                {messagesForRow.trackingId}
+                <span className="text-muted font-normal"> · {messagesForRow.recipientName}</span>
+              </p>
+            </>
+          }
+        >
+          <MessageThread deliveryId={messagesForRow._id} parcelId={messagesForRow.parcelId} />
+        </Modal>
+      ) : null}
 
       {openForRow ? (
         <Modal

@@ -80,6 +80,16 @@ user's request after reviewing a screenshot:
 
 ---
 
+## M9 — recipient phone, messaging, agent suspension
+
+| Item | Notes |
+|---|---|
+| Suspending an agent does not itself move their Assigned/Accepted deliveries anywhere | Deliberate, per the M9 brief's own instruction: "that's already legal (reassignment before PickedUp exists), so no new lifecycle transition is needed." An Accepted delivery cannot reach bare `Booked` in one hop anyway (`Accepted`'s legal moves are `PickedUp`/`Assigned`/`Cancelled` — see lifecycle.ts), so an automatic "return to the pool" would need either a new edge or a same-second auto-reassignment to a guessed replacement, both of which are more machinery than the brief asked for. The admin's existing Assign/Reassign action already works unchanged on a suspended rider's pre-pickup delivery — confirmed live against the demo database — and the suspended rider is excluded from being the one it lands on again. |
+| Admin's read-only thread view is a second small Modal on the board, not folded into the existing Assign/Reassign one | The two are populated by mutually exclusive delivery states — Assign/Reassign only shows before `PickedUp`, a thread only ever has content from `PickedUp` on — so merging them would mean one Modal doing two unrelated jobs depending on which button opened it. Reuses the same `Modal` component and the same `MessageThread` participants render, just a separate trigger. |
+| Message retention cap enforced with a count-then-delete pair, not `$push`/`$slice` | `Message` is its own collection (one document per message, matching Payment/Settlement's shape), not an embedded array on Delivery, so there is no single array to `$slice` atomically. Fine at this project's scale — the cap only ever prunes a handful of rows past 200 on an already-rare write path (one message send). |
+
+---
+
 ## Post-M6.5 — open backlog, no milestone attached
 
 M6.5a, b and c between them did every screen v3's route table names. These
@@ -109,8 +119,7 @@ building for its own sake.
 
 ## M10 — Deploy + rehearse
 
-Renumbered from M7 (M8 this session, M9 not yet scoped) — CLAUDE.md's milestone table
-has the full note.
+Renumbered from M7. M8 and M9 both landed ahead of it, per CLAUDE.md's own milestone table.
 
 | Item | Origin | Notes |
 |---|---|---|
@@ -146,7 +155,6 @@ has the full note.
 | `PROMISED_WINDOW_HOURS = 24` lives in one constant, not in config | Deliberate for now. CLAUDE.md states no service level; one named constant in `lifecycle.ts` is the honest version of "not decided yet". If the promise ever varies by zone or weight it belongs in `PricingConfig` beside the rates. |
 | Analytics keys zone performance off the DROP zone | Deliberate, and the opposite of pricing, which keys off PICKUP. Different questions: pricing asks what it costs to get a rider to the parcel; performance asks where parcels are being taken. |
 | A COD parcel is booked without any checkout step | Deliberate. There is nothing to pay online; `POST /payments/.../checkout` refuses a COD parcel outright rather than creating a session nobody should complete. |
-| Rider disabled controls at 2.36:1 (Call/Navigate) | Decided during the M6.5b rebuild, per the note that raised it: WCAG 1.4.3 exempts text in an inactive component, and these two literally do nothing yet (CLAUDE.md section 7 keeps the recipient's number and drop coordinates off this payload) — no information is lost by them being hard to read outdoors, unlike the Eyebrow case where `--ink-2` replaced `--faint` for text a rider needs at all times. Left on the shared `Button` disabled style rather than given a rider-only override. |
 | The run queue includes the CURRENT delivery, not just the ones behind it | Deliberate, and the reason it isn't called "Up next" the way the static reference labels it: when it is also how a rider switches which parcel is on the left, the selected one has to be in the list, highlighted, or there is nothing to click back to. |
 | `/agent/runs/:id` for an id that isn't (or is no longer) one of the rider's active runs | Falls back to the first active run rather than 404ing. A rider is never looking at nothing just because a bookmark outlived the delivery it named; there is no dedicated detail view a finished run's id could point to instead. |
 | `/track/:id` serves the pre-v3 `/track/:parcelId` redirect AND v3's new public `/track/:trackingId` at the same route | They are the identical path shape — react-router has no way to prefer one over the other by param name — so one component decides by shape: a 24-char hex id (a Mongo ObjectId) redirects to `/customer/track/:id` the way it always did; anything else is treated as a real tracking ID and hits the new public lookup. `PD-XXXX-XX` can never collide with 24 hex characters. |
@@ -172,6 +180,8 @@ has the full note.
 
 | Item | Milestone | Commit |
 |---|---|---|
+| **`delivery.excludedAgents.map(...)` crashed on any pre-M8 delivery** — `GET /deliveries/:id/candidates` and `assignDelivery` both read this field with no fallback; `.lean()` skips the schema default, so a delivery created before M8 added `excludedAgents` comes back with the field simply absent, not `[]`, and every currently-`Assigned` delivery in the live demo database predates M8. Found while verifying M9's suspension work — reassigning a suspended rider's outstanding offer 500'd on every real delivery there was to test it against. Fixed with `(delivery.excludedAgents ?? []).map(...)` in both places, the same "absent means the pre-field default" reading every other `.lean()` call in this codebase already gives a missing field. | M9 | — |
+| **Rider Call/Navigate, no longer disabled controls** — CLAUDE.md section 7's recipient-phone rule was narrowed rather than left in place: the number now reaches the CURRENTLY assigned rider only, and only while the delivery is non-terminal (routes/deliveries.ts's `toListItems`), so Call is a real `tel:` link. Navigate still needs drop coordinates, which the payload still withholds, and stayed dead controls are worse than absent ones (the header-avatar reasoning) — so it's removed outright instead of kept disabled. The 2.36:1-contrast entry this replaces no longer describes reality: there is one control here now, and it works. | M9 | — |
 | **Map WebGL-unavailable crash** — a WebGL-less browser threw synchronously out of `new maplibregl.Map(...)`, before there was a map to attach the existing `on('error')` handler to; React 18 unmounts the whole tree on an uncaught render-phase error, so the failure was a blank page everywhere a map sat, not the friendly "could not load" message the component's own comment says it should show. Fixed with a try/catch around construction. Found by screenshotting this session's own work in a WebGL-less headless browser — the same failure mode a real visitor with WebGL disabled would hit. | M6.96 | — |
 | **Map z-index never actually applied, on every surface** — `.maplibregl-marker:has(.pdms-rider)` assumed MapLibre wraps a custom marker element in its OWN container div; it doesn't, it adds its classes straight onto the SAME element, so `.pdms-rider`/`.maplibregl-marker` were one node, not ancestor and descendant, and `:has()` could never match. z-index silently stayed `auto` on every marker on every screen, and whichever marker happened to insert into the DOM last won the visual stack. Fixed with plain compound selectors (`.maplibregl-marker.pdms-rider`, `.maplibregl-marker.pdms-pin`) — there's no wrapper to reach through in the first place. Confirmed via computed style (`auto` → `2`/`1`) and a live screenshot of a rider sitting exactly at pickup: full clean accent disc on top, no black dot showing through. | M6.97 | — |
 | **A rider's marker could insert into the DOM before the map's own endpoints did** — the "riders, eased between positions" effect checked only `if (!m) return`, not `if (!m \|\| !ready.current) return` like its two sibling effects. `map.current` is assigned synchronously right after construction, before `'load'` fires, so on the very first render this effect could add the rider's marker ahead of pickup/drop — combined with the z-index bug above, later-inserted siblings (pickup, drop) painted over an already-placed rider whenever they coincided, which is exactly what a freshly-assigned or just-picked-up delivery looks like (rider parked at pickup). Fixed by matching the guard the other two effects already use. | M6.97 | — |

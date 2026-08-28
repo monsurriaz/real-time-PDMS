@@ -10,6 +10,7 @@ import {
   type AgentSelf,
   type AgentStatus,
   type GeoPoint,
+  type UserStatus,
   type Vehicle,
   type ZoneName,
 } from '@pdms/shared'
@@ -261,6 +262,8 @@ interface UserNameRow {
   name: string
   phone: string
   email: string
+  /** Optional: `.lean()` skips the schema default — absent means active. */
+  status?: UserStatus
 }
 
 /**
@@ -291,7 +294,7 @@ agentsRouter.get('/', requireAuth, requireRole('admin'), async (_req, res, next)
       >()
 
     const users = await UserModel.find({ _id: { $in: rows.map((r) => r.user) } })
-      .select('name phone email')
+      .select('name phone email status')
       .lean<UserNameRow[]>()
     const byUser = new Map(users.map((u) => [u._id.toString(), u]))
 
@@ -312,6 +315,9 @@ agentsRouter.get('/', requireAuth, requireRole('admin'), async (_req, res, next)
           zones: r.zones,
           status: r.status,
           approvalStatus: r.approvalStatus,
+          // Absent means active — same reasoning as everywhere else `.lean()`
+          // meets a field that predates this account (see middleware/auth.ts).
+          accountStatus: u.status ?? 'active',
           maskedNid: maskNid(r.nid),
           appliedAt: r.createdAt,
         },
@@ -368,3 +374,83 @@ const decide = (nextStatus: 'approved' | 'rejected') =>
 
 agentsRouter.post('/:id/approve', requireAuth, requireRole('admin'), decide('approved'))
 agentsRouter.post('/:id/reject', requireAuth, requireRole('admin'), decide('rejected'))
+
+/**
+ * Suspend or reactivate the rider's ACCOUNT (M9).
+ *
+ * Reuses User.status wholesale — the same field and the same requireAuth/
+ * socket-handshake check M6.9 already wired everywhere else — rather than a
+ * parallel flag on Agent. `approvalStatus` answers "is this rider allowed to
+ * apply for work at all" (an application decision, made once); this answers
+ * "is this account allowed to act right now" (a moderation decision,
+ * reversible), the same split customers.ts draws and the same reason it
+ * gives for not reusing approvalStatus here.
+ *
+ * The one constraint customer-suspend never needed: a rider can be
+ * physically holding a parcel. Suspending someone carrying one would strand
+ * it, so this refuses outright, naming how many — never just a disabled
+ * button with no explanation. An offer (Assigned) or an accepted-but-not-
+ * yet-picked-up job is NOT held in that sense — section 5's own
+ * reassign-before-PickedUp rule already returns both to the pool the moment
+ * an admin reassigns them, so suspending changes nothing about that path;
+ * this route does not reassign anything itself.
+ */
+const decideAccount = (nextStatus: UserStatus) =>
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const actor = req.actor
+      if (!actor) throw unauthorized()
+      const id = objectIdParam(req.params.id)
+
+      const agent = await AgentModel.findById(id)
+        .select('user')
+        .lean<{ _id: mongoose.Types.ObjectId; user: mongoose.Types.ObjectId } | null>()
+      if (!agent) throw new HttpError(404, 'agent not found')
+
+      const target = await UserModel.findById(agent.user)
+        .select('role status')
+        .lean<{ role: string; status?: UserStatus } | null>()
+      if (!target) throw new HttpError(404, 'this rider has no account')
+      if (target.role !== 'agent') {
+        throw new HttpError(422, 'only a rider account can be suspended from here')
+      }
+      if ((target.status ?? 'active') === nextStatus) {
+        throw new HttpError(422, `this account is already ${nextStatus}`)
+      }
+
+      if (nextStatus === 'suspended') {
+        const carrying = await DeliveryModel.countDocuments({
+          agent: agent._id,
+          status: { $in: ['PickedUp', 'InTransit'] },
+        }).exec()
+        if (carrying > 0) {
+          throw new HttpError(
+            422,
+            `carrying ${carrying} parcel${carrying === 1 ? '' : 's'} right now — it must reach Delivered, Failed, or be reassigned before they can be suspended`,
+          )
+        }
+      }
+
+      const at = new Date()
+      await UserModel.updateOne(
+        { _id: agent.user },
+        {
+          $set: { status: nextStatus },
+          $push: {
+            accountHistory: {
+              status: nextStatus,
+              at,
+              by: new mongoose.Types.ObjectId(actor.id),
+            },
+          },
+        },
+      )
+
+      res.json({ status: nextStatus, at })
+    } catch (err) {
+      next(err)
+    }
+  }
+
+agentsRouter.post('/:id/suspend', requireAuth, requireRole('admin'), decideAccount('suspended'))
+agentsRouter.post('/:id/reactivate', requireAuth, requireRole('admin'), decideAccount('active'))

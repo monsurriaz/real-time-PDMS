@@ -10,6 +10,7 @@ import { analyticsRouter } from './routes/analytics'
 import { authRouter } from './routes/auth'
 import { customersRouter } from './routes/customers'
 import { deliveriesRouter } from './routes/deliveries'
+import { messagesRouter } from './routes/messages'
 import { notificationsRouter } from './routes/notifications'
 import { parcelsRouter } from './routes/parcels'
 import {
@@ -75,6 +76,7 @@ export const createApp = (): Express => {
   app.use('/analytics', analyticsRouter)
   app.use('/tracking', trackingRouter)
   app.use('/notifications', notificationsRouter)
+  app.use('/messages', messagesRouter)
 
   app.use(notFoundHandler)
   app.use(errorHandler)

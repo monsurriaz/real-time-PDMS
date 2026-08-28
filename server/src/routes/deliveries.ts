@@ -20,7 +20,7 @@ import { HttpError, unauthorized } from '../middleware/httpError'
 import { assignDelivery, suggestAgents } from '../services/assignment'
 import { codStatusForParcels } from '../services/payments'
 import { issueOtp, recordProof } from '../services/pod'
-import { advanceStatus, availableTransitions, evaluateOfferExpiry } from '../services/lifecycle'
+import { advanceStatus, availableTransitions, evaluateOfferExpiry, isTerminal } from '../services/lifecycle'
 
 export const deliveriesRouter = Router()
 
@@ -67,7 +67,7 @@ interface ParcelRow {
   _id: mongoose.Types.ObjectId
   trackingId: string
   pickup: { area: string; zone: ZoneName }
-  drop: { area: string; zone: ZoneName; contactName: string }
+  drop: { area: string; zone: ZoneName; contactName: string; contactPhone: string }
   weightKg: number
   price: { total: number }
   isCod: boolean
@@ -84,6 +84,8 @@ interface ParcelRow {
 const toListItems = async (
   rows: DeliveryRow[],
   role: 'customer' | 'agent' | 'admin',
+  /** M9: whose eyes this is for — needed to scope recipientPhone below. */
+  viewerId: string,
 ): Promise<DeliveryListItem[]> => {
   if (rows.length === 0) return []
 
@@ -93,6 +95,26 @@ const toListItems = async (
     .select('trackingId pickup drop weightKg price isCod codAmount')
     .lean<ParcelRow[]>()
   const parcelById = new Map(parcels.map((p) => [p._id.toString(), p]))
+
+  /**
+   * M9: the recipient's phone reaches the CURRENTLY assigned rider only —
+   * CLAUDE.md section 7's narrowed rule. Resolving the viewer's own Agent id
+   * once here (rather than per row) is enough to decide "is this row mine"
+   * for every row below; an admin or a customer viewer leaves this null and
+   * every row's recipientPhone stays null for them regardless of d.agent.
+   */
+  let viewerAgentId: string | null = null
+  if (role === 'agent') {
+    viewerAgentId = await runAsSystem('deliveries: viewer agent id', async () => {
+      const agent = await AgentModel.findOne({
+        user: new mongoose.Types.ObjectId(viewerId),
+      })
+        .select('_id')
+        .lean<{ _id: mongoose.Types.ObjectId } | null>()
+        .exec()
+      return agent?._id.toString() ?? null
+    })
+  }
 
   // Rider names come from User via Agent. Run as system: an agent may see the
   // name of whoever holds a delivery they can already see, and an admin sees
@@ -142,6 +164,21 @@ const toListItems = async (
         dropArea: p.drop.area,
         dropZone: p.drop.zone,
         recipientName: p.drop.contactName,
+        /**
+         * Non-null only for the rider this delivery is CURRENTLY assigned
+         * to, and only before it finishes — never for admin, never for the
+         * customer, never for a rider who isn't (or is no longer) holding
+         * it. Role scoping on Delivery already means an agent's own list
+         * can't contain another rider's row at all, but the check stays
+         * explicit here rather than leaning on that alone.
+         */
+        recipientPhone:
+          viewerAgentId !== null &&
+          d.agent !== null &&
+          d.agent.toString() === viewerAgentId &&
+          !isTerminal(d.status)
+            ? p.drop.contactPhone
+            : null,
         weightKg: p.weightKg,
         total: p.price.total,
         isCod: p.isCod,
@@ -198,7 +235,7 @@ deliveriesRouter.get('/', requireAuth, async (req, res, next) => {
      */
     const visible = statusParam ? rows.filter((r) => r.status === statusParam) : rows
 
-    res.json({ deliveries: await toListItems(visible, actor.role) })
+    res.json({ deliveries: await toListItems(visible, actor.role, actor.id) })
   } catch (err) {
     next(err)
   }
@@ -233,7 +270,13 @@ deliveriesRouter.get(
       const suggestion = await suggestAgents({
         pickup: parcel.pickup.point,
         zone: parcel.pickup.zone,
-        excludeAgentIds: delivery.excludedAgents.map((a) => a.toString()),
+        // `.lean()` skips the schema default, so a delivery created before
+        // M8 added this field comes back with it simply absent — found while
+        // verifying M9's suspension work against the live demo database.
+        // Absent means none excluded yet, the same "absent means the
+        // pre-field default" reading every other `.lean()` call in this
+        // codebase gives a missing field.
+        excludeAgentIds: (delivery.excludedAgents ?? []).map((a) => a.toString()),
       })
 
       res.json({
@@ -391,7 +434,7 @@ deliveriesRouter.get('/:id', requireAuth, async (req, res, next) => {
 
     await applyOfferExpiry(rows)
 
-    const [item] = await toListItems(rows, actor.role)
+    const [item] = await toListItems(rows, actor.role, actor.id)
     if (!item) throw new HttpError(404, 'delivery not found')
 
     const full = await DeliveryModel.findById(id)

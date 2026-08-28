@@ -291,6 +291,16 @@ export const deliveryListItemSchema = z.object({
   dropArea: z.string(),
   dropZone: z.string(),
   recipientName: z.string(),
+  /**
+   * M9: the recipient has no account on this platform, so a rider at the
+   * door has to be able to call them. Scoped server-side (routes/
+   * deliveries.ts's toListItems) to the CURRENTLY assigned rider only, and
+   * only while the delivery is non-terminal — null for every other viewer,
+   * every other rider, and the public tracking payload, regardless of what
+   * this field's name might suggest. Null does not mean "no phone on
+   * file"; it means "not this viewer's to see".
+   */
+  recipientPhone: z.string().nullable(),
   weightKg: z.number(),
   total: z.number(),
   isCod: z.boolean(),

@@ -8,7 +8,13 @@ import { TableScroll, Td, Thead, Tr, Who } from '@/components/Table'
 import { useSearchable } from '@/features/shell/useHeaderSearch'
 import { ApiError } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
-import { useAgentRoster, useApproveAgent, useRejectAgent } from './useAgentRoster'
+import {
+  useAgentRoster,
+  useApproveAgent,
+  useReactivateAgent,
+  useRejectAgent,
+  useSuspendAgent,
+} from './useAgentRoster'
 
 /**
  * /admin/agents — v3's "Riders + approval queue". Pending applications get
@@ -27,6 +33,70 @@ const SHIFT_LABEL: Record<string, string> = {
   available: 'Available',
   on_delivery: 'On a delivery',
   offline: 'Off shift',
+}
+
+/**
+ * M9: suspend/reactivate the rider's ACCOUNT — not the approval decision
+ * above, which is one-way for `rejected` and never revisited here. Same
+ * arm-then-confirm shape as AdminCustomersPage's `StatusAction`: suspending
+ * cuts a rider off mid-shift, which is exactly the server-side check this
+ * button can trip — a rider carrying a picked-up parcel is refused outright,
+ * and the refusal names how many rather than the button just silently
+ * declining to work.
+ */
+const AccountAction = ({ agent }: { agent: AgentRosterItem }) => {
+  const suspend = useSuspendAgent()
+  const reactivate = useReactivateAgent()
+  const [armed, setArmed] = useState(false)
+
+  const busy = suspend.isPending || reactivate.isPending
+  const failure = suspend.error ?? reactivate.error
+  const err = failure instanceof ApiError ? failure.message : null
+
+  if (agent.accountStatus === 'suspended') {
+    return (
+      <div className="flex flex-col items-end gap-1">
+        <Button
+          size="sm"
+          variant="ink"
+          disabled={busy}
+          onClick={() => reactivate.mutate(agent._id)}
+        >
+          {reactivate.isPending ? 'Reactivating…' : 'Reactivate'}
+        </Button>
+        {err ? <span className="text-eyebrow text-failed-ink">{err}</span> : null}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      {armed ? (
+        <span className="inline-flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="ink"
+            disabled={busy}
+            onClick={() => suspend.mutate(agent._id, { onSuccess: () => setArmed(false) })}
+          >
+            {suspend.isPending ? 'Suspending…' : 'Confirm'}
+          </Button>
+          <button
+            type="button"
+            onClick={() => setArmed(false)}
+            className="text-meta text-muted hover:text-ink"
+          >
+            Keep
+          </button>
+        </span>
+      ) : (
+        <Button size="sm" onClick={() => setArmed(true)} aria-label={`Suspend ${agent.name}`}>
+          Suspend
+        </Button>
+      )}
+      {err ? <span className="text-eyebrow text-failed-ink max-w-55 text-right">{err}</span> : null}
+    </div>
+  )
 }
 
 const DecisionButtons = ({ agent }: { agent: AgentRosterItem }) => {
@@ -149,8 +219,8 @@ const RidersContent = () => {
                 <p className="text-body text-muted">No approved riders yet.</p>
               </div>
             ) : (
-              <TableScroll min={680}>
-                <Thead cols={['Rider', 'Vehicle', 'Zones', 'Shift']} />
+              <TableScroll min={820}>
+                <Thead cols={['Rider', 'Vehicle', 'Zones', 'Shift', 'Account', '']} />
                 <tbody>
                   {approved.map((a) => (
                     <Tr key={a._id}>
@@ -160,6 +230,16 @@ const RidersContent = () => {
                       <Td>{VEHICLE_LABEL[a.vehicle] ?? a.vehicle}</Td>
                       <Td className="text-ink-2">{a.zones.join(', ')}</Td>
                       <Td>{SHIFT_LABEL[a.status] ?? a.status}</Td>
+                      <Td>
+                        {a.accountStatus === 'suspended' ? (
+                          <Pill tone="failed">Suspended</Pill>
+                        ) : (
+                          <span className="text-ink-2">Active</span>
+                        )}
+                      </Td>
+                      <Td align="right">
+                        <AccountAction agent={a} />
+                      </Td>
                     </Tr>
                   ))}
                 </tbody>

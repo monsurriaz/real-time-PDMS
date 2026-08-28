@@ -310,6 +310,11 @@ export const createSocketServer = (httpServer: HttpServer): Server => {
       // Only used if something other than a socket tick produces a position.
       io.emit(SOCKET_EVENTS.locationBroadcast, payload)
     },
+    // M9: a posted message, broadcast into the SAME parcel:{id} room chat
+    // reuses wholesale — no second room topology, no second join handshake.
+    message: (payload) => {
+      io.to(room(payload.parcelId)).emit(SOCKET_EVENTS.messageNew, payload)
+    },
   })
 
   return io

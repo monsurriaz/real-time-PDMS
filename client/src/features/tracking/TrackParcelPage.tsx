@@ -9,6 +9,7 @@ import type { MapRider } from '@/components/TrackingMap'
 import { ApiError } from '@/lib/api'
 import { formatDateTime, formatKg, formatTaka } from '@/lib/format'
 import { AppShell } from '@/components/AppShell'
+import { MessageThread } from '../messaging/MessageThread'
 import { ConnectionPill } from './ConnectionPill'
 import { EventTimeline } from './EventTimeline'
 import { useLiveTracking } from './useLiveTracking'
@@ -272,6 +273,13 @@ export const TrackParcelPage = () => {
             {delivery.proofOfDelivery ? (
               <ProofPanel proof={delivery.proofOfDelivery} />
             ) : null}
+
+            {/*
+              M9: the customer <-> rider thread — opens at PickedUp, closes
+              once the delivery is Delivered/Cancelled/Failed. The server
+              decides which applies on every load; this only renders it.
+            */}
+            <MessageThread deliveryId={delivery._id} parcelId={parcel._id} />
 
             <div>
               <KeyRow k="Tracking ID">
