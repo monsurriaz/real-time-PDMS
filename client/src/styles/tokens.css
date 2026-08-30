@@ -67,6 +67,17 @@
   --chrome-muted: #8a91a0;
   --chrome-faint: #636a79;
 
+  /**
+   * v4 Meridian (M9.5) — a near-black ground, one step darker than
+   * `--chrome`, used only behind the landing hero's and the login left
+   * panel's full-bleed map. `--chrome` is the navigation frame's colour and
+   * doubles as the floating pill nav's own background there (at reduced
+   * opacity) — if the map sat on `--chrome` too, the nav would barely
+   * separate from what's behind it. Scoped to those two surfaces; every
+   * other dark surface in the app keeps using `--chrome`.
+   */
+  --night: #12151b;
+
   /* workspace */
   --page: #f7f8fa;
   --surface: #ffffff;
@@ -218,6 +229,7 @@
   --color-chrome-ink: var(--chrome-ink);
   --color-chrome-muted: var(--chrome-muted);
   --color-chrome-faint: var(--chrome-faint);
+  --color-night: var(--night);
 
   --color-page: var(--page);
   --color-surface: var(--surface);

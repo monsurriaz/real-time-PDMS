@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import type { PricingSummary } from '@pdms/shared'
+import type { PricingSummary, PricingTiers } from '@pdms/shared'
 import { api } from '@/lib/api'
 
 /**
@@ -13,5 +13,17 @@ export const usePublicPricingSummary = () =>
   useQuery({
     queryKey: ['pricing', 'summary'],
     queryFn: () => api.get<PricingSummary>('/pricing/summary'),
+    staleTime: 5 * 60_000,
+  })
+
+/**
+ * The landing page's pricing section (M9.5) — the full tier ladder, from
+ * GET /pricing/tiers, same unauthenticated reasoning as the summary above.
+ * Admin-edited rates, never hard-coded copy — CLAUDE.md section 5.
+ */
+export const usePublicPricingTiers = () =>
+  useQuery({
+    queryKey: ['pricing', 'tiers'],
+    queryFn: () => api.get<PricingTiers>('/pricing/tiers'),
     staleTime: 5 * 60_000,
   })

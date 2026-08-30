@@ -4,7 +4,7 @@ import { loginInputSchema } from '@pdms/shared'
 import { Button } from '@/components/Button'
 import { Field } from '@/components/Field'
 import { ApiError } from '@/lib/api'
-import { AuthSplit } from './AuthSplit'
+import { LoginSplit } from './LoginSplit'
 import { homeForRole } from './roles'
 import { useLogin, useMe } from './useAuth'
 
@@ -50,10 +50,12 @@ export const LoginPage = () => {
 
   return (
     /**
-     * v3.1's auth split: a chrome-dark proposition panel beside the form,
-     * rather than v3's lone card floating on the cool page — see AuthSplit.
+     * v4's login shell (M9.5): a real map behind the proposition panel
+     * instead of v3.1's flat chrome — see LoginSplit for why this is its
+     * own component rather than a change to the AuthSplit /signup still
+     * uses.
      */
-    <AuthSplit
+    <LoginSplit
       pageClass="login"
       heading="Dhaka's parcels, tracked to the door."
       body="Six zones, live rider positions, and proof of delivery on every handover."
@@ -138,6 +140,6 @@ export const LoginPage = () => {
           Create an account
         </Link>
       </p>
-    </AuthSplit>
+    </LoginSplit>
   )
 }

@@ -228,7 +228,7 @@ export const CodReconciliation = () => {
               : 'The settlement trail could not be loaded.'}
           </p>
         ) : trail.data.length === 0 ? (
-          <p className="text-body text-muted">
+          <p className="text-body text-muted p-2">
             Nothing settled yet. Each hand-in is recorded here with what it
             covered — totals are never edited in place.
           </p>

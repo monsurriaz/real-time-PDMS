@@ -15,7 +15,11 @@ Course project, CSC 470. Seven-day build. Demo-ready beats feature-complete.
    is frozen.** M6.5c shipped — every screen in the route table now matches it, and
    the freeze from the original rule 2 applies to v3 in full: do not restyle a
    component because it "could look better," and do not invent colors, radii, fonts,
-   or spacing outside it. Visual changes require an explicit request.
+   or spacing outside it. Visual changes require an explicit request. **M9.5 narrows
+   this for exactly two routes**: `docs/design-v4-landing-login.html` (v4 Meridian)
+   supersedes v3/v3.1 for the public landing page (`/`) and `/login` only — see
+   section 4. Every other screen, including `/signup`, stays under v3 + v3.1 as
+   written above.
 3. **The delivery state machine is enforced server-side.** The client never decides what
    transition is legal.
 4. **TypeScript strict mode. No `any`.** If a type is hard, model it properly.
@@ -78,6 +82,7 @@ Course project, CSC 470. Seven-day build. Demo-ready beats feature-complete.
 /docs
   design-system-v3-meridian.html   THE visual reference — read before building any UI
   design-system-v3.1-addendum.html M6.96 corrections to v3 — read alongside it, wins on conflict
+  design-v4-landing-login.html     M9.5 — supersedes v3/v3.1 for `/` and `/login` ONLY
   design-system.html               v1, superseded. Kept for history only.
 CLAUDE.md
 .gitignore
@@ -89,11 +94,12 @@ class on its own outermost element — `<role>-<screen>`, kebab-case, matching t
 (`/admin/board` → `admin-board`, `/agent/runs/:id` → `agent-run-detail`). It carries no
 styles; it exists so a screen can be targeted by what it IS, not by a layout class that
 could change under it. `AppShell` takes this as a required `pageClass` prop (so the
-compiler catches a page that forgot one); `AuthSplit` takes the same for `/login` and
-`/signup`; the handful of routes with no shared shell (`/`, `/agent/pending`,
-`/track/:trackingId`) put the class directly on their own root element. A new route
-follows this automatically — `pageClass` being required is what makes it a compile error
-to skip, not tribal knowledge.
+compiler catches a page that forgot one); `AuthSplit` takes the same for `/signup`, and
+`LoginSplit` (M9.5's own shell for `/login` — see section 4) takes it for `/login`;
+the handful of routes with no shared shell (`/`, `/agent/pending`, `/track/:trackingId`)
+put the class directly on their own root element. A new route follows this
+automatically — `pageClass` being required is what makes it a compile error to skip,
+not tribal knowledge.
 
 ---
 
@@ -117,6 +123,35 @@ not spacing values and were never drawn from the scale in the first place (the
 codebase's own long-standing convention — `max-w-[400px]`, `min-h-[340px]`, and
 similar one-off layout facts already appear throughout); only interior
 padding/margin/gap is a rule-1 spacing decision.
+
+**`/docs/design-v4-landing-login.html` (v4 Meridian) supersedes v3/v3.1, but ONLY for
+the public landing page (`/`) and `/login`** (M9.5). Every other screen — everything
+behind the rail, plus `/signup` and `/track/:trackingId` — stays under v3 + v3.1
+exactly as above; `/signup` keeps `AuthSplit` unchanged this session even though
+`/login` moved to a new `LoginSplit` shell, precisely so the two do not silently
+diverge without it being a decision someone made on purpose. v4 introduces:
+
+- **`--night: #12151b`, a new token** (tokens.css), one step darker than `--chrome`.
+  Used only behind the landing hero's and the login left panel's full-bleed map —
+  if that map sat on `--chrome` instead, the floating chrome-coloured pill nav
+  couldn't be told apart from what's behind it. No other surface uses it; every
+  other dark surface in the app is still `--chrome`.
+- **One gradient exception.** Rule 2 above still holds everywhere else: v3/v3.1 has
+  no gradients, separation comes from 1px borders. The v4 hero and the login left
+  panel put real map tiles full-bleed behind text, and only a radial veil — darkest
+  behind the copy, lighter toward the frame — keeps that text legible at every point
+  without flattening the map into an opaque card. It exists for contrast, not
+  decoration, and it is implemented in exactly one place, `.hero-veil` /
+  `.login-veil` in `app.css`, as `color-mix()` against `--night` rather than a
+  literal colour, so it can never drift from that token. No other gradient exists
+  anywhere in the codebase.
+- **Real markers, coloured by lifecycle state.** The hero's and the bento grid's
+  maps are real `TrackingMap` instances (`LazyTrackingMap`, the same lazy chunk
+  every tracking screen already loads), not images. `MapRider` gained an optional
+  `tone` field so the SAME marker component can show the five-colour ramp at once;
+  every existing caller (`RunMap`, `FleetMap`) omits it and renders exactly as
+  before. The hero's rider pins are deliberately static/decorative, not live fleet
+  data — see DEFERRED.md, M9.5, for why.
 
 The v1 system (warm paper, orange accent, header-only layout) is **retired**. Its
 tokens no longer exist under any name, so a component still asking for `--paper` or
@@ -314,6 +349,7 @@ but the override is still bound by the same approval check. A self-registered ri
 | M6.98 | Live board fixes: fleet map sourced from Agent (not delivery rooms), showing every on-shift rider — idle and busy, two marker treatments; assign/reassign moved from an inline panel to a modal; the rail's Shift editor rebuilt on the same modal after it turned out to render underneath the map on wide viewports | Fleet map verified with both marker types and idle riders visible; the assign modal and the Shift modal both confirmed by screenshot; merged via PR |
 | M8 | Offer/accept/decline lifecycle: `Assigned` redefined as an offer awaiting response, a new `Accepted` state, decline with per-delivery exclusion from re-offer, expiry evaluated on read (not scheduled), agent Accept/Decline UI with a countdown | Exhaustive NxN transition tests pass; a declined or expired offer is never re-offered to the same rider; the lifecycle ramp still uses five colours; expiry demoed end to end with a short window |
 | M9 | Recipient phone narrowed to the assigned rider (Call as a real `tel:` link, Navigate removed outright), customer <-> rider messaging windowed to PickedUp-through-terminal reusing the existing socket room, agent suspension via `User.status` refused while carrying a picked-up parcel | A full message exchange demoed, then the thread goes read-only on delivery and the server rejects a post after that; a third customer cannot read the thread; the recipient's phone reaches the assigned rider only, confirmed against the public tracking payload and another rider's payload; suspension refused for an agent carrying a picked-up parcel, and pre-pickup offers/accepted jobs return to the pool through the existing reassign-before-pickup transition, no new one added |
+| M9.5 | Landing + login redesign (v4 Meridian, scoped to `/` and `/login` only): nine-section landing with a real full-bleed hero map, an asymmetric bento grid, live pricing tiers, a real FAQ accordion, and a map-treated login left panel with three vertical anchors | All nine landing sections render at 1440px and 375px with no page ending early; pricing and FAQ read from live `PricingConfig`/checked code behaviour, not invented copy; `/signup` and every screen behind the rail unchanged; merged via PR |
 | M10 | Deploy + rehearse | Live on Vercel + Render + Atlas, demo data seeded, run-through twice |
 
 See DEFERRED.md for work parked out of each milestone.
