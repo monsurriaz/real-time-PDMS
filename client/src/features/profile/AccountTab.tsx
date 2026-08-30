@@ -7,25 +7,26 @@ import { useUpdateAccount } from '../auth/useAuth'
 import { ProfileBlockHeading } from './ProfileShell'
 
 /**
- * Every role's Account tab: name, phone, email. Shared because the fields
- * and the endpoint (PATCH /auth/me) are identical for all three — only the
- * tabs around it differ per role.
+ * Every role's Account tab: name, phone, and email — the first two editable,
+ * shared because the fields and the endpoint (PATCH /auth/me) are identical
+ * for all three roles and only the tabs around it differ.
+ *
+ * Email is shown, not editable: it is the account's sign-in identity, and
+ * `updateAccountInputSchema` no longer accepts it at all — this is a real
+ * read-only field, not a client that merely declines to let you touch it.
  */
 export const AccountTab = ({ user }: { user: SelfUser }) => {
   const update = useUpdateAccount()
   const [name, setName] = useState(user.name)
   const [phone, setPhone] = useState(user.phone)
-  const [email, setEmail] = useState(user.email)
   const [fieldError, setFieldError] = useState<string | null>(null)
   const [justSaved, setJustSaved] = useState(false)
 
-  const dirty = name !== user.name || phone !== user.phone || email !== user.email
-  const emailChanging = email.trim().toLowerCase() !== user.email
+  const dirty = name !== user.name || phone !== user.phone
 
   const reset = (): void => {
     setName(user.name)
     setPhone(user.phone)
-    setEmail(user.email)
     setFieldError(null)
   }
 
@@ -33,7 +34,7 @@ export const AccountTab = ({ user }: { user: SelfUser }) => {
     e.preventDefault()
     setFieldError(null)
     setJustSaved(false)
-    const parsed = updateAccountInputSchema.safeParse({ name, phone, email })
+    const parsed = updateAccountInputSchema.safeParse({ name, phone })
     if (!parsed.success) {
       setFieldError(parsed.error.issues[0]?.message ?? 'check your details')
       return
@@ -58,13 +59,9 @@ export const AccountTab = ({ user }: { user: SelfUser }) => {
       <Field
         label="Email"
         type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        hint={
-          emailChanging
-            ? 'Changing this changes how you sign in — you will use the new address next time.'
-            : 'Changing this changes how you sign in.'
-        }
+        value={user.email}
+        readOnly
+        hint="This is your sign-in address — it cannot be changed here."
       />
 
       {(fieldError ?? serverError) ? (

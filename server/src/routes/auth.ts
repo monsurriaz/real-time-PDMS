@@ -190,11 +190,13 @@ authRouter.get('/me', requireAuth, async (req, res, next) => {
 /**
  * PATCH /auth/me — the profile's Account tab, every role.
  *
- * Re-issues the auth cookie when the email actually changed. The JWT's own
- * claims (`sub`, `role`) do not depend on email, so nothing here is
- * technically broken by skipping this — but an account-affecting change is
- * exactly the moment to hand back a fresh token rather than let a stale one
- * ride out its remaining life, and it costs nothing to do on every save.
+ * Name and phone only. Email is shown on this tab but is read-only — it is
+ * the account's sign-in identity, and this route no longer accepts it at
+ * all (updateAccountInputSchema has no such field), not merely a client that
+ * declines to render an editable box for it. This used to also handle an
+ * email change, with a uniqueness check and a re-issued auth cookie on
+ * success; both are gone along with the field they existed for, rather than
+ * left in place unreachable.
  */
 authRouter.patch('/me', requireAuth, async (req, res, next) => {
   try {
@@ -203,36 +205,16 @@ authRouter.patch('/me', requireAuth, async (req, res, next) => {
     const input = updateAccountInputSchema.parse(req.body)
 
     const updated = await runAsSystem('auth: update account', async () => {
-      if (input.email) {
-        const clash = await UserModel.findOne({
-          email: input.email,
-          _id: { $ne: new mongoose.Types.ObjectId(actor.id) },
-        })
-          .select('_id')
-          .lean()
-          .exec()
-        if (clash) throw conflict('an account with that email already exists')
-      }
-
       const current = await UserModel.findById(actor.id).exec()
       if (!current) throw unauthorized('session no longer valid')
 
-      const emailChanged = current.email !== input.email
       current.name = input.name
       current.phone = input.phone
-      current.email = input.email
       await current.save()
-      return { user: current, emailChanged }
+      return current
     })
 
-    if (updated.emailChanged) {
-      res.cookie(
-        AUTH_COOKIE,
-        signToken(updated.user._id.toString(), updated.user.role),
-        cookieOptions(),
-      )
-    }
-    res.json({ user: toSelfUser(updated.user) })
+    res.json({ user: toSelfUser(updated) })
   } catch (err) {
     next(err)
   }
