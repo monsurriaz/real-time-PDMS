@@ -1,6 +1,15 @@
 import { z } from 'zod'
-import { geoPoint, objectId, role, timestamps } from './common'
+import { cloudinaryUrl, geoPoint, objectId, role, timestamps } from './common'
 import { paymentStatusSchema } from './payment'
+
+/**
+ * Re-exported for every existing import site (`import { cloudinaryUrl } from
+ * './delivery'` / `@pdms/shared`) — M9.6 moved the definition itself to
+ * common.ts, so a second caller (User's avatarUrl) and payment.ts's COD
+ * reconciliation row could both use it without a circular dependency on this
+ * file. See common.ts for the definition and the reasoning.
+ */
+export { cloudinaryUrl }
 
 /**
  * The delivery lifecycle, exactly as drawn in CLAUDE.md section 5 (M8):
@@ -60,24 +69,6 @@ export type DeliveryEvent = z.infer<typeof deliveryEventSchema>
 
 export const podMethodSchema = z.enum(['photo', 'otp', 'signature'])
 export type PodMethod = z.infer<typeof podMethodSchema>
-
-/**
- * A Cloudinary delivery URL, and nothing else.
- *
- * The photo is uploaded straight from the rider's phone with the unsigned
- * preset (CLAUDE.md section 2), so the URL arrives from the client and cannot
- * be trusted on shape alone. This narrows it to Cloudinary's delivery host;
- * the server additionally checks it names OUR cloud, which is the part only
- * the server knows.
- */
-export const cloudinaryUrl = z
-  .string()
-  .url()
-  .max(500)
-  .refine(
-    (u) => u.startsWith('https://res.cloudinary.com/'),
-    'must be an https Cloudinary delivery URL',
-  )
 
 /**
  * Proof of delivery. CLAUDE.md section 5: reaching Delivered requires this to

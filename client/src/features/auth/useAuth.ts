@@ -118,6 +118,35 @@ export const useDismissWelcome = () => {
   })
 }
 
+/**
+ * The profile's "Change photo" (M9.6). The upload itself already happened
+ * browser -> Cloudinary before this fires — this is just handing the server
+ * the URL it got back, the same cache-seeding shape login/register/welcome
+ * already use.
+ */
+export const useUploadAvatar = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (avatarUrl: string) =>
+      api.patch<AuthResponse>('/auth/me/avatar', { avatarUrl }),
+    onSuccess: (data) => {
+      qc.setQueryData(meQueryKey, data)
+    },
+  })
+}
+
+/** "Remove" — clears the photo. The Cloudinary asset itself is orphaned, not
+ *  deleted (no API secret to delete with); see DEFERRED.md. */
+export const useRemoveAvatar = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.delete<AuthResponse>('/auth/me/avatar'),
+    onSuccess: (data) => {
+      qc.setQueryData(meQueryKey, data)
+    },
+  })
+}
+
 /** The Password tab — its own mutation, its own Save button. */
 export const useChangePassword = () =>
   useMutation({

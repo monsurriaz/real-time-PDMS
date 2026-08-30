@@ -26,6 +26,8 @@ interface CustomerLean {
   _id: mongoose.Types.ObjectId
   name: string
   email: string
+  /** M9.6. Optional for the same `.lean()` reason `status` is below. */
+  avatarUrl?: string | null
   /**
    * Optional because `.lean()` skips the schema default, so an account
    * created before this field existed comes back without it. See
@@ -53,7 +55,7 @@ interface CustomerLean {
 customersRouter.get('/', requireAuth, requireRole('admin'), async (_req, res, next) => {
   try {
     const rows = await UserModel.find({ role: 'customer' })
-      .select('name email status accountHistory createdAt')
+      .select('name email avatarUrl status accountHistory createdAt')
       .sort({ createdAt: -1 })
       .lean<CustomerLean[]>()
 
@@ -77,6 +79,7 @@ customersRouter.get('/', requireAuth, requireRole('admin'), async (_req, res, ne
         _id: r._id.toString(),
         name: r.name,
         email: r.email,
+        avatarUrl: r.avatarUrl ?? null,
         status: r.status ?? 'active',
         parcelCount: counts.get(r._id.toString()) ?? 0,
         joinedAt: r.createdAt,
@@ -165,4 +168,56 @@ customersRouter.post(
   requireAuth,
   requireRole('admin'),
   decide('active'),
+)
+
+/**
+ * Admin photo moderation (M9.6) — clears a customer's avatar, not their
+ * account. A separate, lesser action from suspend/reactivate above: this
+ * appends to `moderationHistory`, not `accountHistory` — see the model's own
+ * note for why the two stay apart. The server cannot delete the underlying
+ * Cloudinary asset (no API secret, same limitation POD photos have always
+ * had); this only ever clears the field.
+ */
+customersRouter.post(
+  '/:id/clear-avatar',
+  requireAuth,
+  requireRole('admin'),
+  async (req, res, next) => {
+    try {
+      const actor = req.actor
+      if (!actor) throw unauthorized()
+      const id = req.params.id
+      if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+        throw new HttpError(400, 'not a valid customer id')
+      }
+
+      const target = await UserModel.findById(id).select('role avatarUrl')
+      if (!target) throw new HttpError(404, 'customer not found')
+      if (target.role !== 'customer') {
+        throw new HttpError(422, 'only a customer account can be moderated from here')
+      }
+      if (!target.avatarUrl) {
+        throw new HttpError(422, 'this account has no photo to clear')
+      }
+
+      const at = new Date()
+      await UserModel.updateOne(
+        { _id: id },
+        {
+          $set: { avatarUrl: null },
+          $push: {
+            moderationHistory: {
+              action: 'avatar_cleared',
+              at,
+              by: new mongoose.Types.ObjectId(actor.id),
+            },
+          },
+        },
+      )
+
+      res.json({ avatarUrl: null, at })
+    } catch (err) {
+      next(err)
+    }
+  },
 )

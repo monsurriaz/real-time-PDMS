@@ -467,14 +467,16 @@ export const codReconciliation = async (): Promise<{
   }
   for (const agentId of failedByAgent.keys()) bucket(agentId)
 
-  const names = await riderNames([...byAgent.keys()])
+  const profiles = await riderProfiles([...byAgent.keys()])
 
   const rows: CodReconciliationRow[] = [...byAgent.entries()]
     .map(([agentId, b]) => {
       const failed = failedByAgent.get(agentId) ?? { amount: 0, count: 0 }
+      const profile = profiles.get(agentId)
       return {
         agentId,
-        agentName: names.get(agentId) ?? 'Unknown rider',
+        agentName: profile?.name ?? 'Unknown rider',
+        avatarUrl: profile?.avatarUrl ?? null,
         deliveredCount: b.outstandingCount + b.settledCount,
         outstanding: b.outstanding,
         outstandingCount: b.outstandingCount,
@@ -499,11 +501,11 @@ export const codReconciliation = async (): Promise<{
   }
 }
 
-const riderNames = async (
+const riderProfiles = async (
   agentIds: readonly string[],
-): Promise<Map<string, string>> => {
+): Promise<Map<string, { name: string; avatarUrl: string | null }>> => {
   if (agentIds.length === 0) return new Map()
-  return runAsSystem('payments: rider names', async () => {
+  return runAsSystem('payments: rider profiles', async () => {
     const agents = await AgentModel.find({
       _id: { $in: agentIds.map((id) => new mongoose.Types.ObjectId(id)) },
     })
@@ -511,12 +513,18 @@ const riderNames = async (
       .lean<Array<{ _id: mongoose.Types.ObjectId; user: mongoose.Types.ObjectId }>>()
       .exec()
     const users = await UserModel.find({ _id: { $in: agents.map((a) => a.user) } })
-      .select('name')
-      .lean<Array<{ _id: mongoose.Types.ObjectId; name: string }>>()
+      .select('name avatarUrl')
+      .lean<Array<{ _id: mongoose.Types.ObjectId; name: string; avatarUrl?: string | null }>>()
       .exec()
-    const nameByUser = new Map(users.map((u) => [u._id.toString(), u.name]))
+    const byUser = new Map(users.map((u) => [u._id.toString(), u]))
     return new Map(
-      agents.map((a) => [a._id.toString(), nameByUser.get(a.user.toString()) ?? 'Rider']),
+      agents.map((a) => {
+        const u = byUser.get(a.user.toString())
+        return [
+          a._id.toString(),
+          { name: u?.name ?? 'Rider', avatarUrl: u?.avatarUrl ?? null },
+        ]
+      }),
     )
   })
 }
@@ -582,7 +590,7 @@ export const settleAgent = async (args: {
     }),
   )
 
-  const names = await riderNames([args.agentId])
+  const profiles = await riderProfiles([args.agentId])
   const admin = await runAsSystem('payments: settling admin name', async () =>
     UserModel.findById(args.actor.id).select('name').lean<{ name: string } | null>().exec(),
   )
@@ -590,7 +598,7 @@ export const settleAgent = async (args: {
   return {
     _id: record._id.toString(),
     agent: args.agentId,
-    agentName: names.get(args.agentId) ?? 'Unknown rider',
+    agentName: profiles.get(args.agentId)?.name ?? 'Unknown rider',
     amount,
     paymentCount: settled.length,
     settledBy: args.actor.id,
@@ -637,7 +645,7 @@ export const settlementHistory = async (args: {
 
   if (rows.length === 0) return []
 
-  const names = await riderNames([...new Set(rows.map((r) => r.agent.toString()))])
+  const profiles = await riderProfiles([...new Set(rows.map((r) => r.agent.toString()))])
   const admins = await runAsSystem('payments: settlement admins', async () =>
     UserModel.find({ _id: { $in: rows.map((r) => r.settledBy) } })
       .select('name')
@@ -649,7 +657,7 @@ export const settlementHistory = async (args: {
   return rows.map((r) => ({
     _id: r._id.toString(),
     agent: r.agent.toString(),
-    agentName: names.get(r.agent.toString()) ?? 'Unknown rider',
+    agentName: profiles.get(r.agent.toString())?.name ?? 'Unknown rider',
     amount: r.amount,
     paymentCount: r.payments.length,
     settledBy: r.settledBy.toString(),

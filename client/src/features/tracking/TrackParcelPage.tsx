@@ -1,5 +1,6 @@
 import { Link, useParams } from 'react-router-dom'
-import type { GeoPoint, ProofOfDelivery } from '@pdms/shared'
+import type { DeliveryStatus, GeoPoint, ProofOfDelivery } from '@pdms/shared'
+import { Avatar } from '@/components/Table'
 import { Badge } from '@/components/Badge'
 import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
@@ -29,6 +30,21 @@ const KeyRow = ({ k, children }: { k: string; children: React.ReactNode }) => (
     <span className="text-sm">{children}</span>
   </div>
 )
+
+/**
+ * M9.6: what the rider card's second line says once the delivery has
+ * stopped moving. "2.1 km away" answers a question that no longer applies
+ * to a Delivered/Failed/Cancelled parcel — the rider isn't travelling
+ * toward it any more, so distance is meaningless, not just stale. Terminal
+ * states get an accurate word instead; anything else non-moving (an
+ * offered-but-not-yet-accepted `Assigned`) falls back to the vehicle alone,
+ * unchanged from before.
+ */
+const RIDER_TERMINAL_LABEL: Partial<Record<DeliveryStatus, string>> = {
+  Delivered: 'Delivered',
+  Failed: 'Delivery not completed',
+  Cancelled: 'Cancelled',
+}
 
 /** Straight-line distance, for the "x km away" line on the rider card. */
 const kmBetween = (a: GeoPoint, b: GeoPoint): number => {
@@ -71,10 +87,19 @@ const DeliveryCode = ({ code, expiresAt }: { code: string; expiresAt: string }) 
   </div>
 )
 
-/** What was recorded at the door, once a delivery is proven. */
+/**
+ * What was recorded at the door, once a delivery is proven.
+ *
+ * M9.6: the OTP line now says what actually happened rather than just
+ * naming the method. "OTP" alone reads like a checkbox someone ticked; a
+ * server-issued code that only the recipient ever saw, checked against
+ * what the rider typed, is a real verification the rider could not have
+ * faked — see services/pod.ts's `verifyOtp`. This is copy only: nothing
+ * about how OTP proof actually works changed.
+ */
 const PROOF_LABEL: Record<string, string> = {
   photo: 'Photo taken at the door',
-  otp: 'Code confirmed by the recipient',
+  otp: 'A server-issued code, verified against the recipient',
   signature: 'Signed for',
 }
 
@@ -88,20 +113,30 @@ const ProofPanel = ({ proof }: { proof: ProofOfDelivery }) => (
       {proof.receivedBy ? ` · ${proof.receivedBy}` : ''}
     </p>
     {proof.photoUrl ? (
-      // The record holds a URL, so this is a link to Cloudinary rather than an
-      // image stored anywhere near our database.
-      <a
-        href={proof.photoUrl}
-        target="_blank"
-        rel="noreferrer"
-        className="inline-block mt-2 text-small font-medium text-delivered-ink underline decoration-current/40 hover:decoration-current"
-      >
-        View the photo
+      /*
+       * M9.6: a thumbnail, not a text link — "View the photo" asked the
+       * reader to trust a claim and then act to check it; the thumbnail IS
+       * the proof, glanceable without a click, and click-through still
+       * opens the full Cloudinary image for a closer look. The record
+       * still only ever holds a URL, never the binary.
+       */
+      <a href={proof.photoUrl} target="_blank" rel="noreferrer" className="block mt-2">
+        <img
+          src={proof.photoUrl}
+          alt="Proof of delivery"
+          className="w-full max-w-55 h-30 object-cover rounded-sm border border-delivered-ink/20"
+        />
       </a>
     ) : null}
-    <p className="mono text-tiny text-delivered-ink/80 mt-1.5">
-      {formatDateTime(proof.capturedAt)}
-    </p>
+    {proof.method === 'otp' && proof.otpVerifiedAt ? (
+      <p className="text-tiny text-delivered-ink/80 mt-1.5">
+        Verified <span className="mono">{formatDateTime(proof.otpVerifiedAt)}</span>
+      </p>
+    ) : (
+      <p className="mono text-tiny text-delivered-ink/80 mt-1.5">
+        {formatDateTime(proof.capturedAt)}
+      </p>
+    )}
   </div>
 )
 
@@ -243,15 +278,17 @@ export const TrackParcelPage = () => {
 
             {rider ? (
               <div className="flex items-center gap-11px p-[13px] bg-surface-sunk rounded-md my-4">
-                <div className="w-9 h-9 rounded-full bg-border-strong flex-none" />
+                <Avatar url={rider.avatarUrl} name={rider.name} size="md" />
                 <div className="flex-1 min-w-0">
                   <div className="text-body font-semibold truncate">
                     {rider.name}
                   </div>
                   <div className="text-meta text-muted">
-                    {distanceKm !== null
+                    {moving && distanceKm !== null
                       ? `${distanceKm.toFixed(1)} km away · ${rider.vehicle}`
-                      : rider.vehicle}
+                      : RIDER_TERMINAL_LABEL[delivery.status]
+                        ? `${RIDER_TERMINAL_LABEL[delivery.status]} · ${rider.vehicle}`
+                        : rider.vehicle}
                   </div>
                 </div>
               </div>

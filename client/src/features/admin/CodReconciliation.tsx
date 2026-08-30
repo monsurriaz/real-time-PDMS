@@ -169,7 +169,11 @@ export const CodReconciliation = () => {
               {rows.map((r) => (
                 <Tr key={r.agentId}>
                   <Td>
-                    <Who name={r.agentName} sub={`${r.deliveredCount} COD delivered`} />
+                    <Who
+                      name={r.agentName}
+                      sub={`${r.deliveredCount} COD delivered`}
+                      avatarUrl={r.avatarUrl}
+                    />
                   </Td>
                   <Td>
                     <span className="mono text-small">{r.deliveredCount}</span>

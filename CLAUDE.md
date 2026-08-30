@@ -328,6 +328,17 @@ but the override is still bound by the same approval check. A self-registered ri
   read a thread but never post to it. The window opens at `PickedUp` and closes the moment
   the delivery reaches any terminal state — enforced server-side on every post, not just by
   hiding the input client-side.
+- **Profile photos (M9.6)**, `avatarUrl` on `User`, narrow the same way the recipient's phone
+  does: your own is always visible to you (rail, profile); the ASSIGNED rider's reaches that
+  parcel's customer on **authenticated** tracking only (`routes/tracking.ts`'s `/:parcelId`) —
+  never on public tracking (`/by-id/:trackingId`), which stays exactly `{ name, vehicle }`, and
+  never a customer's own avatar back to the rider. Admin sees every avatar its existing screens
+  already carry a name for (`/admin/agents`, `/admin/customers`, the COD table) — no new field
+  was added anywhere that didn't already carry that person. Uploads reuse the POD photo path
+  wholesale: browser -> Cloudinary with the same unsigned preset, the server checking a
+  submitted URL names our own cloud before storing it, no new env var. Clearing a photo (self
+  or admin) unsets `avatarUrl` only — the Cloudinary asset itself is orphaned, the same
+  accepted limitation POD photos have had since M5.
 
 ---
 
@@ -350,6 +361,7 @@ but the override is still bound by the same approval check. A self-registered ri
 | M8 | Offer/accept/decline lifecycle: `Assigned` redefined as an offer awaiting response, a new `Accepted` state, decline with per-delivery exclusion from re-offer, expiry evaluated on read (not scheduled), agent Accept/Decline UI with a countdown | Exhaustive NxN transition tests pass; a declined or expired offer is never re-offered to the same rider; the lifecycle ramp still uses five colours; expiry demoed end to end with a short window |
 | M9 | Recipient phone narrowed to the assigned rider (Call as a real `tel:` link, Navigate removed outright), customer <-> rider messaging windowed to PickedUp-through-terminal reusing the existing socket room, agent suspension via `User.status` refused while carrying a picked-up parcel | A full message exchange demoed, then the thread goes read-only on delivery and the server rejects a post after that; a third customer cannot read the thread; the recipient's phone reaches the assigned rider only, confirmed against the public tracking payload and another rider's payload; suspension refused for an agent carrying a picked-up parcel, and pre-pickup offers/accepted jobs return to the pool through the existing reassign-before-pickup transition, no new one added |
 | M9.5 | Landing + login redesign (v4 Meridian, scoped to `/` and `/login` only): nine-section landing with a real full-bleed hero map, an asymmetric bento grid, live pricing tiers, a real FAQ accordion, and a map-treated login left panel with three vertical anchors | All nine landing sections render at 1440px and 375px with no page ending early; pricing and FAQ read from live `PricingConfig`/checked code behaviour, not invented copy; `/signup` and every screen behind the rail unchanged; merged via PR |
+| M9.6 | Profile photos (`avatarUrl` on `User`, all three roles) and POD display: real upload/preview/remove reusing the POD Cloudinary path, admin photo moderation, the rider's avatar narrowed onto authenticated tracking only, a POD thumbnail replacing the "View the photo" link, honest OTP-proof copy, an accurate rider-card sublabel on terminal deliveries | Uploaded as each role, confirmed in the rail/profile/every table showing that person; rider avatar confirmed present on authenticated tracking and absent from the public payload by inspecting the actual response; a non-Cloudinary URL rejected server-side; merged via PR |
 | M10 | Deploy + rehearse | Live on Vercel + Render + Atlas, demo data seeded, run-through twice |
 
 See DEFERRED.md for work parked out of each milestone.

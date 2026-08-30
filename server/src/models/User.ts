@@ -18,6 +18,13 @@ export type UserDoc = Doc<User> & {
   passwordHash: string
   /** Customer only in practice; the field exists on every role for simplicity. */
   savedAddresses: Array<Doc<SavedAddress>>
+  /**
+   * Admin photo-moderation decisions (M9.6) — never sent to the client, and
+   * deliberately not part of the shared `User` schema for that reason (the
+   * same way `passwordHash` never is). See `moderationEvent` above for why
+   * this is its own array rather than folded into `accountHistory`.
+   */
+  moderationHistory: Array<{ action: 'avatar_cleared'; at: Date; by: mongoose.Types.ObjectId }>
 }
 
 /**
@@ -46,6 +53,26 @@ const savedAddress = new Schema(
 const accountEvent = new Schema(
   {
     status: { type: String, required: true, enum: userStatusSchema.options },
+    at: { type: Date, required: true },
+    by: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  },
+  { _id: false },
+)
+
+/**
+ * One admin photo-moderation decision (M9.6) — currently only "cleared this
+ * account's avatar". A SIBLING array to `accountHistory` above, not a third
+ * kind of entry interleaved into it: `accountHistory`'s own `status` field is
+ * what /admin/customers' "last decision" column reads via `.at(-1)`, and an
+ * avatar-clear appended into that same array would silently become the
+ * "last decision" shown there even though nothing about the account's
+ * standing changed. Same append-only discipline (actor + timestamp, never
+ * edited), same reason a suspension gets one: a photo does not just vanish,
+ * someone removed it, and the record says who and when.
+ */
+const moderationEvent = new Schema(
+  {
+    action: { type: String, required: true, enum: ['avatar_cleared'] },
     at: { type: Date, required: true },
     by: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   },
@@ -82,11 +109,19 @@ const userSchema = new Schema<UserDoc>(
       index: true,
     },
     accountHistory: { type: [accountEvent], required: true, default: [] },
+    /** M9.6: never sent to the client. See `moderationEvent` above. */
+    moderationHistory: { type: [moderationEvent], required: true, default: [] },
     /**
      * Null until the account dismisses its one-time welcome. See the shared
      * schema's note for why this is not "firstLoginAt".
      */
     welcomeSeenAt: { type: Date, required: false, default: null },
+    /**
+     * M9.6: all three roles. A Cloudinary delivery URL or null — see the
+     * shared schema's own note on why this reuses `cloudinaryUrl` rather
+     * than a second validator.
+     */
+    avatarUrl: { type: String, required: false, default: null },
     savedAddresses: { type: [savedAddress], required: true, default: [] },
     passwordHash: {
       type: String,

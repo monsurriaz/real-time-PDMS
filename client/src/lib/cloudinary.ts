@@ -78,7 +78,51 @@ export const compressImage = async (file: File): Promise<CompressedPhoto> => {
   return { blob, originalBytes: file.size, bytes: blob.size, width, height }
 }
 
-const decode = async (file: File): Promise<ImageBitmap | HTMLImageElement> => {
+/**
+ * M9.6: a profile photo, square and small — 256px is plenty for a circle
+ * that never renders larger than `--space-14` (56px, ProfileShell's `lg`
+ * Avatar) times a couple of device pixels, and a face crop needs no more
+ * detail than a parcel-at-the-doorstep photo does at 1280px.
+ */
+const AVATAR_MAX_EDGE = 256
+/** Higher than POD's 0.72: the file is already tiny at this resolution, so
+ *  there is headroom to spend on not looking soft. */
+const AVATAR_QUALITY = 0.85
+
+/**
+ * Centre-cropped to a square, then downscaled to at most 256px a side.
+ * Reuses `decode` below rather than a second decode path — the only real
+ * difference between a POD photo and an avatar is the crop and the target
+ * size, not how the file gets off the phone and onto a canvas.
+ */
+export const compressAvatar = async (file: File): Promise<CompressedPhoto> => {
+  const bitmap = await decode(file)
+
+  const side = Math.min(bitmap.width, bitmap.height)
+  const sx = (bitmap.width - side) / 2
+  const sy = (bitmap.height - side) / 2
+  const size = Math.min(side, AVATAR_MAX_EDGE)
+
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('this browser cannot process the photo')
+  ctx.drawImage(bitmap, sx, sy, side, side, 0, 0, size, size)
+  if ('close' in bitmap) bitmap.close()
+
+  const blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, 'image/jpeg', AVATAR_QUALITY)
+  })
+  if (!blob) throw new Error('could not compress that photo')
+
+  return { blob, originalBytes: file.size, bytes: blob.size, width: size, height: size }
+}
+
+/** Shared by both `compressImage` and `compressAvatar` above — decode once,
+ *  one place, rather than a second copy of the createImageBitmap/<img>
+ *  fallback dance. */
+export const decode = async (file: File): Promise<ImageBitmap | HTMLImageElement> => {
   if (typeof createImageBitmap === 'function') {
     try {
       return await createImageBitmap(file)

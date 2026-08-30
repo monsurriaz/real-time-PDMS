@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { geoPoint, objectId, phone, timestamps, zoneName } from './common'
+import { cloudinaryUrl, geoPoint, objectId, phone, timestamps, zoneName } from './common'
 
 /**
  * Agent availability. `available` is the only status the $near assignment
@@ -128,6 +128,8 @@ export const agentRosterItemSchema = z.object({
   name: z.string(),
   phone: phone,
   email: z.string().email(),
+  /** M9.6: the rider's own photo, from User — Agent carries no such field. */
+  avatarUrl: cloudinaryUrl.nullable(),
   vehicle: vehicleSchema,
   zones: z.array(zoneName),
   status: agentStatusSchema,

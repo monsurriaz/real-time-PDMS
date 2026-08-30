@@ -19,6 +19,7 @@ import { useSearchable } from '@/features/shell/useHeaderSearch'
 import { ApiError } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import {
+  useClearCustomerAvatar,
   useCustomerRoster,
   useReactivateCustomer,
   useSuspendCustomer,
@@ -109,6 +110,28 @@ const StatusAction = ({ customer }: { customer: CustomerRow }) => {
       )}
       {err ? <span className="text-eyebrow text-failed-ink">{err}</span> : null}
     </div>
+  )
+}
+
+/**
+ * Admin photo moderation (M9.6) — a quiet text action, separate from and
+ * lesser than Suspend/Reactivate: clearing a photo is reversible by the
+ * customer re-uploading one, not an account-standing decision, so it gets
+ * no arm-then-confirm step. Renders nothing when there is no photo to
+ * clear, rather than a disabled control with nothing to say.
+ */
+const ClearAvatarAction = ({ customer }: { customer: CustomerRow }) => {
+  const clear = useClearCustomerAvatar()
+  if (!customer.avatarUrl) return null
+  return (
+    <button
+      type="button"
+      disabled={clear.isPending}
+      onClick={() => clear.mutate(customer._id)}
+      className="text-eyebrow text-muted hover:text-ink disabled:text-faint cursor-pointer"
+    >
+      {clear.isPending ? 'Clearing photo…' : 'Clear photo'}
+    </button>
   )
 }
 
@@ -217,7 +240,7 @@ const CustomersContent = () => {
               {view.slice.map((c) => (
                 <Tr key={c._id}>
                   <Td>
-                    <Who name={c.name} sub={c.email} />
+                    <Who name={c.name} sub={c.email} avatarUrl={c.avatarUrl} />
                   </Td>
                   <Td>
                     <span className="mono text-small">{c.parcelCount}</span>
@@ -245,7 +268,10 @@ const CustomersContent = () => {
                     ) : null}
                   </Td>
                   <Td align="right">
-                    <StatusAction customer={c} />
+                    <div className="flex flex-col items-end gap-1.5">
+                      <ClearAvatarAction customer={c} />
+                      <StatusAction customer={c} />
+                    </div>
                   </Td>
                 </Tr>
               ))}

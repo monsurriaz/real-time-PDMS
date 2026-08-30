@@ -12,8 +12,8 @@ import {
   type RecordPodInput,
 } from '@pdms/shared'
 import type { Actor } from '../lib/context'
+import { assertOurCloud } from '../lib/cloudinary'
 import { runAsSystem } from '../lib/context'
-import { env } from '../lib/env'
 import { DeliveryModel, type PodOtp } from '../models/Delivery'
 import { HttpError } from '../middleware/httpError'
 
@@ -56,28 +56,6 @@ const loadForPod = async (
     )
   }
   return delivery
-}
-
-/**
- * A photo URL is only proof if it is OUR photo.
- *
- * The upload is unsigned and happens in the rider's browser (CLAUDE.md
- * section 2), so the URL arrives from the client. The shared schema has already
- * checked it is a Cloudinary delivery URL; the cloud name is the part only the
- * server knows, and without this check a rider could submit any image on
- * Cloudinary — including one uploaded months ago from somewhere else.
- */
-const assertOurCloud = (photoUrl: string): void => {
-  const cloud = env.CLOUDINARY_CLOUD_NAME
-  if (!cloud) {
-    throw new HttpError(
-      503,
-      'photo proof is not configured — CLOUDINARY_CLOUD_NAME is missing from .env',
-    )
-  }
-  if (!photoUrl.startsWith(`https://res.cloudinary.com/${cloud}/`)) {
-    throw new HttpError(422, 'that photo was not uploaded to this project')
-  }
 }
 
 /**

@@ -47,7 +47,13 @@ export interface TrackingSnapshot {
    * the channel: the sender reads the code out over the phone.
    */
   otp: { code: string; expiresAt: string } | null
-  rider: { name: string; vehicle: string; currentLocation?: GeoPoint } | null
+  /**
+   * M9.6: `avatarUrl` reaches this authenticated snapshot only — the parcel's
+   * owner (customer or admin) is the one viewer CLAUDE.md section 7 names as
+   * allowed to see who's at the door. Never present on the public tracking
+   * payload (`usePublicTracking.ts`'s own snapshot type has no such field).
+   */
+  rider: { name: string; vehicle: string; avatarUrl?: string | null; currentLocation?: GeoPoint } | null
   route: Array<[number, number]>
 }
 

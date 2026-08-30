@@ -40,3 +40,19 @@ export const useRejectAgent = () => useDecision('reject')
  */
 export const useSuspendAgent = () => useDecision('suspend')
 export const useReactivateAgent = () => useDecision('reactivate')
+
+/**
+ * Admin photo moderation (M9.6) — a separate, lesser action from
+ * suspend/reactivate, same reasoning as useCustomers.ts's own
+ * `useClearCustomerAvatar`.
+ */
+export const useClearAgentAvatar = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (agentId: string) =>
+      api.post<{ avatarUrl: null; at: string }>(`/agents/${agentId}/clear-avatar`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: agentRosterKey })
+    },
+  })
+}

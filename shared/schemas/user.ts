@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { agentApplicationFieldsSchema } from './agent'
-import { objectId, phone, role as roleSchema, timestamps, zoneName } from './common'
+import { cloudinaryUrl, objectId, phone, role as roleSchema, timestamps, zoneName } from './common'
 import { addressInputSchema } from './parcel'
 
 /**
@@ -63,6 +63,16 @@ export const userSchema = z.object({
    * "first login" true for a customer, from one field.
    */
   welcomeSeenAt: z.coerce.date().nullable().default(null),
+  /**
+   * M9.6: all three roles, not just riders — a customer or an admin is as
+   * much a person as a rider is. Optional/nullable and defaulting to null
+   * the same way a missing `status` reads as active: absent means no photo
+   * uploaded yet, never an error. A Cloudinary delivery URL and nothing
+   * else — the exact same `cloudinaryUrl` refinement proof-of-delivery
+   * photos already validate against, reused rather than a second one that
+   * could drift from it.
+   */
+  avatarUrl: cloudinaryUrl.nullable().default(null),
   ...timestamps,
 })
 export type User = z.infer<typeof userSchema>
@@ -78,6 +88,7 @@ export const publicUserSchema = userSchema.pick({
   email: true,
   role: true,
   zone: true,
+  avatarUrl: true,
 })
 export type PublicUser = z.infer<typeof publicUserSchema>
 
@@ -174,6 +185,19 @@ export const changePasswordInputSchema = z.object({
 export type ChangePasswordInput = z.infer<typeof changePasswordInputSchema>
 
 /**
+ * PATCH /auth/me/avatar — the profile's "Change photo", every role.
+ *
+ * The upload itself already happened browser -> Cloudinary with the existing
+ * unsigned preset (M9.6 reuses the POD path wholesale, CLAUDE.md section 2);
+ * this is just the URL the client got back, validated with the same
+ * `cloudinaryUrl` refinement as everywhere else one crosses the wire. The
+ * server still checks it names OUR cloud (routes/auth.ts) — a client must
+ * not be able to store an arbitrary Cloudinary URL as someone's avatar.
+ */
+export const uploadAvatarInputSchema = z.object({ avatarUrl: cloudinaryUrl })
+export type UploadAvatarInput = z.infer<typeof uploadAvatarInputSchema>
+
+/**
  * A customer's saved address — the booking form's own address shape plus a
  * label, so "Home" and "Office" are the same fields booking already
  * validates rather than a second, looser address type. No `point`: a saved
@@ -203,6 +227,7 @@ export const customerRowSchema = z.object({
   _id: objectId,
   name: z.string(),
   email: z.string().email(),
+  avatarUrl: cloudinaryUrl.nullable(),
   status: userStatusSchema,
   /** Everything they have ever sent, not just what is moving. */
   parcelCount: z.number().int().nonnegative(),

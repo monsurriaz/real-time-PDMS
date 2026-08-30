@@ -122,6 +122,14 @@ trackingRouter.get('/by-id/:trackingId', async (req, res, next) => {
         delivery.agent = null
       }
 
+      /**
+       * M9.6: deliberately still just `{ name, vehicle }` — no `avatarUrl`,
+       * unlike the authenticated snapshot below. `publicTrackingSnapshotSchema`
+       * doesn't declare the field either, so even a stray extra property here
+       * would be stripped, but the object is built by hand to begin with:
+       * an anonymous visitor is not the parcel's owner, and the rider's face
+       * is not "where is it" information.
+       */
       const rider = delivery.agent
         ? await (async () => {
             const agent = await AgentModel.findById(delivery.agent)
@@ -196,8 +204,14 @@ trackingRouter.get('/:parcelId', requireAuth, async (req, res, next) => {
 
     /**
      * The rider, as a projection. Section 7 forbids sending another user's
-     * phone number, so only a name and vehicle cross the wire — never the
-     * Agent document or the rider's User record.
+     * phone number, so only a name, vehicle and (M9.6) avatar cross the wire
+     * — never the Agent document or the rider's User record.
+     *
+     * The avatar is the one field that narrows the OTHER way from most of
+     * section 7: it is added TO this authenticated payload precisely
+     * because "seeing who's at your door is the point" — but only here, on
+     * the parcel's OWNER's authenticated view. The public lookup below
+     * builds its own separate `rider` object and never gains this field.
      */
     const rider = delivery.agent
       ? await runAsSystem('tracking: rider projection', async () => {
@@ -211,12 +225,13 @@ trackingRouter.get('/:parcelId', requireAuth, async (req, res, next) => {
             .exec()
           if (!agent) return null
           const user = await UserModel.findById(agent.user)
-            .select('name')
-            .lean<{ name: string } | null>()
+            .select('name avatarUrl')
+            .lean<{ name: string; avatarUrl?: string | null } | null>()
             .exec()
           return {
             name: user?.name ?? 'Unknown rider',
             vehicle: agent.vehicle,
+            avatarUrl: user?.avatarUrl ?? null,
             ...(agent.currentLocation ? { currentLocation: agent.currentLocation } : {}),
           }
         })

@@ -7,11 +7,13 @@ import {
   savedAddressInputSchema,
   selfUserSchema,
   updateAccountInputSchema,
+  uploadAvatarInputSchema,
   type SavedAddress,
   type SelfUser,
 } from '@pdms/shared'
 import { AgentModel } from '../models/Agent'
 import { UserModel, type UserDoc } from '../models'
+import { assertOurCloud } from '../lib/cloudinary'
 import { runAsSystem } from '../lib/context'
 import { hashPassword, verifyPassword, wasteTimeLikeAVerify } from '../lib/password'
 import { AUTH_COOKIE, cookieOptions, signToken } from '../lib/token'
@@ -34,6 +36,7 @@ const toSelfUser = (doc: UserDoc): SelfUser =>
     phone: doc.phone,
     role: doc.role,
     zone: doc.zone,
+    avatarUrl: doc.avatarUrl,
     // The timestamp itself never crosses the wire — only the answer to the
     // one question a client has about it.
     showWelcome: doc.welcomeSeenAt === null,
@@ -258,6 +261,63 @@ authRouter.patch('/me/password', requireAuth, async (req, res, next) => {
     })
 
     res.json({ ok: true })
+  } catch (err) {
+    next(err)
+  }
+})
+
+/**
+ * PATCH /auth/me/avatar — "Change photo", every role (M9.6).
+ *
+ * The upload already happened browser -> Cloudinary with the existing
+ * unsigned preset — this route only ever receives a URL, never a binary, the
+ * same shape POST /deliveries/:id/pod has taken since M5. `assertOurCloud` is
+ * the exact function that route uses, reused rather than re-implemented,
+ * because a client submitting a URL it found elsewhere on Cloudinary must be
+ * refused the same way a rider submitting someone else's proof photo is.
+ */
+authRouter.patch('/me/avatar', requireAuth, async (req, res, next) => {
+  try {
+    const actor = req.actor
+    if (!actor) throw unauthorized()
+    const input = uploadAvatarInputSchema.parse(req.body)
+    assertOurCloud(input.avatarUrl)
+
+    const user = await UserModel.findById(actor.id).exec()
+    if (!user) throw unauthorized('session no longer valid')
+
+    user.avatarUrl = input.avatarUrl
+    await user.save()
+
+    res.json({ user: toSelfUser(user) })
+  } catch (err) {
+    next(err)
+  }
+})
+
+/**
+ * DELETE /auth/me/avatar — "Remove", every role.
+ *
+ * Clears `avatarUrl` only. The server cannot delete the Cloudinary asset
+ * itself — the unsigned preset carries no API secret, the same accepted
+ * limitation proof-of-delivery photos have had since M5 (see DEFERRED.md) —
+ * so the image is orphaned on Cloudinary, not actually removed. No audit
+ * entry: this is the account's OWNER clearing their own photo, not a
+ * moderation decision — see routes/agents.ts and routes/customers.ts for
+ * the admin-initiated version, which does record one.
+ */
+authRouter.delete('/me/avatar', requireAuth, async (req, res, next) => {
+  try {
+    const actor = req.actor
+    if (!actor) throw unauthorized()
+
+    const user = await UserModel.findById(actor.id).exec()
+    if (!user) throw unauthorized('session no longer valid')
+
+    user.avatarUrl = null
+    await user.save()
+
+    res.json({ user: toSelfUser(user) })
   } catch (err) {
     next(err)
   }

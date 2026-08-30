@@ -40,6 +40,7 @@ export const AgentProfilePage = () => {
       ) : (
         <ProfileShell
           name={me.data.name}
+          avatarUrl={me.data.avatarUrl}
           roleLine={`Rider · ${agent.data.zones[0] ?? 'no zone'} zone`}
           badge={
             <Pill
