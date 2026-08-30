@@ -162,7 +162,7 @@ export const Hero = ({ me }: { me: SelfUser | undefined }) => {
     <div className="landing-hero relative bg-night overflow-hidden min-h-[660px] flex flex-col on-chrome">
       {/* the real map, full-bleed, decorative fleet — see heroFleet.ts */}
       <div className="absolute inset-0">
-        <LazyTrackingMap className="h-full opacity-60" riders={HERO_FLEET} animate={false} follow={false} />
+        <LazyTrackingMap className="h-full opacity-30" riders={HERO_FLEET} animate={false} follow={false} />
       </div>
       {/* the one documented gradient exception — see app.css .hero-veil */}
       <div className="absolute inset-0 hero-veil" aria-hidden="true" />
