@@ -159,15 +159,15 @@ export const jwtClaimsSchema = z.object({
 export type JwtClaims = z.infer<typeof jwtClaimsSchema>
 
 /**
- * The profile's Account tab, shared by every role. Changing `email` changes
- * how the account signs in, which is exactly why the route that handles this
- * re-issues the auth cookie on success — CLAUDE.md rule 3's spirit applied to
- * a session rather than a delivery: the client states what it wants, the
- * server decides whether the new email is available and acts.
+ * The profile's Account tab, shared by every role. `email` is deliberately
+ * absent: it is shown on that tab but read-only — the account's sign-in
+ * identity does not change from the profile screen. (It used to be editable
+ * here, with the route re-issuing the auth cookie on a successful change;
+ * that machinery is gone along with the field, not merely hidden client-side
+ * — see routes/auth.ts's own note.)
  */
 export const updateAccountInputSchema = z.object({
   name: z.string().min(2).max(80),
-  email: z.string().email().toLowerCase(),
   phone: phone,
 })
 export type UpdateAccountInput = z.infer<typeof updateAccountInputSchema>

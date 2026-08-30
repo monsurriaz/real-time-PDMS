@@ -40,7 +40,7 @@ Course project, CSC 470. Seven-day build. Demo-ready beats feature-complete.
 |---|---|
 | Frontend | React 18 + Vite + TypeScript, React Router |
 | Styling | Tailwind + CSS custom properties from `tokens.css` |
-| Server state | TanStack Query. Client state: Zustand (thin) |
+| Server state | TanStack Query. Client state: React's own built-ins (`useState`, `useSyncExternalStore` for the rare cross-component case — see `client/src/features/agent/locationWatcherStore.ts`) |
 | Backend | Node.js + Express + TypeScript |
 | Real-time | Socket.io (rooms per parcel) |
 | Database | MongoDB Atlas + Mongoose, `2dsphere` indexes |
@@ -55,6 +55,11 @@ Course project, CSC 470. Seven-day build. Demo-ready beats feature-complete.
 | Deploy | Vercel (client) + Render (server) + Atlas (db) |
 
 **Never add a dependency without asking.** The free-tier constraint is real.
+Zustand was the original client-state pick here and was never installed — M1
+deferred it and nothing since has needed real cross-tree client state badly
+enough to ask for it. If that changes, reach for Zustand rather than growing
+`useSyncExternalStore` calls; a table naming a dependency the repo doesn't
+have is worse than one that says so.
 
 ---
 

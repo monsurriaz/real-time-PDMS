@@ -58,6 +58,8 @@ const agentMongooseSchema = new Schema<AgentDoc>(
     approvalHistory: { type: [approvalEventSchema], required: true, default: [] },
     currentLocation: optionalPoint,
     locationUpdatedAt: { type: Date, required: false },
+    /** M9.7: a readable label for currentLocation — see shared/schemas/agent.ts. */
+    locationLabel: { type: String, required: false },
   },
   { timestamps: true },
 )

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { cloudinaryUrl, geoPoint, objectId, phone, timestamps, zoneName } from './common'
+import { addressInputSchema } from './parcel'
 
 /**
  * Agent availability. `available` is the only status the $near assignment
@@ -76,6 +77,14 @@ export const agentSchema = z.object({
    */
   currentLocation: geoPoint.optional(),
   locationUpdatedAt: z.coerce.date().optional(),
+  /**
+   * M9.7: a readable label for `currentLocation` ("Dhanmondi 27, Dhaka"),
+   * reverse-geocoded (coords mode) or carried over from the zone/address that
+   * set the position — never derived client-side, so it survives whichever
+   * of the three tiers set it. Absent means "show the coordinates" — see
+   * ShiftEditor, which falls back to them rather than showing nothing.
+   */
+  locationLabel: z.string().optional(),
   ...timestamps,
 })
 export type Agent = z.infer<typeof agentSchema>
@@ -151,14 +160,38 @@ export const publicAgentSchema = z.object({
 export type PublicAgent = z.infer<typeof publicAgentSchema>
 
 /**
- * Manual position setting, standing in for the GPS stream until M4.
+ * What "type an address" sends — the same fields booking's geocoder actually
+ * reads (see geocode.ts's `normaliseAddress`/`queryFor`), picked off
+ * `addressInputSchema` rather than redeclared so the two can never drift.
+ * `contactName`/`contactPhone` are deliberately absent: those are a parcel's
+ * fields, meaningless for "where is this rider right now".
+ */
+export const agentAddressLookupSchema = addressInputSchema.pick({
+  line1: true,
+  area: true,
+  zone: true,
+  city: true,
+})
+export type AgentAddressLookup = z.infer<typeof agentAddressLookupSchema>
+
+/**
+ * How a rider sets their own position. Three tiers, in priority order — see
+ * ShiftEditor:
+ *   1. `coords` — the browser's own GPS, one tap or the idle background
+ *      watcher (M9.7). This is also what M3.5 originally built as a
+ *      hand-typed stand-in before there was a UI in front of it at all.
+ *   2. `address` — typed and geocoded exactly the way booking geocodes an
+ *      address (same Nominatim wrapper, same cache, same failure shape).
+ *   3. `zone` — drops the rider at a zone's centre; the only tier that still
+ *      works with GPS denied and no usable address.
  *
- * A discriminated union rather than four optional fields, so "neither a zone
- * nor coordinates were given" cannot be represented at all — there is no
- * runtime check to forget.
+ * A discriminated union rather than a pile of optional fields, so "none of
+ * the three were given" cannot be represented at all — there is no runtime
+ * check to forget.
  */
 export const setAgentLocationInputSchema = z.discriminatedUnion('mode', [
   z.object({ mode: z.literal('zone'), zone: zoneName }),
+  z.object({ mode: z.literal('address'), address: agentAddressLookupSchema }),
   z.object({
     mode: z.literal('coords'),
     lng: z.number().min(-180).max(180),
@@ -194,6 +227,7 @@ export const agentSelfSchema = z.object({
   nid: agentNidSchema,
   currentLocation: geoPoint.optional(),
   locationUpdatedAt: z.coerce.date().optional(),
+  locationLabel: z.string().optional(),
   /** Deliveries they are currently holding, so the toggle is an informed one. */
   activeCount: z.number().int().nonnegative(),
 })
