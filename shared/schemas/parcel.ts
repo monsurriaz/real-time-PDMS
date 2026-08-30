@@ -99,6 +99,17 @@ export const bookParcelInputSchema = z.object({
   size: parcelSizeSchema,
   description: z.string().max(300).optional(),
   isCod: z.boolean().default(false),
+  /**
+   * Which of the customer's saved addresses `pickup` came from, if any
+   * (M9.9's autofill) — a hint, not a trusted location. The server looks
+   * this ID up in the CALLER'S OWN saved addresses and only reuses ITS
+   * stored point when `pickup` still matches what that record says word for
+   * word; a client-supplied coordinate is never trusted for pricing on its
+   * own, same reasoning as the codAmount integrity fix in M6.9. An ID that
+   * does not resolve (wrong owner, deleted, edited beyond recognition) is
+   * silently ignored and `pickup` is geocoded exactly as if this were absent.
+   */
+  pickupSavedAddressId: objectId.optional(),
 })
 export type BookParcelInput = z.infer<typeof bookParcelInputSchema>
 
@@ -137,3 +148,26 @@ export const parcelListItemSchema = z.object({
   createdAt: z.coerce.date(),
 })
 export type ParcelListItem = z.infer<typeof parcelListItemSchema>
+
+/**
+ * GET /parcels/recent-recipients — the booking form's drop-off autofill
+ * (M9.9). Derived from the customer's OWN past parcels, not a saved-address
+ * style model of its own: `Parcel.drop` already carries recipient name,
+ * phone and address as one bundle, and a recipient is a fact about who this
+ * customer has shipped to before, not something they curate the way a
+ * pickup address is. Scoped by the exact same roleScope rule GET /parcels
+ * already relies on — this reads through `ParcelModel.find()` unchanged, no
+ * aggregation, so a handler that forgets a filter still cannot leak another
+ * customer's recipients.
+ */
+export const recentRecipientSchema = z.object({
+  recipientName: z.string(),
+  recipientPhone: phone,
+  dropLine1: z.string(),
+  dropArea: z.string(),
+  dropZone: zoneName,
+  dropCity: z.string(),
+  /** The most recent parcel sent to this recipient at this address. */
+  lastUsedAt: z.coerce.date(),
+})
+export type RecentRecipient = z.infer<typeof recentRecipientSchema>

@@ -5,6 +5,7 @@ import type {
   ParcelListItem,
   PaymentSummary,
   PriceBreakdown,
+  RecentRecipient,
 } from '@pdms/shared'
 import { ApiError, api } from '@/lib/api'
 
@@ -43,6 +44,20 @@ export const useBookParcel = () => {
     },
   })
 }
+
+/**
+ * The drop-off autofill's chip row (M9.9) — derived server-side from the
+ * customer's own past parcels, scoped by the same roleScope rule GET
+ * /parcels already relies on. Reference-y enough (recent, not live) to
+ * treat like `useZones`: no need to refetch on every mount.
+ */
+export const useRecentRecipients = () =>
+  useQuery({
+    queryKey: ['parcels', 'recent-recipients'] as const,
+    queryFn: () => api.get<{ recipients: RecentRecipient[] }>('/parcels/recent-recipients'),
+    select: (d) => d.recipients,
+    staleTime: 60_000,
+  })
 
 export const useParcels = (opts?: { enabled?: boolean }) =>
   useQuery({

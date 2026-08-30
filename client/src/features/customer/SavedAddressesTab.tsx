@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { savedAddressInputSchema, type ZoneName } from '@pdms/shared'
+import { savedAddressInputSchema, type SavedAddress, type ZoneName } from '@pdms/shared'
 import { Button } from '@/components/Button'
 import { Field, SelectField } from '@/components/Field'
 import { ProfileBlockHeading } from '../profile/ProfileShell'
@@ -8,14 +8,14 @@ import {
   useAddSavedAddress,
   useDeleteSavedAddress,
   useSavedAddresses,
+  useUpdateSavedAddress,
 } from '../auth/useAuth'
 import { ApiError } from '@/lib/api'
 
 /**
  * The customer profile's role-specific tab — v3's note: "Customer swaps
- * Rider details for saved addresses." CRUD on the list itself; wiring these
- * into the booking form's autofill is a separate piece of work, tracked in
- * DEFERRED.md rather than built into this tab.
+ * Rider details for saved addresses." CRUD on the list, now including Edit
+ * (M9.9) — this is also what the booking form's pick-up autofill reads.
  */
 
 const EMPTY = {
@@ -31,13 +31,43 @@ export const SavedAddressesTab = () => {
   const addresses = useSavedAddresses()
   const zones = useZones()
   const add = useAddSavedAddress()
+  const update = useUpdateSavedAddress()
   const del = useDeleteSavedAddress()
   const [open, setOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(EMPTY)
   const [fieldError, setFieldError] = useState<string | null>(null)
 
   const set = <K extends keyof typeof EMPTY>(key: K, value: (typeof EMPTY)[K]): void =>
     setForm((f) => ({ ...f, [key]: value }))
+
+  const startAdd = (): void => {
+    setEditingId(null)
+    setForm(EMPTY)
+    setFieldError(null)
+    setOpen(true)
+  }
+
+  const startEdit = (a: SavedAddress): void => {
+    setEditingId(a._id)
+    setForm({
+      label: a.label,
+      line1: a.line1,
+      area: a.area,
+      zone: a.zone ?? '',
+      contactName: a.contactName,
+      contactPhone: a.contactPhone ?? '',
+    })
+    setFieldError(null)
+    setOpen(true)
+  }
+
+  const close = (): void => {
+    setOpen(false)
+    setEditingId(null)
+    setForm(EMPTY)
+    setFieldError(null)
+  }
 
   const submit = (e: React.FormEvent): void => {
     e.preventDefault()
@@ -47,15 +77,18 @@ export const SavedAddressesTab = () => {
       setFieldError(parsed.error.issues[0]?.message ?? 'check the address')
       return
     }
-    add.mutate(parsed.data, {
-      onSuccess: () => {
-        setForm(EMPTY)
-        setOpen(false)
-      },
-    })
+    if (editingId) {
+      update.mutate(
+        { addressId: editingId, input: parsed.data },
+        { onSuccess: close },
+      )
+    } else {
+      add.mutate(parsed.data, { onSuccess: close })
+    }
   }
 
-  const serverError = add.error instanceof ApiError ? add.error.message : null
+  const active = editingId ? update : add
+  const serverError = active.error instanceof ApiError ? active.error.message : null
 
   return (
     <div>
@@ -84,16 +117,31 @@ export const SavedAddressesTab = () => {
               <div className="min-w-0">
                 <span className="text-sm font-medium block truncate">{a.label}</span>
                 <span className="text-tiny text-muted truncate block">
-                  {a.line1}, {a.area}, {a.zone} · {a.contactName}
+                  {a.line1}, {a.area}
+                  {a.zone ? `, ${a.zone}` : null}
+                </span>
+                <span className="text-tiny truncate block">
+                  <span className="text-muted">{a.contactName}</span>
+                  {a.contactPhone ? (
+                    <span className="text-muted"> · {a.contactPhone}</span>
+                  ) : (
+                    <span className="text-failed-ink"> · phone not set</span>
+                  )}
+                  {!a.zone ? <span className="text-failed-ink"> · zone not set</span> : null}
                 </span>
               </div>
-              <Button
-                size="sm"
-                disabled={del.isPending}
-                onClick={() => del.mutate(a._id)}
-              >
-                Remove
-              </Button>
+              <div className="flex gap-2 flex-none">
+                <Button size="sm" onClick={() => startEdit(a)}>
+                  Edit
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={del.isPending}
+                  onClick={() => del.mutate(a._id)}
+                >
+                  Remove
+                </Button>
+              </div>
             </div>
           ))}
         </div>
@@ -153,23 +201,16 @@ export const SavedAddressesTab = () => {
           ) : null}
 
           <div className="flex gap-9px">
-            <Button type="submit" variant="primary" disabled={add.isPending}>
-              {add.isPending ? 'Saving…' : 'Save address'}
+            <Button type="submit" variant="primary" disabled={active.isPending}>
+              {active.isPending ? 'Saving…' : editingId ? 'Save changes' : 'Save address'}
             </Button>
-            <Button
-              type="button"
-              onClick={() => {
-                setOpen(false)
-                setForm(EMPTY)
-                setFieldError(null)
-              }}
-            >
+            <Button type="button" onClick={close}>
               Cancel
             </Button>
           </div>
         </form>
       ) : (
-        <Button onClick={() => setOpen(true)}>Add an address</Button>
+        <Button onClick={startAdd}>Add an address</Button>
       )}
     </div>
   )

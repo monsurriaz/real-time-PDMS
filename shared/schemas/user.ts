@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { agentApplicationFieldsSchema } from './agent'
-import { cloudinaryUrl, objectId, phone, role as roleSchema, timestamps, zoneName } from './common'
+import { cloudinaryUrl, geoPoint, objectId, phone, role as roleSchema, timestamps, zoneName } from './common'
 import { addressInputSchema } from './parcel'
 
 /**
@@ -200,17 +200,48 @@ export type UploadAvatarInput = z.infer<typeof uploadAvatarInputSchema>
 /**
  * A customer's saved address — the booking form's own address shape plus a
  * label, so "Home" and "Office" are the same fields booking already
- * validates rather than a second, looser address type. No `point`: a saved
- * address is a template a booking re-geocodes, not a pre-resolved location
- * that could go stale.
+ * validates rather than a second, looser address type. Adding or editing one
+ * (this schema) always requires the complete set, so nothing NEW is ever
+ * saved incomplete.
  */
 export const savedAddressInputSchema = addressInputSchema.extend({
   label: z.string().min(2).max(40),
 })
 export type SavedAddressInput = z.infer<typeof savedAddressInputSchema>
 
+/**
+ * What a saved address looks like coming back. `zone` and `contactPhone` are
+ * widened to optional here even though the input above requires both —
+ * `savedAddressInputSchema` is what the add/edit form validates against
+ * (rule 4: reused, not redeclared), but a document saved before those two
+ * fields existed on this model at all can genuinely lack them, the same way
+ * a `.lean()` read elsewhere in this codebase treats a missing `status` as
+ * "not set" rather than an error. Autofill has to tell "empty because this
+ * address predates the field" apart from "empty because Zod stripped
+ * something", which it can only do if the type admits the gap.
+ */
 export const savedAddressSchema = savedAddressInputSchema.extend({
   _id: objectId,
+  zone: zoneName.optional(),
+  contactPhone: phone.optional(),
+  /**
+   * When this address was last used to book a pickup (M9.9). Null until
+   * used once; autofill prefills the most recently used, falling back to
+   * the first saved address when none has been.
+   */
+  lastUsedAt: z.coerce.date().nullable().default(null),
+  /**
+   * Resolved the first time this address is geocoded as a pickup, so a
+   * later autofill can skip the Nominatim round trip entirely rather than
+   * merely hit the existing address-text cache. Absent until then; cleared
+   * whenever an edit changes the location fields (line1/area/zone/city),
+   * since a stale point would silently describe somewhere the address no
+   * longer names. Never trusted for PRICING on its own — the booking route
+   * only uses it after confirming the submitted address still matches the
+   * text it was resolved from (see routes/parcels.ts).
+   */
+  point: geoPoint.optional(),
+  resolvedLabel: z.string().optional(),
 })
 export type SavedAddress = z.infer<typeof savedAddressSchema>
 

@@ -52,6 +52,41 @@ export const useZones = () =>
     staleTime: 30 * 60_000,
   })
 
+export interface ExampleArgs {
+  distanceKm: number
+  weightKg: number
+  zone?: ZoneName
+}
+
+/**
+ * The SAVED config's worked example — GET /pricing/example, `requireAuth`
+ * only (any role, not just admin, unlike `/preview` below). This is what the
+ * booking form's progressive price panel reads: a real server computation
+ * from the live rates, using `distanceKm: 0` until Get price runs the real
+ * geocode + route lookup. `zoneBase` and `weightTierLabel`/`weightSurcharge`
+ * from that response are real numbers safe to show as they become known;
+ * `distanceCost` and `total` are NOT — both are pinned to a 0km distance and
+ * would misreport what a real quote costs, so the caller must not display
+ * them from this hook. See BookingPage's own note on this split.
+ */
+export const usePriceExample = (args: ExampleArgs | null) =>
+  useQuery({
+    queryKey: ['pricing', 'example', args],
+    queryFn: () => {
+      const a = args as ExampleArgs
+      const params = new URLSearchParams({
+        distanceKm: String(a.distanceKm),
+        weightKg: String(a.weightKg),
+      })
+      if (a.zone) params.set('zone', a.zone)
+      return api.get<{ price: PriceBreakdown }>(`/pricing/example?${params.toString()}`)
+    },
+    select: (d) => d.price,
+    enabled: args !== null,
+    // An in-progress weight/zone is an expected transient state, not a fault.
+    retry: false,
+  })
+
 export interface PreviewArgs extends PricingConfigInput {
   distanceKm: number
   weightKg: number
