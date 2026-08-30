@@ -93,17 +93,23 @@
    * v3's rider marker: a 30px halo at .16 behind an 8px dot with a 2.5px white
    * ring. The rider and the route line are the only saturated things on the
    * map, which is the whole reason the tile style is desaturated to match.
+   *
+   * `--rider-color` (M9.5): the landing page's hero and bento maps show
+   * several parcels at once and set this per-marker to the matching
+   * `--s-*` lifecycle colour (TrackingMap's `applyTone`). Every other
+   * caller never sets it, so the fallback — `--s-transit`, exactly as
+   * before — is what every screen behind the rail still renders.
    */
   .pdms-rider__halo {
     width: 30px;
     height: 30px;
-    background: var(--s-transit);
+    background: var(--rider-color, var(--s-transit));
     opacity: 0.16;
   }
   .pdms-rider__dot {
     width: 16px;
     height: 16px;
-    background: var(--s-transit);
+    background: var(--rider-color, var(--s-transit));
     box-shadow: 0 0 0 2.5px #fff;
   }
   .pdms-rider__label {
@@ -205,5 +211,38 @@
       transform: none;
       background: rgb(255 255 255 / 0.45);
     }
+  }
+
+  /**
+   * THE ONE GRADIENT EXCEPTION (M9.5, CLAUDE.md section 4).
+   *
+   * v3 has no gradients: separation comes from 1px borders. The v4 landing
+   * hero and login left panel put real map tiles full-bleed behind their
+   * text, and a flat scrim could not both keep the text legible everywhere
+   * AND let the map read as a map at the edges — a radial veil, darkest
+   * where the copy sits and lighter toward the frame, is what a poster with
+   * imagery behind text actually needs. It exists to keep text legible over
+   * imagery, not as decoration, and it is scoped to exactly these two
+   * surfaces — every gradient-free rule elsewhere in the system still holds.
+   *
+   * `color-mix` against `--night` rather than a literal rgba(): the veil is
+   * the SAME colour as the surface it sits on, just increasingly opaque
+   * toward the text, so it can never drift from `--night` if that token
+   * ever changes.
+   */
+  .hero-veil {
+    background: radial-gradient(
+      120% 90% at 20% 40%,
+      color-mix(in srgb, var(--night) 97%, transparent) 0%,
+      color-mix(in srgb, var(--night) 86%, transparent) 45%,
+      color-mix(in srgb, var(--night) 60%, transparent) 100%
+    );
+  }
+  .login-veil {
+    background: radial-gradient(
+      110% 80% at 30% 45%,
+      color-mix(in srgb, var(--night) 96%, transparent),
+      color-mix(in srgb, var(--night) 72%, transparent)
+    );
   }
 }

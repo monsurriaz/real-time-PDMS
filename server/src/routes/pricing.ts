@@ -77,6 +77,33 @@ pricingRouter.get('/summary', async (_req, res, next) => {
 })
 
 /**
+ * GET /pricing/tiers — the landing page's pricing section (M9.5),
+ * unauthenticated for the same reason `/summary` above is. A visitor
+ * comparing rates needs the whole ladder, including the 5-20kg formula
+ * tier — `heaviestPricedKg`/`weightSurchargeFor` already read this same
+ * shape, so nothing here is a second definition of the tiers. Excludes
+ * `zoneBaseOverrides`: those are an admin's per-zone editing decisions, not
+ * a rate a visitor is quoted.
+ */
+pricingRouter.get('/tiers', async (_req, res, next) => {
+  try {
+    const config = await runAsSystem('pricing: public tiers', async () =>
+      PricingConfigModel.findOne({ key: 'default' })
+        .select('perKmRate weightTiers')
+        .lean<{ perKmRate: number; weightTiers: PricingDoc['weightTiers'] } | null>()
+        .exec(),
+    )
+    if (!config) {
+      throw new HttpError(503, 'pricing is not configured — run `npm run seed`')
+    }
+
+    res.json({ perKmRate: config.perKmRate, weightTiers: config.weightTiers })
+  } catch (err) {
+    next(err)
+  }
+})
+
+/**
  * GET /pricing — readable by any signed-in role. A customer needs the rates
  * to understand a quote; scoping on the model allows all three roles.
  */

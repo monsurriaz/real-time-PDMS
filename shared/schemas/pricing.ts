@@ -119,6 +119,21 @@ export const pricingSummarySchema = z.object({
 })
 export type PricingSummary = z.infer<typeof pricingSummarySchema>
 
+/**
+ * GET /pricing/tiers — the landing page's pricing section (M9.5), the same
+ * "unauthenticated because the landing page is" reasoning as `/summary`
+ * above, but this is the tier ladder itself: a visitor comparing rates needs
+ * to see all of them, including the 5-20kg formula tier, not just the floor
+ * fee. Still deliberately smaller than pricingConfigSchema — no
+ * `zoneBaseOverrides`, which describe an admin's per-zone editing decisions
+ * rather than a rate a visitor is quoted.
+ */
+export const pricingTiersSchema = z.object({
+  perKmRate: taka,
+  weightTiers: z.array(weightTierSchema).min(1),
+})
+export type PricingTiers = z.infer<typeof pricingTiersSchema>
+
 export const priceBreakdownSchema = z.object({
   zoneBase: taka,
   distanceKm: z.number().nonnegative(),

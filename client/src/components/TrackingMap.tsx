@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import maplibregl, { type LngLatLike, type Map as MapLibreMap } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import type { GeoPoint } from '@pdms/shared'
+import type { DeliveryStatus, GeoPoint } from '@pdms/shared'
 import { coolMapStyle } from '@/lib/mapStyle'
 
 /**
@@ -49,6 +49,16 @@ export interface MapRider {
    * should stay exactly as it was.
    */
   busy?: boolean
+  /**
+   * M9.5: colours the marker by lifecycle state, for the landing page's
+   * hero and bento maps, which show several parcels at once rather than
+   * one active delivery — a single blue dot everywhere would not read as
+   * "this is what the lifecycle ramp looks like on a real map." Optional,
+   * and every existing caller (RunMap, FleetMap) omits it: they show one
+   * status at a time (or a busy/idle split), and the marker keeps rendering
+   * exactly as it always has — `--s-transit` — when this is unset.
+   */
+  tone?: DeliveryStatus
 }
 
 interface Props {
@@ -131,7 +141,25 @@ interface MarkerState {
   startedAt: number
 }
 
-const riderElement = (label: string, busy: boolean): HTMLElement => {
+/** Lifecycle status -> the same `--s-*` custom property Badge/LifecycleRail read. */
+const TONE_VAR: Partial<Record<DeliveryStatus, string>> = {
+  Booked: '--s-booked',
+  Assigned: '--s-assigned',
+  Accepted: '--s-assigned',
+  PickedUp: '--s-picked',
+  InTransit: '--s-transit',
+  Delivered: '--s-delivered',
+  Failed: '--s-failed',
+  Cancelled: '--s-booked',
+}
+
+const applyTone = (el: HTMLElement, tone?: DeliveryStatus): void => {
+  const cssVar = tone ? TONE_VAR[tone] : undefined
+  if (cssVar) el.style.setProperty('--rider-color', `var(${cssVar})`)
+  else el.style.removeProperty('--rider-color')
+}
+
+const riderElement = (label: string, busy: boolean, tone?: DeliveryStatus): HTMLElement => {
   const el = document.createElement('div')
   el.className = busy ? 'pdms-rider' : 'pdms-rider pdms-rider--idle'
   el.innerHTML = `
@@ -142,6 +170,7 @@ const riderElement = (label: string, busy: boolean): HTMLElement => {
   // textContent, not innerHTML: a rider's name is user data.
   const labelEl = el.querySelector('.pdms-rider__label')
   if (labelEl) labelEl.textContent = label
+  applyTone(el, tone)
   return el
 }
 
@@ -437,7 +466,7 @@ export const TrackingMap = ({
 
       if (!existing) {
         const marker = new maplibregl.Marker({
-          element: riderElement(rider.label, rider.busy ?? true),
+          element: riderElement(rider.label, rider.busy ?? true, rider.tone),
           anchor: 'center',
         })
           .setLngLat(rider.point.coordinates)
@@ -456,6 +485,7 @@ export const TrackingMap = ({
       // sync without tearing the marker down and losing its glide state.
       const wantIdle = !(rider.busy ?? true)
       existing.marker.getElement().classList.toggle('pdms-rider--idle', wantIdle)
+      applyTone(existing.marker.getElement(), rider.tone)
 
       const target = rider.point.coordinates
       if (existing.to[0] === target[0] && existing.to[1] === target[1]) continue
