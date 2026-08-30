@@ -159,7 +159,7 @@ export const Hero = ({ me }: { me: SelfUser | undefined }) => {
   const summary = usePublicPricingSummary()
 
   return (
-    <div className="relative bg-night overflow-hidden min-h-[660px] flex flex-col on-chrome">
+    <div className="landing-hero relative bg-night overflow-hidden min-h-[660px] flex flex-col on-chrome">
       {/* the real map, full-bleed, decorative fleet — see heroFleet.ts */}
       <div className="absolute inset-0">
         <LazyTrackingMap className="h-full opacity-60" riders={HERO_FLEET} animate={false} follow={false} />

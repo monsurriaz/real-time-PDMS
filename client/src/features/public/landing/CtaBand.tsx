@@ -4,7 +4,7 @@ import { homeForRole } from '../../auth/roles'
 
 /** v4 section 8 — the closing CTA band. */
 export const CtaBand = ({ me }: { me: SelfUser | undefined }) => (
-  <section className="bg-page py-22">
+  <section className="landing-cta bg-page py-22">
     <div className="max-w-[1200px] mx-auto px-4 sm:px-8">
       <div className="bg-accent rounded-xl p-11 flex flex-wrap items-center gap-8">
         <div>

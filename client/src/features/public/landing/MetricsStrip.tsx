@@ -26,7 +26,7 @@ export const MetricsStrip = () => {
   const summary = usePublicPricingSummary()
 
   return (
-    <div className="border-y border-border bg-surface">
+    <div className="landing-metrics border-y border-border bg-surface">
       <div className="max-w-[1200px] mx-auto grid grid-cols-2 sm:grid-cols-4">
         {CELLS(summary.data?.zoneCount).map((c, i) => (
           <div

@@ -62,7 +62,7 @@ const RailWorked = () => (
 const VISUALS = [<PriceWorked key="p" />, <OfferWorked key="o" />, <RailWorked key="r" />]
 
 export const HowItWorks = () => (
-  <section id="how" className="bg-page py-22 scroll-mt-20">
+  <section id="how" className="landing-how-it-works bg-page py-22 scroll-mt-20">
     <div className="max-w-[1200px] mx-auto px-4 sm:px-8">
       <div className="max-w-[600px] mb-11">
         <div className="text-eyebrow font-semibold uppercase tracking-[0.11em] text-accent mb-3">

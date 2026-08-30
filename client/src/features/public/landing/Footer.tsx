@@ -43,7 +43,7 @@ const FooterLink = ({ to, children }: { to: string; children: string }) =>
   )
 
 export const Footer = () => (
-  <footer className="bg-night text-white on-chrome">
+  <footer className="landing-footer bg-night text-white on-chrome">
     <div className="max-w-[1200px] mx-auto px-4 sm:px-8 py-16">
       <div className="grid sm:grid-cols-[1.5fr_1fr_1fr] gap-8">
         <div>

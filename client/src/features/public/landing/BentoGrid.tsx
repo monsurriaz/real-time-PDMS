@@ -48,7 +48,7 @@ const SPAN = {
 } as const
 
 export const BentoGrid = () => (
-  <section className="bg-surface py-22">
+  <section className="landing-bento bg-surface py-22">
     <div className="max-w-[1200px] mx-auto px-4 sm:px-8">
       <div className="max-w-[600px] mb-11">
         <div className="text-eyebrow font-semibold uppercase tracking-[0.11em] text-accent mb-3">

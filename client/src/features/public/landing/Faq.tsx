@@ -48,7 +48,7 @@ export const Faq = () => {
   const [open, setOpen] = useState(0)
 
   return (
-    <section className="bg-surface py-22">
+    <section className="landing-faq bg-surface py-22">
       {/*
         A narrow, left-hugging accordion under a header — the reference's
         own layout — read as cramped and off-balance once it sat between two
