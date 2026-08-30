@@ -102,11 +102,11 @@ const TrackByIdForm = () => {
         onChange={(e) => setValue(e.target.value)}
         placeholder="PD-XXXX-XX — track without an account"
         aria-label="Tracking ID"
-        className="mono flex-1 min-w-0 bg-transparent border-0 text-chrome-ink placeholder:text-chrome-faint px-14px py-12px text-body outline-none"
+        className="mono flex-1 min-w-0 bg-transparent border-0 text-chrome-ink placeholder:text-chrome-faint px-14px py-3 text-body outline-none"
       />
       <button
         type="submit"
-        className="font-sans font-semibold text-body px-20px py-12px rounded-sm bg-accent text-white hover:bg-accent-hover cursor-pointer whitespace-nowrap"
+        className="font-sans font-semibold text-body px-5 py-3 rounded-sm bg-accent text-white hover:bg-accent-hover cursor-pointer whitespace-nowrap"
       >
         Track
       </button>
