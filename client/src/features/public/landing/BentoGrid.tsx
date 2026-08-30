@@ -5,11 +5,20 @@ import { SHOWCASE_DROP, SHOWCASE_PICKUP, SHOWCASE_RIDER, SHOWCASE_ROUTE } from '
 
 /**
  * v4 section 4 — an asymmetric 6-column bento, not a uniform row of equal
- * cards. One wide dark cell (span 4) carries its own small map; the rest
- * pair up as two narrow (span 2) and two half (span 3) cells. Collapses to
- * 2 columns below 980px and 1 below 600px — the asymmetry itself stays until
- * there is no longer room for it, rather than normalising into equal cards
- * at the first breakpoint.
+ * cards, but every row still fills the full 6 columns: `wide`(4) + `third`(2),
+ * `half`(3) + `half`(3), then a `full`(6) closer. Collapses to 2 columns
+ * below 980px and 1 below 600px — the asymmetry itself stays until there is
+ * no longer room for it, rather than normalising into equal cards at the
+ * first breakpoint.
+ *
+ * The reference's own five spans (wide 4, third 2, third 2, half 3, half 3
+ * — 14 columns) don't actually divide into whole 6-wide rows, which is what
+ * a straight port of it rendered as: a lone half-width card on its own row
+ * with three empty columns beside it, reported as looking broken rather
+ * than intentionally asymmetric. Reassigning the closing card ("Numbers you
+ * can defend") to a full-width row instead of a second half fixes that —
+ * still five unevenly-sized cards, still no uniform grid, just one that
+ * actually tiles.
  *
  * The wide cell's map reuses the exact same fabricated delivery
  * (demoShowcase.ts) as the hero's floating card — the same MapLibre chunk
@@ -35,6 +44,7 @@ const SPAN = {
   wide: 'col-span-4 max-[980px]:col-span-2 max-[600px]:col-span-1',
   half: 'col-span-3 max-[980px]:col-span-2 max-[600px]:col-span-1',
   third: 'col-span-2 max-[600px]:col-span-1',
+  full: 'col-span-6 max-[980px]:col-span-2 max-[600px]:col-span-1',
 } as const
 
 export const BentoGrid = () => (
@@ -107,7 +117,7 @@ export const BentoGrid = () => (
         </div>
 
         {/* cash on delivery, reconciled */}
-        <div className={`${SPAN.third} bg-surface border border-border rounded-lg p-6 flex flex-col`}>
+        <div className={`${SPAN.half} bg-surface border border-border rounded-lg p-6 flex flex-col`}>
           <CellIcon>
             <path d="M12 3v18" />
             <path d="M17 7H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
@@ -139,18 +149,32 @@ export const BentoGrid = () => (
           </p>
         </div>
 
-        {/* numbers you can defend */}
-        <div className={`${SPAN.half} bg-surface border border-border rounded-lg p-6`}>
-          <CellIcon>
-            <path d="M3 3v18h18" />
-            <path d="m7 14 4-4 3 3 5-6" />
-          </CellIcon>
-          <h3 className="text-lg font-semibold tracking-[-0.025em] mb-6px">Numbers you can defend</h3>
-          <p className="text-body text-muted leading-relaxed">
-            Zone performance, delayed-parcel alerts and revenue are counted at
-            read time from deliveries and payments. Nothing on the dashboard
-            is a stored total that drifted.
-          </p>
+        {/* numbers you can defend — the closing, full-width row */}
+        <div className={`${SPAN.full} bg-surface border border-border rounded-lg p-6 flex flex-col sm:flex-row sm:items-center gap-6`}>
+          <div className="flex items-start gap-4 flex-1">
+            <CellIcon>
+              <path d="M3 3v18h18" />
+              <path d="m7 14 4-4 3 3 5-6" />
+            </CellIcon>
+            <div>
+              <h3 className="text-lg font-semibold tracking-[-0.025em] mb-6px">Numbers you can defend</h3>
+              <p className="text-body text-muted leading-relaxed max-w-[52ch]">
+                Zone performance, delayed-parcel alerts and revenue are
+                counted at read time from deliveries and payments. Nothing on
+                the dashboard is a stored total that drifted.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-7px flex-wrap sm:flex-none sm:flex-col sm:items-end">
+            {['Zone performance', 'Delayed alerts', 'Revenue'].map((label) => (
+              <span
+                key={label}
+                className="text-meta font-medium bg-surface-sunk text-muted rounded-pill px-11px py-1 whitespace-nowrap"
+              >
+                {label}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </div>
