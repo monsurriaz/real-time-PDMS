@@ -26,7 +26,7 @@ export const ForRiders = () => {
   const remaining = useOfferCountdown(deadline)
 
   return (
-    <section id="riders" className="bg-chrome text-chrome-ink py-22 on-chrome scroll-mt-20">
+    <section id="riders" className="landing-for-riders bg-chrome text-chrome-ink py-22 on-chrome scroll-mt-20">
       <div className="max-w-[1200px] mx-auto px-4 sm:px-8">
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div>

@@ -15,7 +15,7 @@ export const PricingSection = () => {
   const tiers = usePublicPricingTiers()
 
   return (
-    <section id="pricing" className="bg-page py-22 scroll-mt-20">
+    <section id="pricing" className="landing-pricing bg-page py-22 scroll-mt-20">
       <div className="max-w-[1200px] mx-auto px-4 sm:px-8">
         <div className="max-w-[600px] mb-11">
           <div className="text-eyebrow font-semibold uppercase tracking-[0.11em] text-accent mb-3">
