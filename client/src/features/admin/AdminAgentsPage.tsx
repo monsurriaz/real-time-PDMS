@@ -11,6 +11,7 @@ import { formatDateTime } from '@/lib/format'
 import {
   useAgentRoster,
   useApproveAgent,
+  useClearAgentAvatar,
   useReactivateAgent,
   useRejectAgent,
   useSuspendAgent,
@@ -96,6 +97,27 @@ const AccountAction = ({ agent }: { agent: AgentRosterItem }) => {
       )}
       {err ? <span className="text-eyebrow text-failed-ink max-w-55 text-right">{err}</span> : null}
     </div>
+  )
+}
+
+/**
+ * Admin photo moderation (M9.6) — same quiet, no-confirm action as
+ * AdminCustomersPage's own `ClearAvatarAction`, for the same reason: this
+ * is reversible by the rider re-uploading a photo, not an account-standing
+ * decision, so it doesn't earn the arm-then-confirm step Suspend gets.
+ */
+const ClearAvatarAction = ({ agent }: { agent: AgentRosterItem }) => {
+  const clear = useClearAgentAvatar()
+  if (!agent.avatarUrl) return null
+  return (
+    <button
+      type="button"
+      disabled={clear.isPending}
+      onClick={() => clear.mutate(agent._id)}
+      className="text-eyebrow text-muted hover:text-ink disabled:text-faint cursor-pointer"
+    >
+      {clear.isPending ? 'Clearing photo…' : 'Clear photo'}
+    </button>
   )
 }
 
@@ -193,7 +215,7 @@ const RidersContent = () => {
                   {pending.map((a) => (
                     <Tr key={a._id}>
                       <Td>
-                        <Who name={a.name} sub={a.phone} />
+                        <Who name={a.name} sub={a.phone} avatarUrl={a.avatarUrl} />
                       </Td>
                       <Td>
                         <span className="mono text-small">{formatDateTime(a.appliedAt)}</span>
@@ -225,7 +247,7 @@ const RidersContent = () => {
                   {approved.map((a) => (
                     <Tr key={a._id}>
                       <Td>
-                        <Who name={a.name} sub={a.phone} />
+                        <Who name={a.name} sub={a.phone} avatarUrl={a.avatarUrl} />
                       </Td>
                       <Td>{VEHICLE_LABEL[a.vehicle] ?? a.vehicle}</Td>
                       <Td className="text-ink-2">{a.zones.join(', ')}</Td>
@@ -238,7 +260,10 @@ const RidersContent = () => {
                         )}
                       </Td>
                       <Td align="right">
-                        <AccountAction agent={a} />
+                        <div className="flex flex-col items-end gap-1.5">
+                          <ClearAvatarAction agent={a} />
+                          <AccountAction agent={a} />
+                        </div>
                       </Td>
                     </Tr>
                   ))}
@@ -268,7 +293,7 @@ const RidersContent = () => {
                     {rejected.map((a) => (
                       <Tr key={a._id}>
                         <Td>
-                          <Who name={a.name} sub={a.phone} />
+                          <Who name={a.name} sub={a.phone} avatarUrl={a.avatarUrl} />
                         </Td>
                         <Td>{VEHICLE_LABEL[a.vehicle] ?? a.vehicle}</Td>
                         <Td className="text-ink-2">{a.zones.join(', ')}</Td>

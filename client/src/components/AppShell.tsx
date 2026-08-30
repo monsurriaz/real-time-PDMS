@@ -224,10 +224,13 @@ const Count = ({ value }: { value: number | null }) =>
 const AccountMenu = ({
   name,
   role,
+  avatarUrl,
   touch,
 }: {
   name: string
   role: Role
+  /** M9.6 — always your own, so this is always visible to you. */
+  avatarUrl?: string | null
   touch: boolean
 }) => {
   const [open, setOpen] = useState(false)
@@ -291,7 +294,7 @@ const AccountMenu = ({
         aria-haspopup="menu"
         className={`w-full flex items-center gap-9px px-2 py-7px rounded-sm hover:bg-chrome-2 ${touch ? 'min-h-12' : 'min-h-11'}`}
       >
-        <Avatar size="sm" />
+        <Avatar url={avatarUrl} name={name} size="sm" />
         <span className="min-w-0 text-left max-md:hidden">
           <span className="block text-chrome-ink text-sm font-semibold tracking-[-0.01em] truncate">
             {name}
@@ -570,7 +573,12 @@ export const AppShell = ({ title, titleAside, children, pageClass }: Props) => {
 
         <div className="mt-auto border-t border-chrome-3 pt-3">
           {me.data ? (
-            <AccountMenu name={me.data.name} role={me.data.role} touch={touch} />
+            <AccountMenu
+              name={me.data.name}
+              role={me.data.role}
+              avatarUrl={me.data.avatarUrl}
+              touch={touch}
+            />
           ) : null}
         </div>
       </aside>

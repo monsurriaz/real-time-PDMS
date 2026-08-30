@@ -28,6 +28,7 @@ export const AdminProfilePage = () => {
       ) : (
         <ProfileShell
           name={me.data.name}
+          avatarUrl={me.data.avatarUrl}
           roleLine="Administrator"
           tabs={[
             { key: 'account', label: 'Account', content: <AccountTab user={me.data} /> },

@@ -29,3 +29,20 @@ const useDecision = (action: 'suspend' | 'reactivate') => {
 
 export const useSuspendCustomer = () => useDecision('suspend')
 export const useReactivateCustomer = () => useDecision('reactivate')
+
+/**
+ * Admin photo moderation (M9.6) — a separate, lesser action from
+ * suspend/reactivate above, so its own mutation rather than folded into
+ * `useDecision`'s shape (that helper's callers all read back `status`; this
+ * one reads back `avatarUrl`).
+ */
+export const useClearCustomerAvatar = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (customerId: string) =>
+      api.post<{ avatarUrl: null; at: string }>(`/customers/${customerId}/clear-avatar`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: customerRosterKey })
+    },
+  })
+}

@@ -38,6 +38,30 @@ export const trackingId = z
 /** Currency is BDT throughout; amounts are whole poisha-free taka. */
 export const taka = z.number().int().nonnegative()
 
+/**
+ * A Cloudinary delivery URL, and nothing else.
+ *
+ * Every upload in this project — proof-of-delivery photos, and since M9.6,
+ * profile avatars — happens straight from the browser with the unsigned
+ * preset (CLAUDE.md section 2), so the URL arrives from the client and
+ * cannot be trusted on shape alone. This narrows it to Cloudinary's delivery
+ * host; the server additionally checks it names OUR cloud (assertOurCloud in
+ * lib/cloudinary.ts on both sides that use it), which is the part only the
+ * server knows. Lives here rather than in delivery.ts (where it started,
+ * M5) because a second caller outside deliveries would otherwise have to
+ * import a delivery-specific module for a generic URL shape — and because
+ * payment.ts already needs it (the COD reconciliation row) without being
+ * able to import delivery.ts without a circular dependency.
+ */
+export const cloudinaryUrl = z
+  .string()
+  .url()
+  .max(500)
+  .refine(
+    (u) => u.startsWith('https://res.cloudinary.com/'),
+    'must be an https Cloudinary delivery URL',
+  )
+
 export const zoneName = z.enum([
   'Dhanmondi',
   'Mirpur',

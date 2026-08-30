@@ -27,6 +27,7 @@ export const CustomerProfilePage = () => {
       ) : (
         <ProfileShell
           name={me.data.name}
+          avatarUrl={me.data.avatarUrl}
           roleLine={me.data.zone ? `Customer · ${me.data.zone} zone` : 'Customer'}
           tabs={[
             { key: 'account', label: 'Account', content: <AccountTab user={me.data} /> },

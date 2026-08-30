@@ -90,21 +90,26 @@ export const Td = ({
 )
 
 /**
- * `.who` — an avatar beside a name and a secondary line. The avatar is a plain
- * tinted circle: there are no uploaded profile images in this build, and a
- * generated initial would imply an identity the record does not carry.
+ * `.who` — an avatar beside a name and a secondary line. See `Avatar` below
+ * for the three-tier fallback (photo, then initials, then a plain circle) —
+ * `Who` just threads `avatarUrl` through to it, so every table already using
+ * this component picks up a real photo the moment its row starts sending one.
  */
 export const Who = ({
   name,
   sub,
+  avatarUrl,
   size = 'sm',
 }: {
   name: string
   sub?: string
+  /** M9.6. Omitted entirely by rows whose person has no account to photograph
+   *  (a parcel's recipient) — they still get the initials fallback below. */
+  avatarUrl?: string | null
   size?: 'sm' | 'md'
 }) => (
   <div className="flex items-center gap-9px">
-    <Avatar size={size} />
+    <Avatar url={avatarUrl} name={name} size={size} />
     <div className="min-w-0">
       <div className="font-semibold text-body tracking-[-0.01em] truncate">{name}</div>
       {/* Same reasoning as the column headers: a route is content, not chrome. */}
@@ -119,12 +124,76 @@ const AVATAR_SIZE = {
   lg: 'w-15 h-15',
 } as const
 
-export const Avatar = ({ size = 'sm' }: { size?: keyof typeof AVATAR_SIZE }) => (
-  <span
-    className={`${AVATAR_SIZE[size]} rounded-full bg-surface-sunk border border-border flex-none`}
-    aria-hidden="true"
-  />
-)
+/** Initials text scales down with the circle, or "RH" reads as one dark blob
+ *  at 28px. */
+const AVATAR_INITIAL_TEXT = {
+  sm: 'text-tiny',
+  md: 'text-small',
+  lg: 'text-title',
+} as const
+
+/**
+ * "Rakib Hasan" -> "RH". First letter of the first word plus first letter of
+ * the last, so a two-word name (nearly everything in this build's data)
+ * reads as a real monogram rather than just its first letter repeated.
+ */
+const initialsOf = (name: string): string => {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return ''
+  const first = parts[0]!.slice(0, 1)
+  const last = parts.length > 1 ? parts.at(-1)!.slice(0, 1) : parts[0]!.slice(1, 2)
+  return (first + last).toUpperCase()
+}
+
+/**
+ * Three tiers, in order: an uploaded photo; failing that, initials from the
+ * name; failing that (no name given either — a handful of decorative call
+ * sites on the public landing page), the plain tinted circle this component
+ * has always been. M9.6 — before this, there was no photo system, and a
+ * generated initial would have implied an identity the record did not
+ * carry; there IS one now, so initials are the honest middle state rather
+ * than an empty circle for every account that hasn't uploaded a photo yet.
+ */
+export const Avatar = ({
+  url,
+  name,
+  size = 'sm',
+}: {
+  /** A Cloudinary avatar URL, or null/undefined for "no photo". */
+  url?: string | null
+  /** Whoever this avatar stands for, so a missing photo still says who. */
+  name?: string
+  size?: keyof typeof AVATAR_SIZE
+}) => {
+  if (url) {
+    return (
+      <img
+        src={url}
+        alt={name ?? ''}
+        className={`${AVATAR_SIZE[size]} rounded-full object-cover border border-border flex-none`}
+      />
+    )
+  }
+
+  const initials = name ? initialsOf(name) : ''
+  if (initials) {
+    return (
+      <span
+        className={`${AVATAR_SIZE[size]} ${AVATAR_INITIAL_TEXT[size]} rounded-full bg-accent-tint text-accent-hover font-semibold grid place-items-center flex-none`}
+        aria-hidden="true"
+      >
+        {initials}
+      </span>
+    )
+  }
+
+  return (
+    <span
+      className={`${AVATAR_SIZE[size]} rounded-full bg-surface-sunk border border-border flex-none`}
+      aria-hidden="true"
+    />
+  )
+}
 
 /** `.filterbar` — the strip of dropdowns above a table, with actions trailing. */
 export const FilterBar = ({ children }: { children: ReactNode }) => (

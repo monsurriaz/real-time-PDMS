@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { objectId, taka, timestamps } from './common'
+import { cloudinaryUrl, objectId, taka, timestamps } from './common'
 
 /**
  * Payments sit behind a PaymentProvider interface (CLAUDE.md section 2), so
@@ -77,6 +77,8 @@ export type CheckoutSession = z.infer<typeof checkoutSessionSchema>
 export const codReconciliationRowSchema = z.object({
   agentId: objectId,
   agentName: z.string(),
+  /** M9.6: the rider's own photo, alongside the name this row already shows. */
+  avatarUrl: cloudinaryUrl.nullable(),
   /** COD parcels this rider actually delivered. */
   deliveredCount: z.number().int().nonnegative(),
   /** Cash in hand: delivered, not yet settled with the office. */

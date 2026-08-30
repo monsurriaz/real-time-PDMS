@@ -262,6 +262,8 @@ interface UserNameRow {
   name: string
   phone: string
   email: string
+  /** M9.6. Optional for the same `.lean()` reason `status` is below. */
+  avatarUrl?: string | null
   /** Optional: `.lean()` skips the schema default — absent means active. */
   status?: UserStatus
 }
@@ -294,7 +296,7 @@ agentsRouter.get('/', requireAuth, requireRole('admin'), async (_req, res, next)
       >()
 
     const users = await UserModel.find({ _id: { $in: rows.map((r) => r.user) } })
-      .select('name phone email status')
+      .select('name phone email avatarUrl status')
       .lean<UserNameRow[]>()
     const byUser = new Map(users.map((u) => [u._id.toString(), u]))
 
@@ -311,6 +313,7 @@ agentsRouter.get('/', requireAuth, requireRole('admin'), async (_req, res, next)
           name: u.name,
           phone: u.phone,
           email: u.email,
+          avatarUrl: u.avatarUrl ?? null,
           vehicle: r.vehicle,
           zones: r.zones,
           status: r.status,
@@ -454,3 +457,57 @@ const decideAccount = (nextStatus: UserStatus) =>
 
 agentsRouter.post('/:id/suspend', requireAuth, requireRole('admin'), decideAccount('suspended'))
 agentsRouter.post('/:id/reactivate', requireAuth, requireRole('admin'), decideAccount('active'))
+
+/**
+ * Admin photo moderation (M9.6) — clears a rider's avatar, not their
+ * account or their application. A separate, lesser action from suspend
+ * above: appends to User's `moderationHistory`, not `accountHistory` — see
+ * that model's own note for why the two stay apart. Same "the server
+ * cannot delete the Cloudinary asset itself" limitation as everywhere else
+ * an unsigned preset uploads a photo.
+ */
+agentsRouter.post(
+  '/:id/clear-avatar',
+  requireAuth,
+  requireRole('admin'),
+  async (req, res, next) => {
+    try {
+      const actor = req.actor
+      if (!actor) throw unauthorized()
+      const id = objectIdParam(req.params.id)
+
+      const agent = await AgentModel.findById(id)
+        .select('user')
+        .lean<{ _id: mongoose.Types.ObjectId; user: mongoose.Types.ObjectId } | null>()
+      if (!agent) throw new HttpError(404, 'agent not found')
+
+      const target = await UserModel.findById(agent.user).select('role avatarUrl')
+      if (!target) throw new HttpError(404, 'this rider has no account')
+      if (target.role !== 'agent') {
+        throw new HttpError(422, 'only a rider account can be moderated from here')
+      }
+      if (!target.avatarUrl) {
+        throw new HttpError(422, 'this account has no photo to clear')
+      }
+
+      const at = new Date()
+      await UserModel.updateOne(
+        { _id: agent.user },
+        {
+          $set: { avatarUrl: null },
+          $push: {
+            moderationHistory: {
+              action: 'avatar_cleared',
+              at,
+              by: new mongoose.Types.ObjectId(actor.id),
+            },
+          },
+        },
+      )
+
+      res.json({ avatarUrl: null, at })
+    } catch (err) {
+      next(err)
+    }
+  },
+)
