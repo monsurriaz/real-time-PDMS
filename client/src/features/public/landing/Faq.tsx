@@ -49,8 +49,17 @@ export const Faq = () => {
 
   return (
     <section className="bg-surface py-22">
-      <div className="max-w-[1200px] mx-auto px-4 sm:px-8">
-        <div className="max-w-[600px] mb-11">
+      {/*
+        A narrow, left-hugging accordion under a header — the reference's
+        own layout — read as cramped and off-balance once it sat between two
+        full-width sections (bento, pricing) rather than in the reference's
+        own isolated mock. Side by side instead, the same rhythm ForRiders
+        already uses: a fixed-width label column, the accordion taking the
+        rest of the row, so this section uses the container the way its
+        neighbours do rather than stacking into one narrow column.
+      */}
+      <div className="max-w-[1200px] mx-auto px-4 sm:px-8 grid md:grid-cols-[300px_1fr] gap-8 md:gap-16">
+        <div className="md:max-w-70">
           <div className="text-eyebrow font-semibold uppercase tracking-[0.11em] text-accent mb-3">
             Questions
           </div>
@@ -59,7 +68,7 @@ export const Faq = () => {
           </h2>
         </div>
 
-        <div className="max-w-[780px]">
+        <div className="min-w-0">
           {FAQS.map((f, i) => {
             const expanded = open === i
             return (
