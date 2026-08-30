@@ -172,6 +172,16 @@ export const useAddSavedAddress = () => {
   })
 }
 
+/** Correct one field without deleting and retyping the whole address. */
+export const useUpdateSavedAddress = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ addressId, input }: { addressId: string; input: SavedAddressInput }) =>
+      api.patch<{ addresses: SavedAddress[] }>(`/auth/me/addresses/${addressId}`, input),
+    onSuccess: (data) => qc.setQueryData(addressesKey, data),
+  })
+}
+
 export const useDeleteSavedAddress = () => {
   const qc = useQueryClient()
   return useMutation({

@@ -7,12 +7,15 @@ import {
   type DeliveryStatus,
   type GeocodedAddress,
   type ParcelListItem,
+  type RecentRecipient,
+  type ZoneName,
 } from '@pdms/shared'
 import { runAsSystem } from '../lib/context'
 import { geocodeAddress } from '../lib/geocode'
 import { routeBetween } from '../lib/routing'
 import { DeliveryModel } from '../models/Delivery'
 import { ParcelModel } from '../models/Parcel'
+import { UserModel } from '../models/User'
 import { requireAuth, requireRole } from '../middleware/auth'
 import { HttpError, unauthorized } from '../middleware/httpError'
 import { autoAssignAfterBooking } from '../services/assignment'
@@ -23,6 +26,84 @@ import { generateTrackingId } from '../services/trackingId'
 
 export const parcelsRouter = Router()
 
+interface SavedAddressLean {
+  _id: mongoose.Types.ObjectId
+  line1: string
+  area: string
+  zone?: ZoneName
+  city: string
+  point?: GeocodedAddress['point']
+  resolvedLabel?: string
+}
+
+/**
+ * Resolve the pick-up point, skipping Nominatim when `savedAddressId` names
+ * one of the CALLER'S OWN saved addresses whose location fields still match
+ * `pickup` word for word AND already carries a stored point (M9.9).
+ *
+ * The match check is what keeps this safe: a client-supplied coordinate is
+ * never trusted for pricing on its own (same reasoning as the codAmount
+ * integrity fix in M6.9) — what is trusted here is a point THIS SERVER
+ * resolved earlier and stored against a record it already scoped to this
+ * actor, reused only when the address it was resolved from is still exactly
+ * what is being submitted now. An edited address, a wrong or deleted id, or
+ * one that has simply never been geocoded before all fall straight through
+ * to a normal `geocodeAddress` call — this is an optimisation, never a
+ * dependency.
+ *
+ * `matched` (regardless of whether a point existed yet to reuse) is what the
+ * booking route uses to decide whether this use should stamp `lastUsedAt` —
+ * see POST / below.
+ */
+const resolvePickupGeo = async (
+  actorId: string,
+  pickup: AddressInput,
+  savedAddressId?: string,
+): Promise<{ geo: GeocodedAddress; matched: boolean }> => {
+  let saved: SavedAddressLean | undefined
+  if (savedAddressId) {
+    const user = await UserModel.findById(actorId)
+      .select('savedAddresses')
+      .lean<{ savedAddresses: SavedAddressLean[] } | null>()
+      .exec()
+    saved = user?.savedAddresses.find((a) => a._id.toString() === savedAddressId)
+  }
+
+  const matched =
+    saved !== undefined &&
+    saved.line1 === pickup.line1 &&
+    saved.area === pickup.area &&
+    saved.zone === pickup.zone &&
+    saved.city === pickup.city
+
+  if (matched && saved?.point) {
+    return { geo: { point: saved.point, resolvedLabel: saved.resolvedLabel ?? '' }, matched: true }
+  }
+
+  const geo = await geocodeAddress(pickup, 'pickup')
+
+  if (matched && savedAddressId) {
+    // Best-effort backfill so the NEXT use of this saved address can skip
+    // straight to the point above. A failure here must not fail a booking
+    // or quote that has otherwise succeeded — it only costs the shortcut.
+    try {
+      await UserModel.updateOne(
+        { _id: actorId, 'savedAddresses._id': savedAddressId },
+        {
+          $set: {
+            'savedAddresses.$.point': geo.point,
+            'savedAddresses.$.resolvedLabel': geo.resolvedLabel,
+          },
+        },
+      ).exec()
+    } catch {
+      // Optimisation only — see above.
+    }
+  }
+
+  return { geo, matched }
+}
+
 /**
  * Geocode both ends and measure the road distance between them.
  *
@@ -31,17 +112,24 @@ export const parcelsRouter = Router()
  * failure attributable to the address that caused it.
  */
 const measure = async (
+  actorId: string,
   pickup: AddressInput,
   drop: AddressInput,
+  pickupSavedAddressId?: string,
 ): Promise<{
   pickupGeo: GeocodedAddress
   dropGeo: GeocodedAddress
   distanceKm: number
+  pickupMatched: boolean
 }> => {
-  const pickupGeo = await geocodeAddress(pickup, 'pickup')
+  const { geo: pickupGeo, matched: pickupMatched } = await resolvePickupGeo(
+    actorId,
+    pickup,
+    pickupSavedAddressId,
+  )
   const dropGeo = await geocodeAddress(drop, 'drop')
   const route = await routeBetween(pickupGeo.point, dropGeo.point)
-  return { pickupGeo, dropGeo, distanceKm: route.distanceKm }
+  return { pickupGeo, dropGeo, distanceKm: route.distanceKm, pickupMatched }
 }
 
 /**
@@ -52,8 +140,15 @@ const measure = async (
  */
 parcelsRouter.post('/quote', requireAuth, requireRole('customer'), async (req, res, next) => {
   try {
+    const actor = req.actor
+    if (!actor) throw unauthorized()
     const input = quoteInputSchema.parse(req.body)
-    const { pickupGeo, dropGeo, distanceKm } = await measure(input.pickup, input.drop)
+    const { pickupGeo, dropGeo, distanceKm } = await measure(
+      actor.id,
+      input.pickup,
+      input.drop,
+      input.pickupSavedAddressId,
+    )
 
     /**
      * The zone base is taken from the PICKUP zone: it represents the cost of
@@ -90,7 +185,12 @@ parcelsRouter.post('/', requireAuth, requireRole('customer'), async (req, res, n
     if (!actor) throw unauthorized()
 
     const input = bookParcelInputSchema.parse(req.body)
-    const { pickupGeo, dropGeo, distanceKm } = await measure(input.pickup, input.drop)
+    const { pickupGeo, dropGeo, distanceKm, pickupMatched } = await measure(
+      actor.id,
+      input.pickup,
+      input.drop,
+      input.pickupSavedAddressId,
+    )
 
     const price = await priceFor({
       distanceKm,
@@ -185,6 +285,25 @@ parcelsRouter.post('/', requireAuth, requireRole('customer'), async (req, res, n
       deliveryId: delivery._id.toString(),
     })
 
+    /**
+     * M9.9: a saved pick-up address counts as "used" only when the booking
+     * actually went through with it unedited — `pickupMatched` is the same
+     * check `resolvePickupGeo` used to decide whether to reuse its point.
+     * Quoting never stamps this; only a real booking does. Best-effort, like
+     * the point backfill above: this is what autofill reads to pick the
+     * default next time, not something a booking can fail over.
+     */
+    if (pickupMatched && input.pickupSavedAddressId) {
+      try {
+        await UserModel.updateOne(
+          { _id: customerId, 'savedAddresses._id': input.pickupSavedAddressId },
+          { $set: { 'savedAddresses.$.lastUsedAt': new Date() } },
+        ).exec()
+      } catch {
+        // Optimisation only — see resolvePickupGeo's own note.
+      }
+    }
+
     res.status(201).json({
       parcel: {
         _id: parcel._id.toString(),
@@ -277,6 +396,80 @@ parcelsRouter.get('/', requireAuth, async (req, res, next) => {
     next(err)
   }
 })
+
+interface RecipientRow {
+  drop: {
+    contactName: string
+    contactPhone: string
+    line1: string
+    area: string
+    zone: ZoneName
+    city: string
+  }
+  createdAt: Date
+}
+
+/** How many distinct recipients the booking form's drop-off autofill offers. */
+const RECENT_RECIPIENTS_LIMIT = 8
+/**
+ * How far back to look for them. Generous relative to the limit above so a
+ * customer who reuses only a handful of recipients still fills the chip row,
+ * even though most of what it scans will be dropped as duplicates.
+ */
+const RECENT_RECIPIENTS_SCAN = 100
+
+/**
+ * GET /parcels/recent-recipients — the booking form's drop-off autofill
+ * (M9.9). Derived entirely from the customer's own `Parcel.drop` fields —
+ * no new model, per the brief.
+ *
+ * Scoped exactly like GET /parcels above: a plain `ParcelModel.find()`, no
+ * aggregation, so the SAME roleScope rule (customer -> their own `customer`
+ * field) applies here with nothing new to get wrong. Registered before
+ * GET /:id so Express does not try to parse "recent-recipients" as an id.
+ */
+parcelsRouter.get(
+  '/recent-recipients',
+  requireAuth,
+  requireRole('customer'),
+  async (req, res, next) => {
+    try {
+      const rows = await ParcelModel.find()
+        .select('drop createdAt')
+        .sort({ createdAt: -1 })
+        .limit(RECENT_RECIPIENTS_SCAN)
+        .lean<RecipientRow[]>()
+
+      // Rows arrive newest-first, so the first time a key is seen IS the most
+      // recent use of that recipient — nothing to re-sort afterwards.
+      const seen = new Map<string, RecentRecipient>()
+      for (const row of rows) {
+        const key = [
+          row.drop.contactName.trim().toLowerCase(),
+          row.drop.contactPhone,
+          row.drop.line1.trim().toLowerCase(),
+          row.drop.area.trim().toLowerCase(),
+          row.drop.zone,
+        ].join('|')
+        if (seen.has(key)) continue
+        seen.set(key, {
+          recipientName: row.drop.contactName,
+          recipientPhone: row.drop.contactPhone,
+          dropLine1: row.drop.line1,
+          dropArea: row.drop.area,
+          dropZone: row.drop.zone,
+          dropCity: row.drop.city,
+          lastUsedAt: row.createdAt,
+        })
+        if (seen.size >= RECENT_RECIPIENTS_LIMIT) break
+      }
+
+      res.json({ recipients: [...seen.values()] })
+    } catch (err) {
+      next(err)
+    }
+  },
+)
 
 /** GET /parcels/:id — one parcel, scoped the same way. */
 parcelsRouter.get('/:id', requireAuth, async (req, res, next) => {

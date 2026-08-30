@@ -47,10 +47,15 @@ const toSavedAddress = (a: UserDoc['savedAddresses'][number]): SavedAddress => (
   label: a.label,
   line1: a.line1,
   area: a.area,
+  // Optional on the shared schema for exactly this reason — a document
+  // saved before these two fields existed on the model may not have them.
   zone: a.zone,
   city: a.city,
   contactName: a.contactName,
   contactPhone: a.contactPhone,
+  lastUsedAt: a.lastUsedAt ?? null,
+  ...(a.point ? { point: a.point } : {}),
+  ...(a.resolvedLabel ? { resolvedLabel: a.resolvedLabel } : {}),
 })
 
 /**
@@ -334,9 +339,8 @@ authRouter.post('/me/welcome', requireAuth, async (req, res, next) => {
 })
 
 /**
- * Saved addresses — the customer profile's role-specific tab. Booking form
- * autofill from these is not wired up this session (see DEFERRED.md); this
- * is CRUD on the list itself.
+ * Saved addresses — the customer profile's role-specific tab, and (M9.9)
+ * what the booking form's pick-up autofill reads from.
  */
 authRouter.get('/me/addresses', requireAuth, requireRole('customer'), async (req, res, next) => {
   try {
@@ -359,13 +363,79 @@ authRouter.post('/me/addresses', requireAuth, requireRole('customer'), async (re
     const user = await UserModel.findById(actor.id).select('savedAddresses').exec()
     if (!user) throw unauthorized('session no longer valid')
 
-    user.savedAddresses.push({ ...input, _id: new mongoose.Types.ObjectId() })
+    // lastUsedAt starts null (never booked with yet); point/resolvedLabel
+    // start absent (never geocoded yet) — both filled in later by
+    // routes/parcels.ts as this address is actually used.
+    user.savedAddresses.push({
+      ...input,
+      _id: new mongoose.Types.ObjectId(),
+      lastUsedAt: null,
+    })
     await user.save()
     res.status(201).json({ addresses: user.savedAddresses.map(toSavedAddress) })
   } catch (err) {
     next(err)
   }
 })
+
+/**
+ * PATCH /auth/me/addresses/:addressId — correct one field without deleting
+ * and retyping the whole address (M9.9). Reuses the exact same
+ * `savedAddressInputSchema` the Add flow validates against — editing always
+ * supplies the complete set, same as adding does.
+ *
+ * If the edit changes any of the fields geocoding actually reads (line1,
+ * area, zone, city), the stored `point`/`resolvedLabel` are cleared: they
+ * describe the OLD text, and carrying them forward against new text would
+ * silently mis-locate a future autofilled booking. Editing only the label or
+ * the contact fields leaves them alone — nothing about where "here" is
+ * changed.
+ */
+authRouter.patch(
+  '/me/addresses/:addressId',
+  requireAuth,
+  requireRole('customer'),
+  async (req, res, next) => {
+    try {
+      const actor = req.actor
+      if (!actor) throw unauthorized()
+      const { addressId } = req.params
+      if (!addressId || !mongoose.Types.ObjectId.isValid(addressId)) {
+        throw new HttpError(400, 'not a valid address id')
+      }
+      const input = savedAddressInputSchema.parse(req.body)
+
+      const user = await UserModel.findById(actor.id).select('savedAddresses').exec()
+      if (!user) throw unauthorized('session no longer valid')
+
+      const existing = user.savedAddresses.find((a) => a._id.toString() === addressId)
+      if (!existing) throw new HttpError(404, 'address not found')
+
+      const locationChanged =
+        existing.line1 !== input.line1 ||
+        existing.area !== input.area ||
+        existing.zone !== input.zone ||
+        existing.city !== input.city
+
+      existing.label = input.label
+      existing.line1 = input.line1
+      existing.area = input.area
+      existing.zone = input.zone
+      existing.city = input.city
+      existing.contactName = input.contactName
+      existing.contactPhone = input.contactPhone
+      if (locationChanged) {
+        existing.point = undefined
+        existing.resolvedLabel = undefined
+      }
+
+      await user.save()
+      res.json({ addresses: user.savedAddresses.map(toSavedAddress) })
+    } catch (err) {
+      next(err)
+    }
+  },
+)
 
 authRouter.delete(
   '/me/addresses/:addressId',

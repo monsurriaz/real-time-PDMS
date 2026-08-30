@@ -7,6 +7,7 @@ import {
   type User,
 } from '@pdms/shared'
 import type { Doc } from './types'
+import { optionalPoint } from './geo'
 import { ALLOW_ALL, roleScopePlugin } from './plugins/roleScope'
 
 /**
@@ -29,19 +30,34 @@ export type UserDoc = Doc<User> & {
 
 /**
  * A customer's saved address (profile's role-specific tab). Same shape as the
- * booking form's own address, plus a label — no `point`: a saved address is
- * a template a booking re-geocodes, not a pre-resolved location that could go
- * stale between when it was saved and when it is next used.
+ * booking form's own address, plus a label.
+ *
+ * `zone` and `contactPhone` are NOT `required` at the database level even
+ * though the add/edit form always sends both — a document created before
+ * this schema carried the field can genuinely lack it, and the shared
+ * `savedAddressSchema` types that gap as optional for exactly this reason
+ * (see its own note). Loosening the DB constraint is what makes that true
+ * rather than aspirational: a `required: true` here would only stop a NEW
+ * write, not describe an old one.
  */
 const savedAddress = new Schema(
   {
     label: { type: String, required: true, trim: true, minlength: 2, maxlength: 40 },
     line1: { type: String, required: true, trim: true },
     area: { type: String, required: true, trim: true },
-    zone: { type: String, required: true, enum: zoneName.options },
+    zone: { type: String, required: false, enum: zoneName.options },
     city: { type: String, required: true, default: 'Dhaka', trim: true },
     contactName: { type: String, required: true, trim: true },
-    contactPhone: { type: String, required: true, trim: true },
+    contactPhone: { type: String, required: false, trim: true },
+    /** M9.9: stamped when this address is used to book a pickup. */
+    lastUsedAt: { type: Date, required: false, default: null },
+    /**
+     * M9.9: resolved the first time this address is geocoded as a pickup —
+     * see the shared schema's note. Cleared on an edit that changes the
+     * location fields (routes/auth.ts's PATCH handler).
+     */
+    point: optionalPoint,
+    resolvedLabel: { type: String, required: false },
   },
   { timestamps: false },
 )
