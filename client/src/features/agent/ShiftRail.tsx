@@ -3,6 +3,7 @@ import { Modal } from '@/components/Modal'
 import { Eyebrow } from '@/components/Card'
 import { ShiftEditor } from './ShiftEditor'
 import { useAgentSelf } from './useAgentSelf'
+import { useIdleLocationWatcher } from './useIdleLocationWatcher'
 
 /**
  * The rail's "Shift" block, from v3's Shell section: a compact status
@@ -41,6 +42,11 @@ const STATUS_DOT: Record<string, string> = {
 export const ShiftRail = () => {
   const me = useAgentSelf()
   const [open, setOpen] = useState(false)
+
+  // Called every render regardless of loading state — rules of hooks — with
+  // `active` folding in "loaded, and actually available" so it starts out
+  // false rather than undefined while `me` is still pending.
+  useIdleLocationWatcher(me.data?.status === 'available')
 
   const heading = (
     <div className="text-rail font-semibold uppercase tracking-[0.12em] text-chrome-muted px-2.5 pt-3.5 pb-6px max-md:hidden">

@@ -6,6 +6,7 @@ import { Eyebrow } from '@/components/Card'
 import { ApiError } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import { useZones } from '../pricing/usePricing'
+import { useLocationWatcherState } from './locationWatcherStore'
 import { useAgentSelf, useSetAgentStatus, useSetLocation } from './useAgentSelf'
 
 /**
@@ -18,8 +19,23 @@ import { useAgentSelf, useSetAgentStatus, useSetLocation } from './useAgentSelf'
  * surface, sizing and dismissal.
  *
  * Both fields feed the $near assignment query in CLAUDE.md section 5 —
- * without a way to move a rider by hand, proximity assignment cannot be
- * exercised at all.
+ * without a way to move a rider, proximity assignment cannot be exercised.
+ *
+ * M9.7: location-setting is three tiers, in priority order, replacing the
+ * raw zone-or-lat/lng form M3.5 built as a stand-in before there was a UI in
+ * front of it — no real rider knows their own coordinates.
+ *   1. "Use my current location" — the browser's GPS, one tap, PLUS an idle
+ *      background watcher (useIdleLocationWatcher, mounted once in ShiftRail
+ *      rather than here — see that hook's own note on why).
+ *   2. Type an address — geocoded through the exact same Nominatim wrapper
+ *      booking uses (server's geocodeAddress), same cache, same failure
+ *      shape (asLookupProblem-compatible: reads off ApiError, not repeated
+ *      here since this form just shows the message).
+ *   3. Pick a zone — demoted below the other two, kept because it is the
+ *      only tier that works with GPS denied and no resolvable address, and
+ *      it drops a rider into a zone instantly for rehearsal.
+ * Raw coordinates still exist, behind an "Advanced" disclosure, for the same
+ * rehearsal reason — never as something a rider is expected to reach for.
  */
 
 const STATUS_LABEL: Record<string, string> = {
@@ -28,17 +44,26 @@ const STATUS_LABEL: Record<string, string> = {
   offline: 'Off shift',
 }
 
+type LocationMode = 'address' | 'zone'
+
 export const ShiftEditor = ({ onLocationSaved }: { onLocationSaved?: () => void }) => {
   const me = useAgentSelf()
   const zones = useZones()
   const setLocation = useSetLocation()
   const setStatus = useSetAgentStatus()
+  const watcher = useLocationWatcherState()
 
-  const [mode, setMode] = useState<'zone' | 'coords'>('zone')
+  const [mode, setMode] = useState<LocationMode>('address')
+  const [line1, setLine1] = useState('')
+  const [area, setArea] = useState('')
+  const [addrZone, setAddrZone] = useState<ZoneName | ''>('')
   const [zone, setZone] = useState<ZoneName | ''>('')
   const [lat, setLat] = useState('')
   const [lng, setLng] = useState('')
   const [invalid, setInvalid] = useState<string | null>(null)
+  const [advancedInvalid, setAdvancedInvalid] = useState<string | null>(null)
+  const [geoBusy, setGeoBusy] = useState(false)
+  const [geoError, setGeoError] = useState<string | null>(null)
 
   if (me.isPending) {
     return <p className="text-sm text-muted">Loading…</p>
@@ -56,18 +81,66 @@ export const ShiftEditor = ({ onLocationSaved }: { onLocationSaved?: () => void 
   const statusError = setStatus.error instanceof ApiError ? setStatus.error.message : null
   const locationError = setLocation.error instanceof ApiError ? setLocation.error.message : null
 
+  /** Tier 1, one tap: the browser's own GPS. Falls through to tier 2 on denial. */
+  const useMyLocation = (): void => {
+    setGeoError(null)
+    setInvalid(null)
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setGeoError('This browser cannot report your location — type an address or pick a zone below.')
+      setMode('address')
+      return
+    }
+    setGeoBusy(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGeoBusy(false)
+        setLocation.mutate(
+          { mode: 'coords', lat: pos.coords.latitude, lng: pos.coords.longitude },
+          { onSuccess: () => onLocationSaved?.() },
+        )
+      },
+      (err) => {
+        setGeoBusy(false)
+        setGeoError(
+          err.code === err.PERMISSION_DENIED
+            ? 'Location access denied — type an address or pick a zone below.'
+            : 'Could not get your location — type an address or pick a zone below.',
+        )
+        setMode('address')
+      },
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 15_000 },
+    )
+  }
+
+  /** Tiers 2 and 3: address or zone, whichever tab is open. */
   const submitLocation = (e: React.FormEvent): void => {
     e.preventDefault()
     setInvalid(null)
     const payload =
       mode === 'zone'
         ? { mode: 'zone' as const, zone }
-        : { mode: 'coords' as const, lat: Number(lat), lng: Number(lng) }
+        : { mode: 'address' as const, address: { line1, area, zone: addrZone, city: 'Dhaka' } }
 
     // Same schema the server uses (rule 4); the server re-validates anyway.
     const parsed = setAgentLocationInputSchema.safeParse(payload)
     if (!parsed.success) {
       setInvalid(parsed.error.issues[0]?.message ?? 'check the location')
+      return
+    }
+    setLocation.mutate(parsed.data, { onSuccess: () => onLocationSaved?.() })
+  }
+
+  /** The advanced disclosure: raw coordinates, for rehearsal — never the primary path. */
+  const submitCoords = (e: React.FormEvent): void => {
+    e.preventDefault()
+    setAdvancedInvalid(null)
+    const parsed = setAgentLocationInputSchema.safeParse({
+      mode: 'coords',
+      lat: Number(lat),
+      lng: Number(lng),
+    })
+    if (!parsed.success) {
+      setAdvancedInvalid(parsed.error.issues[0]?.message ?? 'check the coordinates')
       return
     }
     setLocation.mutate(parsed.data, { onSuccess: () => onLocationSaved?.() })
@@ -123,25 +196,56 @@ export const ShiftEditor = ({ onLocationSaved }: { onLocationSaved?: () => void 
 
       <div className="border-t border-border pt-4">
         <Eyebrow tone="strong">Your location</Eyebrow>
+
         {agent.currentLocation ? (
-          <p className="mono text-small mb-3">
-            {agent.currentLocation.coordinates[1].toFixed(4)},{' '}
-            {agent.currentLocation.coordinates[0].toFixed(4)}
-            {agent.locationUpdatedAt ? (
-              <span className="block font-sans text-eyebrow text-muted">
-                set {formatDateTime(agent.locationUpdatedAt)}
-              </span>
+          <div className="mb-3">
+            <p className="text-md font-semibold text-ink">
+              {agent.locationLabel ??
+                `${agent.currentLocation.coordinates[1].toFixed(4)}, ${agent.currentLocation.coordinates[0].toFixed(4)}`}
+            </p>
+            {agent.locationLabel ? (
+              <p className="mono text-tiny text-muted">
+                {agent.currentLocation.coordinates[1].toFixed(4)}, {agent.currentLocation.coordinates[0].toFixed(4)}
+              </p>
             ) : null}
-          </p>
+            <p className="text-eyebrow text-muted mt-0.5">
+              {agent.locationUpdatedAt ? `set ${formatDateTime(agent.locationUpdatedAt)}` : null}
+              {watcher.isWatching ? ' · updating automatically' : null}
+            </p>
+          </div>
         ) : (
           <p className="text-small text-muted mb-3">
             Not set — proximity assignment will skip you until it is.
           </p>
         )}
 
+        {watcher.permissionDenied ? (
+          <p className="text-small text-muted mb-3">
+            Automatic location is off — location access was denied. Set it
+            manually below.
+          </p>
+        ) : null}
+
+        <Button
+          type="button"
+          variant="ink"
+          size="lg"
+          className="w-full mb-3"
+          disabled={geoBusy}
+          onClick={useMyLocation}
+        >
+          {geoBusy ? 'Getting your location…' : 'Use my current location'}
+        </Button>
+
+        {geoError ? (
+          <p role="alert" className="text-small text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2 mb-3">
+            {geoError}
+          </p>
+        ) : null}
+
         <form onSubmit={submitLocation} noValidate>
           <div className="flex gap-2 mb-3">
-            {(['zone', 'coords'] as const).map((m) => (
+            {(['address', 'zone'] as const).map((m) => (
               <button
                 key={m}
                 type="button"
@@ -154,12 +258,42 @@ export const ShiftEditor = ({ onLocationSaved }: { onLocationSaved?: () => void 
                     : 'bg-surface text-ink-2 border-border-strong hover:bg-surface-sunk',
                 ].join(' ')}
               >
-                {m === 'zone' ? 'Pick a zone' : 'Coordinates'}
+                {m === 'address' ? 'Type an address' : 'Pick a zone'}
               </button>
             ))}
           </div>
 
-          {mode === 'zone' ? (
+          {mode === 'address' ? (
+            <>
+              <Field
+                touch
+                label="Street, house, road"
+                placeholder="House 12, Road 3"
+                value={line1}
+                onChange={(e) => setLine1(e.target.value)}
+              />
+              <Field
+                touch
+                label="Area"
+                placeholder="Dhanmondi 27"
+                value={area}
+                onChange={(e) => setArea(e.target.value)}
+              />
+              <SelectField
+                touch
+                label="Zone"
+                value={addrZone}
+                onChange={(e) => setAddrZone(e.target.value as ZoneName | '')}
+              >
+                <option value="">Select a zone</option>
+                {(zones.data ?? []).map((z) => (
+                  <option key={z.name} value={z.name}>
+                    {z.label}
+                  </option>
+                ))}
+              </SelectField>
+            </>
+          ) : (
             <SelectField
               touch
               label="Zone centre"
@@ -174,7 +308,33 @@ export const ShiftEditor = ({ onLocationSaved }: { onLocationSaved?: () => void 
                 </option>
               ))}
             </SelectField>
-          ) : (
+          )}
+
+          {(invalid ?? locationError) ? (
+            <p role="alert" className="text-small text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2 mb-3">
+              {invalid ?? locationError}
+            </p>
+          ) : null}
+
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full"
+            disabled={setLocation.isPending}
+          >
+            {setLocation.isPending
+              ? 'Saving…'
+              : mode === 'address'
+                ? 'Set from this address'
+                : 'Set to zone centre'}
+          </Button>
+        </form>
+
+        <details className="mt-4">
+          <summary className="text-tiny text-muted cursor-pointer select-none">
+            Advanced: enter coordinates directly
+          </summary>
+          <form onSubmit={submitCoords} noValidate className="mt-3">
             <div className="grid grid-cols-2 gap-x-3">
               <Field
                 touch
@@ -193,23 +353,16 @@ export const ShiftEditor = ({ onLocationSaved }: { onLocationSaved?: () => void 
                 onChange={(e) => setLng(e.target.value)}
               />
             </div>
-          )}
-
-          {(invalid ?? locationError) ? (
-            <p role="alert" className="text-small text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2 mb-3">
-              {invalid ?? locationError}
-            </p>
-          ) : null}
-
-          <Button
-            type="submit"
-            size="lg"
-            className="w-full"
-            disabled={setLocation.isPending}
-          >
-            {setLocation.isPending ? 'Saving…' : 'Set my location'}
-          </Button>
-        </form>
+            {advancedInvalid ? (
+              <p role="alert" className="text-small text-failed-ink bg-failed-bg border border-failed/25 rounded-sm px-3 py-2 mb-3">
+                {advancedInvalid}
+              </p>
+            ) : null}
+            <Button type="submit" size="lg" className="w-full" disabled={setLocation.isPending}>
+              {setLocation.isPending ? 'Saving…' : 'Set from coordinates'}
+            </Button>
+          </form>
+        </details>
       </div>
     </div>
   )

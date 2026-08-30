@@ -15,6 +15,7 @@ import {
   type ZoneName,
 } from '@pdms/shared'
 import { runAsSystem } from '../lib/context'
+import { geocodeAddress, reverseGeocode } from '../lib/geocode'
 import { AgentModel } from '../models/Agent'
 import { DeliveryModel } from '../models/Delivery'
 import { UserModel } from '../models/User'
@@ -42,6 +43,7 @@ interface AgentLean {
   nid: string
   currentLocation?: GeoPoint
   locationUpdatedAt?: Date
+  locationLabel?: string
 }
 
 /**
@@ -91,6 +93,7 @@ const toSelf = async (agent: AgentLean): Promise<AgentSelf> => {
     nid: agent.nid,
     ...(agent.currentLocation ? { currentLocation: agent.currentLocation } : {}),
     ...(agent.locationUpdatedAt ? { locationUpdatedAt: agent.locationUpdatedAt } : {}),
+    ...(agent.locationLabel ? { locationLabel: agent.locationLabel } : {}),
     activeCount,
   }
 }
@@ -162,7 +165,21 @@ agentsRouter.patch(
 )
 
 /**
- * POST /agents/me/location — drop a pin, by zone centre or by coordinates.
+ * POST /agents/me/location — set a position, by one of three tiers (M9.7,
+ * replacing the old zone-or-raw-coordinates form M3.5 built as a stand-in
+ * before there was a UI in front of it: no real rider knows their own
+ * latitude and longitude).
+ *
+ *   coords  — the browser's own GPS: a rider's tap, or the idle background
+ *             watcher. Reverse-geocoded for display; the reverse lookup is
+ *             best-effort and never fails the request (see reverseGeocode).
+ *   address — typed and geocoded through the SAME Nominatim wrapper booking
+ *             uses (geocodeAddress) — a LookupError propagates to `next(err)`
+ *             exactly like a booking quote's does, same shape, same client
+ *             handling (asLookupProblem).
+ *   zone    — drops the rider at that zone's centre, labelled by the zone's
+ *             own name — the last resort, and the only one that needs
+ *             neither GPS nor a resolvable address.
  *
  * Writes `currentLocation`, which is the exact field the sparse 2dsphere index
  * and the $near assignment query both read.
@@ -179,20 +196,38 @@ agentsRouter.post(
       const agent = await myAgent(actor.id)
 
       let point: GeoPoint
+      let label: string | undefined
       if (input.mode === 'zone') {
         const zone = await ZoneModel.findOne({ name: input.zone })
-          .select('centre')
-          .lean<{ centre: GeoPoint } | null>()
+          .select('centre label')
+          .lean<{ centre: GeoPoint; label: string } | null>()
         if (!zone) throw new HttpError(404, `${input.zone} is not a known zone`)
         point = zone.centre
+        label = zone.label
+      } else if (input.mode === 'address') {
+        // A thrown LookupError propagates to next(err) below and the global
+        // errorHandler turns it into the same { error, reason, retryable,
+        // field } shape a failed booking quote returns.
+        const resolved = await geocodeAddress(input.address)
+        point = resolved.point
+        label = resolved.resolvedLabel
       } else {
         point = { type: 'Point', coordinates: [input.lng, input.lat] }
+        // Best-effort: a reverse-geocode failure must not block setting a
+        // position that is already usable for assignment without a label.
+        const reverse = await reverseGeocode(point).catch(() => null)
+        label = reverse?.label
       }
 
       const at = new Date()
       await AgentModel.updateOne(
         { _id: agent._id },
-        { $set: { currentLocation: point, locationUpdatedAt: at } },
+        {
+          $set: { currentLocation: point, locationUpdatedAt: at, ...(label ? { locationLabel: label } : {}) },
+          // A fresh coords tick with no reverse-geocoded label must not keep
+          // showing whatever address the PREVIOUS position happened to have.
+          ...(label ? {} : { $unset: { locationLabel: '' } }),
+        },
       )
 
       res.json({
@@ -200,6 +235,7 @@ agentsRouter.post(
           ...agent,
           currentLocation: point,
           locationUpdatedAt: at,
+          locationLabel: label,
         }),
       })
     } catch (err) {
