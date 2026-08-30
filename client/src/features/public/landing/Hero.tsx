@@ -49,7 +49,7 @@ const PillNav = ({ me }: { me: SelfUser | undefined }) => (
         {me ? (
           <Link
             to={homeForRole(me.role)}
-            className="font-sans font-semibold text-body px-17px py-10px rounded-pill bg-accent text-white hover:bg-accent-hover whitespace-nowrap"
+            className="font-sans font-semibold text-body px-17px py-10px rounded-sm bg-accent text-white hover:bg-accent-hover whitespace-nowrap"
           >
             Go to my dashboard
           </Link>
@@ -69,7 +69,7 @@ const PillNav = ({ me }: { me: SelfUser | undefined }) => (
             </Link>
             <Link
               to="/signup"
-              className="font-sans font-semibold text-body px-17px py-10px rounded-pill bg-accent text-white hover:bg-accent-hover whitespace-nowrap"
+              className="font-sans font-semibold text-body px-17px py-10px rounded-sm bg-accent text-white hover:bg-accent-hover whitespace-nowrap"
             >
               Send a parcel
             </Link>
@@ -106,7 +106,7 @@ const TrackByIdForm = () => {
       />
       <button
         type="submit"
-        className="font-sans font-semibold text-body px-20px py-12px rounded-md bg-accent text-white hover:bg-accent-hover cursor-pointer whitespace-nowrap"
+        className="font-sans font-semibold text-body px-20px py-12px rounded-sm bg-accent text-white hover:bg-accent-hover cursor-pointer whitespace-nowrap"
       >
         Track
       </button>
@@ -188,17 +188,17 @@ export const Hero = ({ me }: { me: SelfUser | undefined }) => {
 
           <div className="flex gap-6 sm:gap-26px mt-26px flex-wrap">
             <div className="flex items-baseline gap-7px">
-              <span className="mono text-lg text-chrome-ink tracking-[-0.03em]">~3s</span>
+              <span className="mono text-mark text-chrome-ink tracking-[-0.03em]">~3s</span>
               <span className="text-small text-chrome-faint">location latency</span>
             </div>
             <div className="flex items-baseline gap-7px">
-              <span className="mono text-lg text-chrome-ink tracking-[-0.03em]">
+              <span className="mono text-mark text-chrome-ink tracking-[-0.03em]">
                 {summary.data ? formatTaka(summary.data.floorFee) : '—'}
               </span>
               <span className="text-small text-chrome-faint">from, up to 1 kg</span>
             </div>
             <div className="flex items-baseline gap-7px">
-              <span className="mono text-lg text-chrome-ink tracking-[-0.03em]">
+              <span className="mono text-mark text-chrome-ink tracking-[-0.03em]">
                 {summary.data ? `${summary.data.weightCapKg}kg` : '—'}
               </span>
               <span className="text-small text-chrome-faint">max parcel</span>

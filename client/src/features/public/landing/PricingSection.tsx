@@ -41,9 +41,10 @@ export const PricingSection = () => {
             {tiers.data.weightTiers.map((t, i) => {
               const floor = tierFloor(tiers.data.weightTiers, i)
               return (
-                <div key={t.label} className="bg-surface p-24px">
+                <div key={t.label} className="bg-surface py-24px px-22px">
                   <div className="text-sm text-muted font-medium">{t.label}</div>
-                  <div className="mono text-figure-lg font-medium tracking-[-0.05em] my-7px">
+                  {/* text-figure-xl (27px): the closest token to the reference's 29px. */}
+                  <div className="mono text-figure-xl font-medium tracking-[-0.05em] mt-7px mb-3px">
                     {formatTaka(t.baseFee)}
                   </div>
                   <div className="text-meta text-faint">
