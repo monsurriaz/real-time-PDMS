@@ -17,8 +17,25 @@ Render + MongoDB Atlas).
 
 ---
 
+## Live demo
+
+| | |
+|---|---|
+| **App (Vercel)** | [real-time-pdms-client.vercel.app](https://real-time-pdms-client.vercel.app) |
+| **API (Render)** | [real-time-pdms.onrender.com](https://real-time-pdms.onrender.com) |
+
+Both run on free tiers. Render's free instance spins down after inactivity,
+so the **first** request after a while can take 30–60 seconds to wake it up
+— `GET /health` on the API exists specifically for this, to warm the server
+before a live demo. The client's login screen ships with a visible
+seeded-credentials panel (`VITE_SHOW_DEMO_LOGINS`), so no account setup is
+needed to try any of the three roles.
+
+---
+
 ## Table of contents
 
+- [Live demo](#live-demo)
 - [Course & team](#course--team)
 - [Key features](#key-features)
 - [Tech stack](#tech-stack)
@@ -267,6 +284,9 @@ still bound by the same approval checks.
 
 ## Getting started
 
+To run your own local copy — for the hosted version, see
+[Live demo](#live-demo) above.
+
 ### Prerequisites
 
 - Node.js ≥ 20
@@ -363,6 +383,8 @@ Run from the repository root unless noted otherwise.
 ---
 
 ## Deployment
+
+Live at [real-time-pdms-client.vercel.app](https://real-time-pdms-client.vercel.app) (client) and [real-time-pdms.onrender.com](https://real-time-pdms.onrender.com) (API) — see [Live demo](#live-demo) above.
 
 - **Client → Vercel.** Root directory `client`, build command
   `npm run build`, output directory `dist`. `client/vercel.json` adds the
