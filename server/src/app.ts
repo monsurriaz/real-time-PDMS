@@ -1,6 +1,7 @@
 import cookieParser from 'cookie-parser'
 import cors from 'cors'
 import express, { type Express } from 'express'
+import helmet from 'helmet'
 import mongoose from 'mongoose'
 import { env } from './lib/env'
 import { attachActor } from './middleware/auth'
@@ -26,6 +27,23 @@ import './models'
 
 export const createApp = (): Express => {
   const app = express()
+
+  /**
+   * M10: Render (and any host worth deploying to) terminates TLS at a
+   * reverse proxy in front of this process, so `req.ip` is the proxy's
+   * address unless Express is told to trust its `X-Forwarded-*` headers.
+   * `authRateLimiter`/`publicTrackingRateLimiter` key on `req.ip` — without
+   * this, every request looks like it came from the same address and one
+   * abusive caller's lockout becomes everyone's. `1` trusts exactly one hop,
+   * matching Render's single edge proxy.
+   */
+  app.set('trust proxy', 1)
+
+  /**
+   * Basic security headers (CSP off — this API serves JSON, not HTML, and a
+   * default CSP is written for pages with scripts/styles to restrict).
+   */
+  app.use(helmet({ contentSecurityPolicy: false }))
 
   app.use(
     cors({

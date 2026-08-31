@@ -17,6 +17,7 @@ import { ParcelModel } from '../models/Parcel'
 import { UserModel } from '../models/User'
 import { requireAuth } from '../middleware/auth'
 import { HttpError } from '../middleware/httpError'
+import { publicTrackingRateLimiter } from '../middleware/rateLimit'
 import { evaluateOfferExpiry } from '../services/lifecycle'
 import { outstandingChallenge } from '../services/pod'
 
@@ -81,7 +82,7 @@ interface DeliveryDoc {
  * collide since one is `/by-id/<id>` and the other `/<id>` — Express
  * matches on path shape, not registration order, when the shapes differ.
  */
-trackingRouter.get('/by-id/:trackingId', async (req, res, next) => {
+trackingRouter.get('/by-id/:trackingId', publicTrackingRateLimiter, async (req, res, next) => {
   try {
     const trackingIdParam = req.params.trackingId
     if (!trackingIdParam) throw new HttpError(400, 'a tracking ID is required')
