@@ -19,6 +19,7 @@ import { hashPassword, verifyPassword, wasteTimeLikeAVerify } from '../lib/passw
 import { AUTH_COOKIE, cookieOptions, signToken } from '../lib/token'
 import { requireAuth, requireRole, suspended } from '../middleware/auth'
 import { conflict, HttpError, unauthorized } from '../middleware/httpError'
+import { authRateLimiter } from '../middleware/rateLimit'
 
 export const authRouter = Router()
 
@@ -66,7 +67,7 @@ const toSavedAddress = (a: UserDoc['savedAddresses'][number]): SavedAddress => (
  * downgraded — see auth.test.ts for the assertion that a payload naming the
  * admin role never reaches this handler with a matched shape.
  */
-authRouter.post('/register', async (req, res, next) => {
+authRouter.post('/register', authRateLimiter, async (req, res, next) => {
   try {
     const input = registerInputSchema.parse(req.body)
 
@@ -117,7 +118,7 @@ authRouter.post('/register', async (req, res, next) => {
   }
 })
 
-authRouter.post('/login', async (req, res, next) => {
+authRouter.post('/login', authRateLimiter, async (req, res, next) => {
   try {
     const input = loginInputSchema.parse(req.body)
 
