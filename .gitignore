@@ -52,3 +52,10 @@ Thumbs.db
 # ---- deploy tooling ----
 .vercel
 .render
+
+# ---- internal build/process docs, not part of the public repo ----
+# Already present in older commits' history — that's fine, left as-is.
+# From here on, these just stay local and out of new commits.
+/CLAUDE.md
+/DEFERRED.md
+/docs/
