@@ -29,27 +29,45 @@ export const verifyToken = (token: string): JwtClaims | null => {
 }
 
 /**
- * httpOnly so client JS cannot read it (section 2), sameSite lax so the
- * cookie survives normal top-level navigation while still blocking
- * cross-site POSTs. Secure follows COOKIE_SECURE — false on localhost,
- * true once deployed behind HTTPS.
+ * httpOnly so client JS cannot read it (section 2). secure/sameSite/
+ * partitioned all key off the SAME flag (COOKIE_SECURE) rather than being
+ * independently toggleable, so they can never drift into a combination a
+ * browser would reject or silently drop:
+ *
+ * - Locally, client and server are both localhost: `lax` + no `secure`
+ *   works, and `secure` would break over plain http.
+ * - Deployed, client (Vercel) and server (Render) are different hosts, so
+ *   the cookie is genuinely cross-site. That requires `sameSite: 'none'`,
+ *   which browsers refuse to honour without `secure: true` alongside it —
+ *   never one without the other.
+ *
+ * `sameSite: 'none'` is necessary but not sufficient, though: it says the
+ * cookie MAY be sent cross-site, but says nothing about whether the
+ * browser treats third-party cookies as allowed AT ALL. Chrome's Incognito
+ * windows block third-party cookies by default regardless of SameSite, and
+ * Safari's ITP blocks every third-party cookie unconditionally — SameSite
+ * has no bearing on either. `partitioned: true` (CHIPS — Cookies Having
+ * Independent Partitioned State) is the actual fix for that: a cookie
+ * scoped to the (Vercel origin, Render origin) pair specifically, which is
+ * exempt from both of those blocks because it structurally cannot be used
+ * for cross-site tracking. Supported by Chrome and Safari 18.4+; on an
+ * older browser without CHIPS support the attribute is simply ignored, no
+ * worse off than before. Only ever set alongside `secure`/`sameSite:
+ * 'none'`, never on its own — a Partitioned cookie without Secure is
+ * meaningless and some browsers reject it outright.
  */
 export const cookieOptions = (): {
   httpOnly: true
   secure: boolean
   sameSite: 'lax' | 'none'
+  partitioned: boolean
   path: string
   maxAge: number
 } => ({
   httpOnly: true,
   secure: env.COOKIE_SECURE,
-  /**
-   * Deployed, client and server sit on different hosts (Vercel and Render),
-   * so the cookie must be sameSite=none to travel at all — and that requires
-   * Secure. Locally both are localhost, where lax works and Secure would
-   * break over plain http.
-   */
   sameSite: env.COOKIE_SECURE ? 'none' : 'lax',
+  partitioned: env.COOKIE_SECURE,
   path: '/',
   maxAge: 7 * 24 * 60 * 60 * 1000,
 })
