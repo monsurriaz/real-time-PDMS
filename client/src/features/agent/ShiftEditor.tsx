@@ -228,12 +228,24 @@ export const ShiftEditor = ({ onLocationSaved }: { onLocationSaved?: () => void 
 
         <Button
           type="button"
-          variant="ink"
+          variant="primary"
           size="lg"
           className="w-full mb-3"
           disabled={geoBusy}
           onClick={useMyLocation}
         >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="3" />
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+          </svg>
           {geoBusy ? 'Getting your location…' : 'Use my current location'}
         </Button>
 
@@ -243,19 +255,30 @@ export const ShiftEditor = ({ onLocationSaved }: { onLocationSaved?: () => void 
           </p>
         ) : null}
 
+        {/* GPS is the one-tap path above; everything below is the fallback. */}
+        <div className="flex items-center gap-10px my-4">
+          <hr className="flex-1 border-t border-border" />
+          <Eyebrow>or set manually</Eyebrow>
+          <hr className="flex-1 border-t border-border" />
+        </div>
+
         <form onSubmit={submitLocation} noValidate>
-          <div className="flex gap-2 mb-3">
+          <div
+            className="flex gap-3px p-3px bg-surface-sunk rounded-pill mb-3"
+            role="radiogroup"
+            aria-label="How to set your location"
+          >
             {(['address', 'zone'] as const).map((m) => (
               <button
                 key={m}
                 type="button"
+                role="radio"
+                aria-checked={mode === m}
                 onClick={() => setMode(m)}
                 className={[
                   // 48px floor, same as every other control a rider taps.
-                  'text-small font-medium px-4 min-h-12 rounded-pill border',
-                  mode === m
-                    ? 'bg-ink text-white border-transparent'
-                    : 'bg-surface text-ink-2 border-border-strong hover:bg-surface-sunk',
+                  'flex-1 text-small font-semibold min-h-12 rounded-pill transition-colors duration-100',
+                  mode === m ? 'bg-surface text-ink' : 'text-muted',
                 ].join(' ')}
               >
                 {m === 'address' ? 'Type an address' : 'Pick a zone'}
