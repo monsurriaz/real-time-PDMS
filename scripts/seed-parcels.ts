@@ -321,14 +321,15 @@ export const seedParcels = async (): Promise<void> => {
       /**
        * Section 5: Delivered requires proof of delivery already on the
        * record. Seeding a Delivered parcel without it would create demo data
-       * the app's own rules forbid. Signature rather than photo, so no fake
-       * Cloudinary URL is invented.
+       * the app's own rules forbid. OTP rather than photo, so no fake
+       * Cloudinary URL is invented — was signature for the same reason until
+       * that method was removed post-M10.
        */
       ...(isDelivered
         ? {
             proofOfDelivery: {
-              method: 'signature' as const,
-              receivedBy: to.contactName,
+              method: 'otp' as const,
+              otpVerifiedAt: at('Delivered') ?? new Date(),
               capturedAt: at('Delivered') ?? new Date(),
             },
           }

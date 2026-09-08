@@ -18,7 +18,7 @@ const STEPS = [
   {
     n: '03',
     title: 'Watch it move',
-    body: "The rider's position streams to your map every few seconds. Proof of delivery — photo, code, or signature — is recorded the moment it's handed over.",
+    body: "The rider's position streams to your map every few seconds. Proof of delivery — a photo or a code — is recorded the moment it's handed over.",
   },
 ] as const
 

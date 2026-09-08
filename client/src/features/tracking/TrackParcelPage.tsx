@@ -100,7 +100,6 @@ const DeliveryCode = ({ code, expiresAt }: { code: string; expiresAt: string }) 
 const PROOF_LABEL: Record<string, string> = {
   photo: 'Photo taken at the door',
   otp: 'A server-issued code, verified against the recipient',
-  signature: 'Signed for',
 }
 
 const ProofPanel = ({ proof }: { proof: ProofOfDelivery }) => (

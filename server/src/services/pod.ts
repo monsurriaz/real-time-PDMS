@@ -18,7 +18,7 @@ import { DeliveryModel, type PodOtp } from '../models/Delivery'
 import { HttpError } from '../middleware/httpError'
 
 /**
- * Proof of delivery capture: photo, code, or signature.
+ * Proof of delivery capture: photo or code.
  *
  * What this file does NOT do is decide whether a delivery may become
  * Delivered. Section 5 puts that precondition on the transition, advanceStatus
@@ -209,19 +209,13 @@ export const recordProof = async (args: {
       capturedAt,
       ...(input.receivedBy?.trim() ? { receivedBy: input.receivedBy.trim() } : {}),
     }
-  } else if (input.method === 'otp') {
+  } else {
     const otpVerifiedAt = await verifyOtp(delivery._id, input.code)
     proof = {
       method: 'otp',
       otpVerifiedAt,
       capturedAt,
       ...(input.receivedBy?.trim() ? { receivedBy: input.receivedBy.trim() } : {}),
-    }
-  } else {
-    proof = {
-      method: 'signature',
-      receivedBy: input.receivedBy.trim(),
-      capturedAt,
     }
   }
 

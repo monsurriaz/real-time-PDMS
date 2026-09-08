@@ -129,9 +129,9 @@ export const DeliveryActions = ({ d }: { d: DeliveryListItem }) => {
             {advance.isPending ? 'Saving…' : (ADVANCE_LABEL[nextStep] ?? nextStep)}
           </Button>
           {needsProof ? (
-            // All three proof methods are live, so the line names all three.
+            // Both proof methods are live, so the line names both.
             <p className="text-tiny text-muted text-center mt-11px">
-              Needs a photo, code, or signature first
+              Needs a photo or code first
             </p>
           ) : null}
         </>

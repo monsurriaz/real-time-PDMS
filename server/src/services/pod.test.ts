@@ -28,10 +28,6 @@ describe('proof of delivery records', () => {
       proofOfDeliverySchema.safeParse({ method: 'otp', capturedAt }).success,
       false,
     )
-    assert.equal(
-      proofOfDeliverySchema.safeParse({ method: 'signature', capturedAt }).success,
-      false,
-    )
   })
 
   it('accepts each method with its own evidence', () => {
@@ -50,12 +46,18 @@ describe('proof of delivery records', () => {
         capturedAt,
       }).success,
     )
-    assert.ok(
+  })
+
+  it('no longer accepts signature — removed post-M10', () => {
+    // A typed name with nothing behind it isn't evidence of anything, unlike
+    // a photo or a server-verified code. Only photo and OTP remain.
+    assert.equal(
       proofOfDeliverySchema.safeParse({
         method: 'signature',
         receivedBy: 'Nusrat Jahan',
-        capturedAt,
+        capturedAt: new Date(),
       }).success,
+      false,
     )
   })
 
@@ -112,11 +114,10 @@ describe('what the rider may submit', () => {
     assert.equal(recordPodInputSchema.safeParse({ receivedBy: 'Someone' }).success, false)
   })
 
-  it('still accepts the signature capture M3 shipped', () => {
-    const parsed = recordPodInputSchema.parse({
-      method: 'signature',
-      receivedBy: 'Rakib Hasan',
-    })
-    assert.equal(parsed.method, 'signature')
+  it('no longer has a signature arm — removed post-M10', () => {
+    assert.equal(
+      recordPodInputSchema.safeParse({ method: 'signature', receivedBy: 'Rakib Hasan' }).success,
+      false,
+    )
   })
 })
