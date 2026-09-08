@@ -32,7 +32,6 @@ const STATUSES = ['Delivered', 'Cancelled', 'Failed'] as const satisfies readonl
 const POD_LABEL: Record<string, string> = {
   photo: 'Photo',
   otp: 'Code',
-  signature: 'Signature',
 }
 
 const PER_PAGE = 15

@@ -102,16 +102,13 @@ export const BentoGrid = () => (
           </CellIcon>
           <h3 className="text-lg font-semibold tracking-[-0.025em] mb-6px">Proof at the door</h3>
           <p className="text-body text-muted leading-relaxed">
-            A photo, a one-time code, or a signature — recorded against the
-            delivery, not taken on trust.
+            A photo or a one-time code — recorded against the delivery, not
+            taken on trust.
           </p>
           <div className="flex gap-7px mt-auto pt-18px flex-wrap">
             <Badge status="Delivered" />
             <span className="text-meta font-medium bg-surface-sunk text-muted rounded-pill px-11px py-1">
               OTP
-            </span>
-            <span className="text-meta font-medium bg-surface-sunk text-muted rounded-pill px-11px py-1">
-              Signature
             </span>
           </div>
         </div>

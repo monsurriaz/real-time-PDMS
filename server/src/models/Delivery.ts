@@ -53,10 +53,11 @@ const proofOfDelivery = new Schema(
     photoUrl: { type: String, required: false },
     otpVerifiedAt: { type: Date, required: false },
     /**
-     * Not required since M5: it IS the evidence for a signature, but for photo
-     * and OTP proof the evidence is the photo or the verified code, and forcing
-     * a name there would record an unverified claim as part of the proof.
-     * Which field each method needs is enforced by the shared Zod schema.
+     * Optional metadata alongside the real evidence (the photo or the
+     * verified code) — never evidence on its own. A third method, signature,
+     * used this field AS the evidence; removed post-M10 since a typed name
+     * with nothing behind it isn't proof of anything. Which field each
+     * remaining method needs is enforced by the shared Zod schema.
      */
     receivedBy: { type: String, required: false, trim: true },
     capturedAt: { type: Date, required: true },

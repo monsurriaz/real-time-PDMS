@@ -67,7 +67,7 @@ export const deliveryEventSchema = z.object({
 })
 export type DeliveryEvent = z.infer<typeof deliveryEventSchema>
 
-export const podMethodSchema = z.enum(['photo', 'otp', 'signature'])
+export const podMethodSchema = z.enum(['photo', 'otp'])
 export type PodMethod = z.infer<typeof podMethodSchema>
 
 /**
@@ -75,11 +75,16 @@ export type PodMethod = z.infer<typeof podMethodSchema>
  * already be on the record, so advanceStatus() reads it rather than
  * accepting it alongside the transition.
  *
- * Three live methods since M5, and each one carries its own evidence — which
- * is why the per-method refinement below exists rather than a shape where
- * every field is optional and any combination validates. A record claiming
- * `method: 'photo'` with no photoUrl would satisfy the Delivered precondition
- * while proving nothing.
+ * Two live methods, and each one carries its own evidence — which is why the
+ * per-method refinement below exists rather than a shape where every field is
+ * optional and any combination validates. A record claiming `method: 'photo'`
+ * with no photoUrl would satisfy the Delivered precondition while proving
+ * nothing.
+ *
+ * A third method, signature, existed from M3 through M10: a typed name with
+ * nothing behind it. Removed post-M10 — a rider could type any name and
+ * submit it as delivered, which is not evidence of anything, unlike a photo
+ * or a server-verified code. Photo and OTP remain.
  */
 export const proofOfDeliverySchema = z
   .object({
@@ -93,20 +98,17 @@ export const proofOfDeliverySchema = z
      */
     otpVerifiedAt: z.coerce.date().optional(),
     /**
-     * Who took it. Required for a signature — that IS the signature — and
-     * optional for photo and OTP, where the evidence is the photo or the code
-     * and a typed name would be an unverified extra claim.
+     * Who took it — optional metadata alongside the real evidence (the photo
+     * or the verified code), never evidence on its own. A typed name here is
+     * an unverified extra claim, which is exactly why it can't be the whole
+     * proof (see this schema's own note on why signature was removed).
      */
     receivedBy: z.string().min(2).max(80).optional(),
     capturedAt: z.coerce.date(),
   })
   .superRefine((pod, ctx) => {
     const missing =
-      pod.method === 'photo'
-        ? !pod.photoUrl && 'photoUrl'
-        : pod.method === 'otp'
-          ? !pod.otpVerifiedAt && 'otpVerifiedAt'
-          : !pod.receivedBy && 'receivedBy'
+      pod.method === 'photo' ? !pod.photoUrl && 'photoUrl' : !pod.otpVerifiedAt && 'otpVerifiedAt'
     if (missing) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -215,11 +217,6 @@ export type DeclineOfferInput = z.infer<typeof declineOfferInputSchema>
  * decides, because a client that could validate the code could also skip it.
  */
 export const recordPodInputSchema = z.discriminatedUnion('method', [
-  z.object({
-    method: z.literal('signature'),
-    receivedBy: z.string().min(2).max(80),
-    note: z.string().max(300).optional(),
-  }),
   z.object({
     method: z.literal('photo'),
     photoUrl: cloudinaryUrl,

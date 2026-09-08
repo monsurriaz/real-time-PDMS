@@ -16,12 +16,16 @@ import {
 import { useIssueOtp, useRecordPod } from '../deliveries/useDeliveries'
 
 /**
- * The proof-of-delivery block on the rider's card: the three dashed `.pod`
- * tiles from docs/design-system.html, all three live since M5.
+ * The proof-of-delivery block on the rider's card: the dashed `.pod` tiles
+ * from docs/design-system.html. A third tile, signature, existed from M3
+ * through M10 and was removed — a typed name with nothing behind it isn't
+ * evidence, unlike a photo or a server-verified code. The frozen reference
+ * (docs/design-system-v3-meridian.html and friends) still shows three; this
+ * is a deliberate, explicitly-requested divergence from it, not a drift.
  *
- * The tiles are a radio group, not three buttons that each do something: only
- * one proof is recorded, so choosing a method reveals that method's controls
- * underneath rather than opening a third thing next to two others. That keeps
+ * The tiles are a radio group, not buttons that each do something: only one
+ * proof is recorded, so choosing a method reveals that method's controls
+ * underneath rather than opening a third thing next to another. That keeps
  * the "ONE enormous button" rule intact — the primary action below stays the
  * transition, and nothing here competes with it.
  */
@@ -49,17 +53,11 @@ const ICON = {
       <path d="M8 10V7a4 4 0 0 1 8 0v3" />
     </svg>
   ),
-  signature: (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M3 17c3-1 4-8 7-8s2 6 5 6 3-3 6-3" />
-    </svg>
-  ),
 } as const satisfies Record<PodMethod, React.ReactNode>
 
 const LABEL: Record<PodMethod, string> = {
   photo: 'Photo',
   otp: 'OTP',
-  signature: 'Signature',
 }
 
 /** The `.pod` tile: dashed border, 20px icon above a 12.5px label. */
@@ -109,7 +107,6 @@ export const PodCapture = ({ d }: Props) => {
   const fileInput = useRef<HTMLInputElement>(null)
 
   const [method, setMethod] = useState<PodMethod | null>(null)
-  const [receivedBy, setReceivedBy] = useState('')
   const [code, setCode] = useState('')
   const [photo, setPhoto] = useState<{ url: string; bytes: number; from: number } | null>(null)
   const [progress, setProgress] = useState<number | null>(null)
@@ -193,19 +190,6 @@ export const PodCapture = ({ d }: Props) => {
     pod.mutate({ deliveryId: d._id, ...parsed.data })
   }
 
-  const submitSignature = (): void => {
-    setLocalError(null)
-    const parsed = recordPodInputSchema.safeParse({
-      method: 'signature',
-      receivedBy: receivedBy.trim(),
-    })
-    if (!parsed.success) {
-      setLocalError('a name needs at least two characters')
-      return
-    }
-    pod.mutate({ deliveryId: d._id, ...parsed.data })
-  }
-
   const photoBlocked = !photoUploadConfigured()
 
   return (
@@ -225,12 +209,6 @@ export const PodCapture = ({ d }: Props) => {
           selected={method === 'otp'}
           disabled={busy}
           onSelect={() => choose('otp')}
-        />
-        <PodTile
-          method="signature"
-          selected={method === 'signature'}
-          disabled={busy}
-          onSelect={() => choose('signature')}
         />
       </div>
 
@@ -347,34 +325,6 @@ export const PodCapture = ({ d }: Props) => {
               </p>
             </>
           )}
-        </div>
-      ) : null}
-
-      {/* ---- signature ---- */}
-      {method === 'signature' ? (
-        <div className="mt-14px">
-          <label
-            htmlFor={`rb-${d._id}`}
-            className="block text-small font-medium text-ink-2 mb-1.5"
-          >
-            Received by
-          </label>
-          <div className="flex gap-2">
-            <input
-              id={`rb-${d._id}`}
-              value={receivedBy}
-              placeholder={d.recipientName}
-              onChange={(e) => setReceivedBy(e.target.value)}
-              className={`${FIELD} flex-1 min-w-0`}
-            />
-            <Button
-              className="min-h-12"
-              disabled={receivedBy.trim().length < 2 || busy}
-              onClick={submitSignature}
-            >
-              {pod.isPending ? 'Saving…' : 'Save'}
-            </Button>
-          </div>
         </div>
       ) : null}
 

@@ -11,9 +11,9 @@ import { usePublicPricingSummary } from '../usePublicStats'
  * (TanStack Query dedupes the two calls into one request). The other three
  * are structural facts about this build, not admin-editable config: the
  * lifecycle ramp is five states and frozen there (CLAUDE.md section 4), proof
- * of delivery has exactly three methods (PodCapture: photo, OTP, signature),
- * and booking/tracking have no operating hours because nothing about them
- * depends on a person being on shift.
+ * of delivery has exactly two methods (PodCapture: photo, OTP — a third,
+ * signature, was removed post-M10), and booking/tracking have no operating
+ * hours because nothing about them depends on a person being on shift.
  */
 const CELLS = (zoneCount: number | undefined) => [
   { v: zoneCount ?? '—', k: 'Dhaka zones covered' },
