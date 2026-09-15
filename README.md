@@ -63,7 +63,7 @@ under **Faculty: [Momtazul Arefin Labib](https://www.linkedin.com/in/arefin-labi
 |---|---|---|
 | [Md. Monsur Rahman (Riaz)](https://www.linkedin.com/in/monsurriaz/) | Project Lead | 23103157 |
 | Sadi Md. Imtiaj | Member | 23103155 |
-| Md. Fardin | Member | 23103120 |
+| Md. Fardin | Member | 23103144 |
 
 ---
 
