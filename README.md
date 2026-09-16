@@ -95,7 +95,7 @@ under **Faculty: [Momtazul Arefin Labib](https://www.linkedin.com/in/arefin-labi
 - **Payments** — Stripe test-mode checkout behind a provider interface, or
   cash-on-delivery with a per-agent reconciliation table for admins.
 - **In-app messaging** — a customer and their currently-assigned rider can
-  message each other from pickup through delivery, over the same
+  message each other from pickup through delivery and over the same
   authenticated socket room tracking already uses.
 - **Admin analytics** — stat cards, a zone-performance chart, delayed-
   delivery alerts, revenue, all computed under the same role-scoping rules
